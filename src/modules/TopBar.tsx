@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePixelStore } from './store'
 import { createPortal } from 'react-dom'
 import { FaEraser } from 'react-icons/fa'
-import { LuDownload, LuPaintbrush, LuPaintBucket, LuChevronRight, LuCheck } from 'react-icons/lu'
+import { LuDownload, LuPaintbrush, LuPaintBucket, LuChevronRight, LuCheck, LuSquare, LuSlash } from 'react-icons/lu'
 import { FaEllipsisV } from 'react-icons/fa'
 
 export function TopBar() {
@@ -96,6 +96,24 @@ export function TopBar() {
           >
             <LuPaintBucket aria-hidden />
             <span className="hidden sm:inline">Bucket</span>
+          </button>
+          <button
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-gray-300 ${tool === 'line' ? 'bg-gray-200' : 'bg-white'} hover:bg-gray-100`}
+            onClick={() => setTool('line')}
+            aria-pressed={tool === 'line'}
+            title="Line"
+          >
+            <LuSlash aria-hidden />
+            <span className="hidden sm:inline">Line</span>
+          </button>
+          <button
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-gray-300 ${tool === 'rect' ? 'bg-gray-200' : 'bg-white'} hover:bg-gray-100`}
+            onClick={() => setTool('rect')}
+            aria-pressed={tool === 'rect'}
+            title="Rect"
+          >
+            <LuSquare aria-hidden />
+            <span className="hidden sm:inline">Rect</span>
           </button>
         </div>
       </div>

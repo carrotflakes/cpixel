@@ -36,6 +36,13 @@ export function PixelCanvas() {
   const checkerTileRef = useRef<HTMLCanvasElement | null>(null)
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const panModRef = useRef(false) // Space key held
+  const dragShape = useRef<{
+    kind: 'line' | 'rect' | null
+    startX: number
+    startY: number
+    curX: number
+    curY: number
+  }>({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
 
   // view clamping now imported from utils
 
@@ -218,6 +225,30 @@ export function PixelCanvas() {
       ctx.strokeRect(hoverCell.x * size + 0.5, hoverCell.y * size + 0.5, size - 1, size - 1)
       ctx.restore()
     }
+    // shape preview overlay
+    if (dragShape.current.kind) {
+      ctx.save()
+      ctx.strokeStyle = 'rgba(0,0,0,0.8)'
+      ctx.setLineDash([4, 3])
+      const s = size
+      const x0 = dragShape.current.startX * s + 0.5
+      const y0 = dragShape.current.startY * s + 0.5
+      const x1 = dragShape.current.curX * s + 0.5
+      const y1 = dragShape.current.curY * s + 0.5
+      if (dragShape.current.kind === 'rect') {
+        const left = Math.min(x0, x1)
+        const top = Math.min(y0, y1)
+        const w = Math.abs(x1 - x0) + (s - 1)
+        const h = Math.abs(y1 - y0) + (s - 1)
+        ctx.strokeRect(left, top, w, h)
+      } else if (dragShape.current.kind === 'line') {
+        ctx.beginPath()
+        ctx.moveTo(x0, y0)
+        ctx.lineTo(x1, y1)
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
   }, [data, indices, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y])
 
   const pickPoint = (clientX: number, clientY: number) => {
@@ -252,7 +283,7 @@ export function PixelCanvas() {
 
   const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const wantPan = e.button === 1 || (e.button === 0 && (panModRef.current || e.ctrlKey))
+  const wantPan = e.button === 1 || (e.button === 0 && (panModRef.current || e.ctrlKey))
   if (wantPan) {
       dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -264,13 +295,18 @@ export function PixelCanvas() {
     // begin drawing stroke for history if starting to draw/erase
     const { x, y } = pickPoint(e.clientX, e.clientY)
     if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
-      if (e.button === 0 || e.button === 2) beginStroke()
-      // For bucket, apply immediately on mouse down so it fills once per click
-      const contiguous = !e.shiftKey
-      if (e.button === 0) {
-        if (tool === 'bucket') { fillBucket(x, y, parseCSSColor(color), contiguous) }
-      } else if (e.button === 2) {
-        if (tool === 'bucket') { fillBucket(x, y, 0x00000000, contiguous) }
+      if (tool === 'line' || tool === 'rect') {
+        // start shape drag; defer commit until mouse up
+        dragShape.current = { kind: tool, startX: x, startY: y, curX: x, curY: y }
+        beginStroke()
+      } else {
+        if (e.button === 0 || e.button === 2) beginStroke()
+        const contiguous = !e.shiftKey
+        if (e.button === 0) {
+          if (tool === 'bucket') { fillBucket(x, y, parseCSSColor(color), contiguous) }
+        } else if (e.button === 2) {
+          if (tool === 'bucket') { fillBucket(x, y, 0x00000000, contiguous) }
+        }
       }
     }
     onPointer(e)
@@ -294,12 +330,32 @@ export function PixelCanvas() {
       e.preventDefault()
       return
     }
+    if (dragShape.current.kind) {
+      const { x, y } = pickPoint(e.clientX, e.clientY)
+      dragShape.current.curX = clamp(x, 0, WIDTH - 1)
+      dragShape.current.curY = clamp(y, 0, HEIGHT - 1)
+      // trigger re-render via hover change
+      setHoverCell((h) => h ? { ...h } : { x: -1, y: -1 })
+      return
+    }
     onPointer(e)
   }
   const onPointerUp = () => {
-  dragState.current.panning = false
+    dragState.current.panning = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
-  endStroke()
+    if (dragShape.current.kind) {
+      const s = dragShape.current
+      const rgba = parseCSSColor(color)
+      if (s.kind === 'line') {
+        usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
+      } else if (s.kind === 'rect') {
+        usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
+      }
+      dragShape.current.kind = null
+      endStroke()
+      return
+    }
+    endStroke()
   }
   const onPointerLeave = () => { setHoverCell(null); clearHoverInfo() }
 

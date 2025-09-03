@@ -32,18 +32,20 @@ export type PixelState = {
   mode: 'truecolor' | 'indexed'
   palette: Uint32Array
   transparentIndex: number
-  tool?: 'brush' | 'bucket'
+  tool?: 'brush' | 'bucket' | 'line' | 'rect'
   setColor: (c: string) => void
   addPaletteColor: (rgba: number) => number
   setTransparentIndex: (idx: number) => void
   removePaletteIndex: (idx: number) => void
   movePaletteIndex: (from: number, to: number) => void
-  setTool: (t: 'brush' | 'bucket') => void
+  setTool: (t: 'brush' | 'bucket' | 'line' | 'rect') => void
   setPixelSize: (n: number) => void
   setPixelSizeRaw: (n: number) => void
   setView: (x: number, y: number) => void
   panBy: (dx: number, dy: number) => void
   setAt: (x: number, y: number, rgba: number) => void
+  drawLine: (x0: number, y0: number, x1: number, y1: number, rgba: number) => void
+  drawRect: (x0: number, y0: number, x1: number, y1: number, rgba: number) => void
   fillBucket: (x: number, y: number, rgba: number, contiguous: boolean) => void
   setMode: (m: 'truecolor' | 'indexed') => void
   // history
@@ -196,6 +198,84 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const next = new Uint8Array(idx)
       next[i] = writeIndex & 0xff
       return { indices: next }
+    }
+  }),
+  drawLine: (x0, y0, x1, y1, rgba) => set((s) => {
+    // Clamp endpoints
+    x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
+    const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT
+    if (!inBounds(x0, y0) && !inBounds(x1, y1)) return {}
+    if (s.mode === 'truecolor') {
+      const out = new Uint32Array(s.data)
+      // Bresenham
+      let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1
+      let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1
+      let err = dx + dy
+      let x = x0, y = y0
+      while (true) {
+        if (inBounds(x, y)) out[y * WIDTH + x] = rgba >>> 0
+        if (x === x1 && y === y1) break
+        const e2 = 2 * err
+        if (e2 >= dy) { err += dy; x += sx }
+        if (e2 <= dx) { err += dx; y += sy }
+      }
+      if (equalU32(out, s.data)) return {}
+      return { data: out }
+    } else {
+      const idxArr = s.indices ?? new Uint8Array(WIDTH * HEIGHT)
+      const writeIndex = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      const out = new Uint8Array(idxArr)
+      let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1
+      let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1
+      let err = dx + dy
+      let x = x0, y = y0
+      while (true) {
+        if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) out[y * WIDTH + x] = writeIndex & 0xff
+        if (x === x1 && y === y1) break
+        const e2 = 2 * err
+        if (e2 >= dy) { err += dy; x += sx }
+        if (e2 <= dx) { err += dx; y += sy }
+      }
+      if (equalU8(out, idxArr)) return {}
+      return { indices: out }
+    }
+  }),
+  drawRect: (x0, y0, x1, y1, rgba) => set((s) => {
+    x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
+    let left = Math.max(0, Math.min(x0, x1))
+    let right = Math.min(WIDTH - 1, Math.max(x0, x1))
+    let top = Math.max(0, Math.min(y0, y1))
+    let bottom = Math.min(HEIGHT - 1, Math.max(y0, y1))
+    if (left > right || top > bottom) return {}
+    if (s.mode === 'truecolor') {
+      const out = new Uint32Array(s.data)
+      const pix = rgba >>> 0
+      // top/bottom
+      for (let x = left; x <= right; x++) {
+        out[top * WIDTH + x] = pix
+        out[bottom * WIDTH + x] = pix
+      }
+      // sides
+      for (let y = top; y <= bottom; y++) {
+        out[y * WIDTH + left] = pix
+        out[y * WIDTH + right] = pix
+      }
+      if (equalU32(out, s.data)) return {}
+      return { data: out }
+    } else {
+      const idxArr = s.indices ?? new Uint8Array(WIDTH * HEIGHT)
+      const writeIndex = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      const out = new Uint8Array(idxArr)
+      for (let x = left; x <= right; x++) {
+        out[top * WIDTH + x] = writeIndex & 0xff
+        out[bottom * WIDTH + x] = writeIndex & 0xff
+      }
+      for (let y = top; y <= bottom; y++) {
+        out[y * WIDTH + left] = writeIndex & 0xff
+        out[y * WIDTH + right] = writeIndex & 0xff
+      }
+      if (equalU8(out, idxArr)) return {}
+      return { indices: out }
     }
   }),
   fillBucket: (x, y, rgba, contiguous) => set((s) => {
