@@ -21,6 +21,8 @@ export type PixelState = {
   setColor: (c: string) => void
   addPaletteColor: (rgba: number) => number
   setTransparentIndex: (idx: number) => void
+  removePaletteIndex: (idx: number) => void
+  movePaletteIndex: (from: number, to: number) => void
   setPixelSize: (n: number) => void
   setPixelSizeRaw: (n: number) => void
   setView: (x: number, y: number) => void
@@ -77,6 +79,65 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const norm = (x: string) => x.toLowerCase()
     const next = [c, ...existing.filter(v => norm(v) !== norm(c))].slice(0, 10)
     return { color: c, recentColors: next }
+  }),
+  removePaletteIndex: (idx) => set((s) => {
+    const n = s.palette.length
+    if (idx < 0 || idx >= n || n <= 1) return {}
+    // build new palette without idx
+    const pal = new Uint32Array(n - 1)
+    for (let i = 0, j = 0; i < n; i++) if (i !== idx) pal[j++] = s.palette[i]
+    // compute new transparent index
+    let ti = s.transparentIndex
+    if (ti === idx) ti = 0
+    else if (ti > idx) ti = ti - 1
+    // remap indices if present
+    let newIdxArr: Uint8Array | null = null
+    if (s.indices) {
+      const src = s.indices
+      const dst = new Uint8Array(src.length)
+      for (let k = 0; k < src.length; k++) {
+        const v = src[k]
+        if (v === idx) dst[k] = ti
+        else if (v > idx) dst[k] = (v - 1) & 0xff
+        else dst[k] = v
+      }
+      newIdxArr = dst
+    }
+    return { palette: pal, transparentIndex: ti, indices: newIdxArr ?? s.indices }
+  }),
+  movePaletteIndex: (from, to) => set((s) => {
+    const n = s.palette.length
+    if (from === to || from < 0 || to < 0 || from >= n || to >= n) return {}
+    // move in palette
+    const pal = new Uint32Array(n)
+    pal.set(s.palette)
+    const val = pal[from]
+    if (from < to) {
+      for (let i = from; i < to; i++) pal[i] = pal[i + 1]
+      pal[to] = val
+    } else {
+      for (let i = from; i > to; i--) pal[i] = pal[i - 1]
+      pal[to] = val
+    }
+    // build mapping old->new
+    const map = new Uint8Array(n)
+    for (let i = 0; i < n; i++) {
+      if (i === from) map[i] = to
+      else if (from < to && i > from && i <= to) map[i] = i - 1
+      else if (to < from && i >= to && i < from) map[i] = i + 1
+      else map[i] = i
+    }
+    // remap indices
+    let newIdxArr: Uint8Array | null = null
+    if (s.indices) {
+      const src = s.indices
+      const dst = new Uint8Array(src.length)
+      for (let k = 0; k < src.length; k++) dst[k] = map[src[k]]
+      newIdxArr = dst
+    }
+    // remap transparent index
+    const ti = map[s.transparentIndex]
+    return { palette: pal, indices: newIdxArr ?? s.indices, transparentIndex: ti }
   }),
   addPaletteColor: (rgba) => {
     const s = get()

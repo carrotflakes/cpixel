@@ -13,7 +13,8 @@ export function StatusBar() {
 
   return (
     <div className="text-xs flex items-center gap-4 px-3 py-1 border-t border-gray-300 bg-white/60 dark:bg-gray-900/40 backdrop-blur">
-      <span>Zoom: {Math.round(size * 100) / 100}x</span>
+  <span>Zoom: {Math.round(size * 100) / 100}x</span>
+  <span>Mode: {mode}{mode === 'indexed' ? ` (${palette.length})` : ''}</span>
       {hx !== undefined && hy !== undefined ? (
         <span>Pos: ({hx}, {hy})</span>
       ) : (

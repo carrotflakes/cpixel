@@ -1,12 +1,6 @@
 # cpixel
 
-Minimal pixel-art editor scaffold inspired by cpaint.
-
-Features
-- 64x64 pixel canvas
-- Left-drag to draw, right-drag to erase
-- Color picker, pixel size (zoom) slider
-- Clear and Export PNG
+Simple pixel-art editor.
 
 Dev
 - Vite + React + TypeScript + Tailwind CSS
