@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { rgbaToCSSHex, parseCSSColor } from './utils/color'
 import { usePixelStore } from './store'
+import { LuPin, LuArrowUp, LuArrowDown, LuTrash2 } from 'react-icons/lu'
 
 export function PalettePanel() {
   const mode = usePixelStore(s => s.mode)
@@ -18,9 +19,8 @@ export function PalettePanel() {
   const [menu, setMenu] = useState<{ open: boolean; x: number; y: number; index: number } | null>(null)
   const longPressRef = useRef<{ timer?: number; index?: number } | null>({})
   const suppressClickRef = useRef(false)
-  const touchStartPos = useRef<{x: number, y: number} | null>(null)
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null)
 
-  // Global close handler (registered only in indexed mode)
   useEffect(() => {
     if (mode !== 'indexed') return
     const close = (e: MouseEvent | PointerEvent | KeyboardEvent) => {
@@ -28,7 +28,6 @@ export function PalettePanel() {
         if (e.key === 'Escape') setMenu(null)
         return
       }
-      // close if clicking outside the menu/panel
       const target = e.target as Node | null
       if (menuRef.current && target && menuRef.current.contains(target)) return
       setMenu(null)
@@ -42,7 +41,6 @@ export function PalettePanel() {
     }
   }, [mode])
 
-  // When menu opens, clamp its position to the viewport so it's always visible
   useEffect(() => {
     if (!menu?.open) return
     const el = menuRef.current
@@ -54,9 +52,7 @@ export function PalettePanel() {
     const maxY = window.innerHeight - h - margin
     const nextX = Math.max(margin, Math.min(menu.x, maxX))
     const nextY = Math.max(margin, Math.min(menu.y, maxY))
-    if (nextX !== menu.x || nextY !== menu.y) {
-      setMenu(m => (m ? { ...m, x: nextX, y: nextY } : m))
-    }
+    if (nextX !== menu.x || nextY !== menu.y) setMenu(m => (m ? { ...m, x: nextX, y: nextY } : m))
   }, [menu?.open, menu?.x, menu?.y])
 
   if (mode !== 'indexed') return null
@@ -98,8 +94,8 @@ export function PalettePanel() {
             style={{ background: rgbaToCSSHex(rgba) }}
             onClick={(e) => {
               if (suppressClickRef.current) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault()
+                e.stopPropagation()
                 suppressClickRef.current = false
                 return
               }
@@ -120,7 +116,7 @@ export function PalettePanel() {
               if (e.pointerType === 'touch' && touchStartPos.current) {
                 const dx = e.clientX - touchStartPos.current.x
                 const dy = e.clientY - touchStartPos.current.y
-                if (dx*dx + dy*dy > 16) { // >4px movement cancels long press
+                if (dx * dx + dy * dy > 16) {
                   if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
                   touchStartPos.current = null
                 }
@@ -148,28 +144,40 @@ export function PalettePanel() {
         >
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-gray-100"
+            className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center gap-2"
             onClick={() => { setTransparentIndex(menu.index); setMenu(null) }}
             disabled={menu.index === transparentIndex}
-          >Set transparent</button>
+          >
+            <LuPin aria-hidden />
+            <span>Set transparent</span>
+          </button>
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-gray-100 disabled:opacity-50"
+            className="w-full text-left px-3 py-2 hover:bg-gray-100 disabled:opacity-50 inline-flex items-center gap-2"
             onClick={() => { movePaletteIndex(menu.index, Math.max(0, menu.index - 1)); setMenu(null) }}
             disabled={menu.index === 0}
-          >Move up</button>
+          >
+            <LuArrowUp aria-hidden />
+            <span>Move up</span>
+          </button>
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-gray-100 disabled:opacity-50"
+            className="w-full text-left px-3 py-2 hover:bg-gray-100 disabled:opacity-50 inline-flex items-center gap-2"
             onClick={() => { movePaletteIndex(menu.index, Math.min(palette.length - 1, menu.index + 1)); setMenu(null) }}
             disabled={menu.index === palette.length - 1}
-          >Move down</button>
+          >
+            <LuArrowDown aria-hidden />
+            <span>Move down</span>
+          </button>
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700 disabled:opacity-50"
+            className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700 disabled:opacity-50 inline-flex items-center gap-2"
             onClick={() => { removePaletteIndex(menu.index); setMenu(null) }}
             disabled={palette.length <= 1}
-          >Remove</button>
+          >
+            <LuTrash2 aria-hidden />
+            <span>Remove</span>
+          </button>
         </div>,
         document.body
       )}
