@@ -25,6 +25,11 @@ export function TopBar() {
   const [openSub, setOpenSub] = useState<null | 'mode' | 'export'>(null)
   const [modePos, setModePos] = useState<{x:number,y:number} | null>(null)
   const [exportPos, setExportPos] = useState<{x:number,y:number} | null>(null)
+  // Recent colors popover
+  const recentBtnRef = useRef<HTMLButtonElement | null>(null)
+  const recentRootRef = useRef<HTMLDivElement | null>(null)
+  const [recentOpen, setRecentOpen] = useState(false)
+  const [recentPos, setRecentPos] = useState<{x:number,y:number}>({x:0,y:0})
 
   useEffect(() => {
     if (!menuOpen) return
@@ -45,6 +50,25 @@ export function TopBar() {
       window.removeEventListener('pointerdown', onDown, { capture: true } as any)
     }
   }, [menuOpen])
+
+  // Dismiss recent popover on outside click / Escape
+  useEffect(() => {
+    if (!recentOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setRecentOpen(false) }
+    const onDown = (e: MouseEvent | PointerEvent) => {
+      const t = e.target as Node | null
+      const insideBtn = recentBtnRef.current && t && recentBtnRef.current.contains(t)
+      const insideRoot = recentRootRef.current && t && recentRootRef.current.contains(t)
+      if (insideBtn || insideRoot) return
+      setRecentOpen(false)
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    window.addEventListener('pointerdown', onDown, { capture: true })
+    return () => {
+      window.removeEventListener('keydown', onKey, { capture: true } as any)
+      window.removeEventListener('pointerdown', onDown, { capture: true } as any)
+    }
+  }, [recentOpen])
 
   const openMore = () => {
     if (!moreBtnRef.current) return
@@ -72,7 +96,7 @@ export function TopBar() {
         />
       </div>
       <div className="hidden sm:flex items-center gap-1">
-        {recent?.map((c) => (
+        {(recent ?? []).slice(0, 4).map((c) => (
           <button
             key={c}
             title={c}
@@ -82,6 +106,26 @@ export function TopBar() {
             onClick={() => setColor(c)}
           />
         ))}
+        {Math.max(0, (recent?.length || 0) - 4) > 0 && (
+          <button
+            ref={recentBtnRef}
+            className="w-6 h-6 rounded border border-gray-300 bg-white text-[10px] leading-6 text-gray-700 hover:bg-gray-50"
+            title="Show all recent colors"
+            aria-haspopup="dialog"
+            aria-expanded={recentOpen}
+            onClick={() => {
+              if (!recentBtnRef.current) return
+              const r = recentBtnRef.current.getBoundingClientRect()
+              const margin = 6
+              const x = Math.min(window.innerWidth - 220 - margin, Math.max(margin, r.left))
+              const y = Math.min(window.innerHeight - 10 - margin, r.bottom + margin)
+              setRecentPos({ x, y })
+              setRecentOpen(v => !v)
+            }}
+          >
+            +{Math.max(0, (recent?.length || 0) - 4)}
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-2 ml-auto">
         <label className="text-sm">Tool</label>
@@ -219,6 +263,30 @@ export function TopBar() {
             </div>,
             document.body
           )}
+        </div>,
+        document.body
+      )}
+      {recentOpen && createPortal(
+        <div
+          ref={recentRootRef}
+          className="fixed z-[1000] min-w-44 max-w-72 rounded-md border border-gray-300 bg-white shadow-lg p-2"
+          style={{ left: recentPos.x, top: recentPos.y }}
+          role="dialog"
+          aria-label="Recent colors"
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div className="grid grid-cols-8 gap-1">
+            {(recent ?? []).map((c) => (
+              <button
+                key={c}
+                title={c}
+                aria-label={`Use ${c}`}
+                className="w-6 h-6 rounded border border-black/20"
+                style={{ background: c }}
+                onClick={() => { setColor(c); setRecentOpen(false) }}
+              />
+            ))}
+          </div>
         </div>,
         document.body
       )}
