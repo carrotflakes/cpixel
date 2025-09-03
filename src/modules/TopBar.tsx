@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { FaEraser } from 'react-icons/fa'
 import { LuDownload, LuPaintbrush, LuPaintBucket, LuChevronRight, LuCheck, LuSquare, LuSlash } from 'react-icons/lu'
 import { FaEllipsisV } from 'react-icons/fa'
+import { CanvasSizeDialog } from './CanvasSizeDialog'
 
 export function TopBar() {
   const color = usePixelStore(s => s.color)
@@ -16,6 +17,9 @@ export function TopBar() {
   const exportPNG = usePixelStore(s => s.exportPNG)
   const exportJSON = usePixelStore(s => s.exportJSON)
   const importJSON = usePixelStore(s => s.importJSON)
+  const resizeCanvas = usePixelStore(s => s.resizeCanvas)
+  const curW = usePixelStore(s => s.width)
+  const curH = usePixelStore(s => s.height)
   const tool = usePixelStore(s => s.tool)
   const setTool = usePixelStore(s => s.setTool)
   const moreBtnRef = useRef<HTMLButtonElement | null>(null)
@@ -32,6 +36,7 @@ export function TopBar() {
   const recentRootRef = useRef<HTMLDivElement | null>(null)
   const [recentOpen, setRecentOpen] = useState(false)
   const [recentPos, setRecentPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
+  const [sizeOpen, setSizeOpen] = useState(false)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -226,6 +231,13 @@ export function TopBar() {
           <button
             role="menuitem"
             className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
+            onClick={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}
+          >
+            <span>Canvas size…</span>
+          </button>
+          <button
+            role="menuitem"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
             onClick={() => {
               // open a hidden file input for JSON import
               const input = document.createElement('input')
@@ -322,6 +334,13 @@ export function TopBar() {
         </div>,
         document.body
       )}
+      <CanvasSizeDialog
+        open={sizeOpen}
+        initialWidth={curW}
+        initialHeight={curH}
+        onCancel={() => setSizeOpen(false)}
+        onSubmit={(w, h) => { resizeCanvas(w, h); setSizeOpen(false) }}
+      />
     </div>
   )
 }

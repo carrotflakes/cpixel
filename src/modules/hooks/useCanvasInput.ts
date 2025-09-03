@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { usePixelStore, WIDTH, HEIGHT, MIN_SIZE, MAX_SIZE } from '../store'
+import { usePixelStore, MIN_SIZE, MAX_SIZE } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel } from '../utils/composite'
@@ -34,6 +34,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const setView = usePixelStore(s => s.setView)
   const setHoverInfo = usePixelStore(s => s.setHoverInfo)
   const clearHoverInfo = usePixelStore(s => s.clearHoverInfo)
+  const W = usePixelStore(s => s.width)
+  const H = usePixelStore(s => s.height)
 
   const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null)
   const [shapePreview, setShapePreview] = useState<ShapePreview>({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
@@ -110,12 +112,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   // If this were a touch-derived PointerEvent with multiple contacts, bail
   if ((e as any).isPrimary === false) return
   const { x, y } = pickPoint(e.clientX, e.clientY)
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) { setHoverCell(null); clearHoverInfo(); return }
+    if (x < 0 || y < 0 || x >= W || y >= H) { setHoverCell(null); clearHoverInfo(); return }
     setHoverCell({ x, y })
-    const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, WIDTH, HEIGHT)
+    const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
     setHoverInfo(x, y, hov)
     if (e.altKey) {
-      const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, WIDTH, HEIGHT)
+      const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
       setColor(rgbaToCSSHex(rgba))
       e.preventDefault();
       return
@@ -167,7 +169,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       return
     }
     const { x, y } = pickPoint(e.clientX, e.clientY)
-    if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
+  if (x >= 0 && y >= 0 && x < W && y < H) {
       if (tool === 'line' || tool === 'rect') {
         setShapePreview({ kind: tool, startX: x, startY: y, curX: x, curY: y })
         beginStroke()
@@ -209,8 +211,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const rect = canvasRef.current!.getBoundingClientRect()
       const vw = rect.width
       const vh = rect.height
-      const cw = WIDTH * size
-      const ch = HEIGHT * size
+  const cw = W * size
+  const ch = H * size
       let nvx = viewX + dx
       let nvy = viewY + dy
         ; ({ vx: nvx, vy: nvy } = clampViewToBounds(nvx, nvy, vw, vh, cw, ch))
@@ -220,7 +222,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
     if (shapePreview.kind) {
       const { x, y } = pickPoint(e.clientX, e.clientY)
-      setShapePreview((s) => ({ ...s, curX: clamp(x, 0, WIDTH - 1), curY: clamp(y, 0, HEIGHT - 1) }))
+  setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
       // force re-render via hover change to show dashed preview
       setHoverCell((h) => h ? { ...h } : { x: -1, y: -1 })
       return
@@ -263,9 +265,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const ratio = nextSize / size
     const newVX = viewX - (Cx - viewX) * (ratio - 1)
     const newVY = viewY - (Cy - viewY) * (ratio - 1)
-    const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, WIDTH * nextSize, HEIGHT * nextSize)
-    setPixelSize(nextSize)
-    setView(Math.round(cvx), Math.round(cvy))
+  const { vx: cvx2, vy: cvy2 } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
+  setPixelSize(nextSize)
+  setView(Math.round(cvx2), Math.round(cvy2))
     e.preventDefault()
   }
 
@@ -292,7 +294,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (touches.current.isDrawing) return
         if (touches.current.multi) return
         const { x, y } = pickPoint(touches.current.startX!, touches.current.startY!)
-        if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
+  if (x >= 0 && y >= 0 && x < W && y < H) {
           beginStroke()
           if (tool === 'bucket') {
             fillBucket(x, y, parseCSSColor(color), true)
@@ -335,7 +337,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       }
       if (touches.current.isDrawing) {
         const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
+  if (x >= 0 && y >= 0 && x < W && y < H) {
           const rgba = parseCSSColor(color)
           const lx = touches.current.lastPixX
           const ly = touches.current.lastPixY
@@ -371,7 +373,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const v1y = viewY + dy
       const newVX = v1x - (Cx - v1x) * (ratio - 1)
       const newVY = v1y - (Cy - v1y) * (ratio - 1)
-      const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, WIDTH * nextSize, HEIGHT * nextSize)
+  const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
       setPixelSizeRaw(nextSize)
       setView(Math.round(cvx), Math.round(cvy))
       touches.current.lastDist = d
@@ -387,7 +389,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       if (!touches.current.multi && !touches.current.isDrawing) {
         const t = e.changedTouches[0]
         const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
+  if (x >= 0 && y >= 0 && x < W && y < H) {
           beginStroke()
           if (tool === 'bucket') {
             fillBucket(x, y, parseCSSColor(color), true)

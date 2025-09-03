@@ -31,7 +31,8 @@ type Layer = {
 }
 
 export type PixelState = {
-  // legacy single-buffer fields are replaced by layers
+  width: number
+  height: number
   layers: Layer[]
   activeLayerId: string
   pixelSize: number
@@ -89,11 +90,12 @@ export type PixelState = {
   exportPNG: () => void
   exportJSON: () => void
   importJSON: (data: unknown) => void
+  resizeCanvas: (w: number, h: number) => void
 }
 
-// clamp imported from utils
-
 export const usePixelStore = create<PixelState>((set, get) => ({
+  width: WIDTH,
+  height: HEIGHT,
   layers: [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
   activeLayerId: 'L1',
   pixelSize: 10,
@@ -118,8 +120,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   addLayer: () => set((s) => {
     const id = 'L' + (s.layers.length + 1)
     const layer: Layer = s.mode === 'truecolor'
-      ? { id, visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }
-      : { id, visible: true, locked: false, indices: new Uint8Array(WIDTH * HEIGHT) }
+  ? { id, visible: true, locked: false, data: new Uint32Array(s.width * s.height) }
+  : { id, visible: true, locked: false, indices: new Uint8Array(s.width * s.height) }
     return { layers: [layer, ...s.layers], activeLayerId: id }
   }),
   removeLayer: (id) => set((s) => {
@@ -136,8 +138,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const src = s.layers[i]
     const nid = 'L' + (s.layers.length + 1)
     const dup: Layer = s.mode === 'truecolor'
-      ? { id: nid, visible: true, locked: false, data: new Uint32Array(src.data ?? new Uint32Array(WIDTH * HEIGHT)) }
-      : { id: nid, visible: true, locked: false, indices: new Uint8Array(src.indices ?? new Uint8Array(WIDTH * HEIGHT)) }
+      ? { id: nid, visible: true, locked: false, data: new Uint32Array(src.data ?? new Uint32Array(s.width * s.height)) }
+      : { id: nid, visible: true, locked: false, indices: new Uint8Array(src.indices ?? new Uint8Array(s.width * s.height)) }
     const next = s.layers.slice()
     next.splice(i + 1, 0, dup)
     return { layers: next, activeLayerId: nid }
@@ -308,21 +310,22 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   setView: (x, y) => set({ viewX: x, viewY: y }),
   panBy: (dx, dy) => set((s) => ({ viewX: s.viewX + dx, viewY: s.viewY + dy })),
   setAt: (x, y, rgba) => set((s) => {
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return {}
+    const W = s.width, H = s.height
+    if (x < 0 || y < 0 || x >= W || y >= H) return {}
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
     const layers = s.layers.slice()
     if (s.mode === 'truecolor') {
-      const src = layer.data ?? new Uint32Array(WIDTH * HEIGHT)
+      const src = layer.data ?? new Uint32Array(W * H)
       const next = new Uint32Array(src)
-      next[y * WIDTH + x] = rgba >>> 0
+      next[y * W + x] = rgba >>> 0
       layers[li] = { ...layer, data: next }
       return { layers }
     } else {
-      const src = layer.indices ?? new Uint8Array(WIDTH * HEIGHT)
-      const i = y * WIDTH + x
+      const src = layer.indices ?? new Uint8Array(W * H)
+      const i = y * W + x
       const writeIndex = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
       const next = new Uint8Array(src)
       next[i] = writeIndex & 0xff
@@ -331,9 +334,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     }
   }),
   drawLine: (x0, y0, x1, y1, rgba) => set((s) => {
+    const W = s.width, H = s.height
     // Clamp endpoints
     x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
-    const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT
+    const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
@@ -341,14 +345,14 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     if (!inBounds(x0, y0) && !inBounds(x1, y1)) return {}
     const layers = s.layers.slice()
     if (s.mode === 'truecolor') {
-      const out = new Uint32Array(layer.data ?? new Uint32Array(WIDTH * HEIGHT))
+      const out = new Uint32Array(layer.data ?? new Uint32Array(W * H))
       // Bresenham
       let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1
       let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1
       let err = dx + dy
       let x = x0, y = y0
       while (true) {
-        if (inBounds(x, y)) out[y * WIDTH + x] = rgba >>> 0
+        if (inBounds(x, y)) out[y * W + x] = rgba >>> 0
         if (x === x1 && y === y1) break
         const e2 = 2 * err
         if (e2 >= dy) { err += dy; x += sx }
@@ -358,7 +362,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       layers[li] = { ...layer, data: out }
       return { layers }
     } else {
-      const idxArr = layer.indices ?? new Uint8Array(WIDTH * HEIGHT)
+      const idxArr = layer.indices ?? new Uint8Array(W * H)
       const writeIndex = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
       const out = new Uint8Array(idxArr)
       let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1
@@ -366,7 +370,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       let err = dx + dy
       let x = x0, y = y0
       while (true) {
-        if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) out[y * WIDTH + x] = writeIndex & 0xff
+        if (x >= 0 && y >= 0 && x < W && y < H) out[y * W + x] = writeIndex & 0xff
         if (x === x1 && y === y1) break
         const e2 = 2 * err
         if (e2 >= dy) { err += dy; x += sx }
@@ -378,11 +382,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     }
   }),
   drawRect: (x0, y0, x1, y1, rgba) => set((s) => {
+    const W = s.width, H = s.height
     x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
     let left = Math.max(0, Math.min(x0, x1))
-    let right = Math.min(WIDTH - 1, Math.max(x0, x1))
+    let right = Math.min(W - 1, Math.max(x0, x1))
     let top = Math.max(0, Math.min(y0, y1))
-    let bottom = Math.min(HEIGHT - 1, Math.max(y0, y1))
+    let bottom = Math.min(H - 1, Math.max(y0, y1))
     if (left > right || top > bottom) return {}
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
@@ -390,32 +395,32 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     if (layer.locked) return {}
     const layers = s.layers.slice()
     if (s.mode === 'truecolor') {
-      const out = new Uint32Array(layer.data ?? new Uint32Array(WIDTH * HEIGHT))
+      const out = new Uint32Array(layer.data ?? new Uint32Array(W * H))
       const pix = rgba >>> 0
       // top/bottom
       for (let x = left; x <= right; x++) {
-        out[top * WIDTH + x] = pix
-        out[bottom * WIDTH + x] = pix
+        out[top * W + x] = pix
+        out[bottom * W + x] = pix
       }
       // sides
       for (let y = top; y <= bottom; y++) {
-        out[y * WIDTH + left] = pix
-        out[y * WIDTH + right] = pix
+        out[y * W + left] = pix
+        out[y * W + right] = pix
       }
       if (layer.data && equalU32(out, layer.data)) return {}
       layers[li] = { ...layer, data: out }
       return { layers }
     } else {
-      const idxArr = layer.indices ?? new Uint8Array(WIDTH * HEIGHT)
+      const idxArr = layer.indices ?? new Uint8Array(W * H)
       const writeIndex = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
       const out = new Uint8Array(idxArr)
       for (let x = left; x <= right; x++) {
-        out[top * WIDTH + x] = writeIndex & 0xff
-        out[bottom * WIDTH + x] = writeIndex & 0xff
+        out[top * W + x] = writeIndex & 0xff
+        out[bottom * W + x] = writeIndex & 0xff
       }
       for (let y = top; y <= bottom; y++) {
-        out[y * WIDTH + left] = writeIndex & 0xff
-        out[y * WIDTH + right] = writeIndex & 0xff
+        out[y * W + left] = writeIndex & 0xff
+        out[y * W + right] = writeIndex & 0xff
       }
       if (equalU8(out, idxArr)) return {}
       layers[li] = { ...layer, indices: out }
@@ -423,25 +428,26 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     }
   }),
   fillBucket: (x, y, rgba, contiguous) => set((s) => {
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return {}
+    const W = s.width, H = s.height
+    if (x < 0 || y < 0 || x >= W || y >= H) return {}
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
     const layers = s.layers.slice()
     if (s.mode === 'truecolor') {
-      const src = layer.data ?? new Uint32Array(WIDTH * HEIGHT)
-      const out = floodFillTruecolor(src, WIDTH, HEIGHT, x, y, rgba, contiguous)
+      const src = layer.data ?? new Uint32Array(W * H)
+      const out = floodFillTruecolor(src, W, H, x, y, rgba, contiguous)
       if (out === src || (layer.data && equalU32(out, layer.data))) return {}
       layers[li] = { ...layer, data: out }
       return { layers }
     } else {
       // indexed mode
-      const idxArr = layer.indices ?? new Uint8Array(WIDTH * HEIGHT)
+      const idxArr = layer.indices ?? new Uint8Array(W * H)
       const replacementIdx = (rgba >>> 0) === 0x00000000
         ? s.transparentIndex
         : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
-      const out = floodFillIndexed(idxArr, WIDTH, HEIGHT, x, y, replacementIdx, contiguous, s.transparentIndex)
+      const out = floodFillIndexed(idxArr, W, H, x, y, replacementIdx, contiguous, s.transparentIndex)
       if (out === idxArr || equalU8(out, idxArr)) return {}
       layers[li] = { ...layer, indices: out }
       return { layers }
@@ -452,8 +458,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     if (m === 'indexed') {
       // convert all layers: truecolor -> indices
       const layers = s.layers.map(l => {
-        const src = l.data ?? new Uint32Array(WIDTH * HEIGHT)
-        const idx = new Uint8Array(WIDTH * HEIGHT)
+        const src = l.data ?? new Uint32Array(s.width * s.height)
+        const idx = new Uint8Array(s.width * s.height)
         for (let i = 0; i < idx.length; i++) {
           const rgba = src[i]
           idx[i] = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
@@ -464,8 +470,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     } else {
       // convert all layers: indices -> truecolor
       const layers = s.layers.map(l => {
-        const src = l.indices ?? new Uint8Array(WIDTH * HEIGHT)
-        const data = new Uint32Array(WIDTH * HEIGHT)
+        const src = l.indices ?? new Uint8Array(s.width * s.height)
+        const data = new Uint32Array(s.width * s.height)
         for (let i = 0; i < data.length; i++) {
           const pi = src[i] ?? s.transparentIndex
           data[i] = s.palette[pi] ?? 0x00000000
@@ -570,6 +576,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     }
   }),
   clear: () => set((s: any) => {
+    const W = s.width, H = s.height
     const curSnap = {
       mode: s.mode,
       layers: s.layers.map((l: Layer) => ({
@@ -588,20 +595,20 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     if (li < 0) return {}
     const layers = s.layers.slice()
     const layer = layers[li]
-    if (s.mode === 'truecolor') layers[li] = { ...layer, data: new Uint32Array(WIDTH * HEIGHT) }
-    else layers[li] = { ...layer, indices: new Uint8Array(WIDTH * HEIGHT) }
+    if (s.mode === 'truecolor') layers[li] = { ...layer, data: new Uint32Array(W * H) }
+    else layers[li] = { ...layer, indices: new Uint8Array(W * H) }
     return { layers, _undo: undo, _redo: [], canUndo: true, canRedo: false }
   }),
   exportPNG: () => {
-    const { mode, layers, palette, transparentIndex } = get()
+    const { mode, layers, palette, transparentIndex, width: W, height: H } = get()
     const cvs = document.createElement('canvas')
-    cvs.width = WIDTH
-    cvs.height = HEIGHT
+    cvs.width = W
+    cvs.height = H
     const ctx = cvs.getContext('2d')!
-    const img = ctx.createImageData(WIDTH, HEIGHT)
-    for (let y = 0; y < HEIGHT; y++) {
-      for (let x = 0; x < WIDTH; x++) {
-        const i = (y * WIDTH + x) * 4
+    const img = ctx.createImageData(W, H)
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4
         // composite visible layers bottom->top (Normal)
         let out = 0x00000000
         for (let li = 0; li < layers.length; li++) {
@@ -609,9 +616,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
           if (!L.visible) continue
           let rgba = 0x00000000
           if (mode === 'truecolor') {
-            rgba = (L.data ?? new Uint32Array(WIDTH * HEIGHT))[y * WIDTH + x] >>> 0
+            rgba = (L.data ?? new Uint32Array(W * H))[y * W + x] >>> 0
           } else {
-            const pi = (L.indices ?? new Uint8Array(WIDTH * HEIGHT))[y * WIDTH + x] ?? transparentIndex
+            const pi = (L.indices ?? new Uint8Array(W * H))[y * W + x] ?? transparentIndex
             rgba = palette[pi] ?? 0x00000000
           }
           // alpha over
@@ -645,12 +652,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     a.click()
   },
   exportJSON: () => {
-    const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors } = get()
+    const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors, width, height } = get()
     const payload = {
       app: 'cpixel' as const,
       version: 1 as const,
-      width: WIDTH,
-      height: HEIGHT,
+      width,
+      height,
       mode,
       layers: layers.map(l => ({
         id: l.id,
@@ -678,12 +685,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       palette: current.palette,
       color: current.color,
       recentColors: current.recentColors,
-    }, WIDTH, HEIGHT)
+    }, current.width, current.height)
     if (!normalized) return
     const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors } = normalized
     set({
       mode,
-      layers: layers.length > 0 ? layers : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
+      layers: layers.length > 0 ? layers : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(current.width * current.height) }],
       activeLayerId,
       palette,
       transparentIndex,
@@ -695,4 +702,36 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       canRedo: false,
     })
   },
+  resizeCanvas: (w, h) => set((s) => {
+    let newW = Math.max(1, Math.floor(w))
+    let newH = Math.max(1, Math.floor(h))
+    // Optional: cap to avoid huge allocations
+    const MAX_WH = 512
+    newW = Math.min(newW, MAX_WH)
+    newH = Math.min(newH, MAX_WH)
+    const oldW = s.width, oldH = s.height
+    if (newW === oldW && newH === oldH) return {}
+    const layers = s.layers.map(l => {
+      if (s.mode === 'truecolor') {
+        const src = l.data ?? new Uint32Array(oldW * oldH)
+        const dst = new Uint32Array(newW * newH)
+        const copyW = Math.min(oldW, newW)
+        const copyH = Math.min(oldH, newH)
+        for (let y = 0; y < copyH; y++) {
+          dst.set(src.subarray(y * oldW, y * oldW + copyW), y * newW)
+        }
+        return { ...l, data: dst, indices: undefined }
+      } else {
+        const src = l.indices ?? new Uint8Array(oldW * oldH)
+        const dst = new Uint8Array(newW * newH)
+        const copyW = Math.min(oldW, newW)
+        const copyH = Math.min(oldH, newH)
+        for (let y = 0; y < copyH; y++) {
+          dst.set(src.subarray(y * oldW, y * oldW + copyW), y * newW)
+        }
+        return { ...l, indices: dst, data: undefined }
+      }
+    })
+    return { width: newW, height: newH, layers }
+  }),
 }))

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { usePixelStore, WIDTH, HEIGHT, MIN_SIZE, MAX_SIZE } from './store'
+import { usePixelStore, MIN_SIZE, MAX_SIZE } from './store'
 import { compositeImageData } from './utils/composite'
 import { drawBorder, drawChecker, drawGrid, drawHoverCell, drawShapePreview, ensureHiDPICanvas, getCheckerPatternCanvas } from './utils/canvasDraw'
 import { useCanvasInput } from './hooks/useCanvasInput'
@@ -8,6 +8,8 @@ export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const { hoverCell, shapePreview, onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onWheel, onTouchStart, onTouchMove, onTouchEnd } = useCanvasInput(canvasRef)
   const size = usePixelStore(s => s.pixelSize)
+  const W = usePixelStore(s => s.width)
+  const H = usePixelStore(s => s.height)
   const layers = usePixelStore(s => s.layers)
   const mode = usePixelStore(s => s.mode)
   const palette = usePixelStore(s => s.palette)
@@ -17,8 +19,8 @@ export function PixelCanvas() {
   const setPixelSizeRaw = usePixelStore(s => s.setPixelSizeRaw)
   const setView = usePixelStore(s => s.setView)
 
-  const scaledW = WIDTH * size
-  const scaledH = HEIGHT * size
+  const scaledW = W * size
+  const scaledH = H * size
   // cache small helper canvases
   const checkerTileRef = useRef<HTMLCanvasElement | null>(null)
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -48,8 +50,8 @@ export function PixelCanvas() {
     const rect = cvs.getBoundingClientRect()
     const vw = rect.width
     const vh = rect.height
-    const cw = WIDTH * size
-    const ch = HEIGHT * size
+    const cw = W * size
+    const ch = H * size
     const cx = Math.round((vw - cw) / 2)
     const cy = Math.round((vh - ch) / 2)
     setView(cx, cy)
@@ -77,24 +79,24 @@ export function PixelCanvas() {
     // now translate for drawing content and grid
     ctx.translate(vx, vy)
     // draw bitmap on top (alpha respected)
-    const img = compositeImageData(layers, mode, palette, transparentIndex, ctx, WIDTH, HEIGHT)
+    const img = compositeImageData(layers, mode, palette, transparentIndex, ctx, W, H)
     if (!tmpCanvasRef.current) {
       const t = document.createElement('canvas')
-      t.width = WIDTH
-      t.height = HEIGHT
+      t.width = W
+      t.height = H
       tmpCanvasRef.current = t
-    } else if (tmpCanvasRef.current.width !== WIDTH || tmpCanvasRef.current.height !== HEIGHT) {
-      tmpCanvasRef.current.width = WIDTH
-      tmpCanvasRef.current.height = HEIGHT
+    } else if (tmpCanvasRef.current.width !== W || tmpCanvasRef.current.height !== H) {
+      tmpCanvasRef.current.width = W
+      tmpCanvasRef.current.height = H
     }
     tmpCanvasRef.current.getContext('2d')!.putImageData(img, 0, 0)
-    ctx.drawImage(tmpCanvasRef.current, 0, 0, WIDTH, HEIGHT, 0, 0, scaledW, scaledH)
+    ctx.drawImage(tmpCanvasRef.current, 0, 0, W, H, 0, 0, scaledW, scaledH)
 
     // border and grid
     drawBorder(ctx, scaledW, scaledH)
-    drawGrid(ctx, WIDTH, HEIGHT, size)
+    drawGrid(ctx, W, H, size)
     // hover highlight
-    if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < WIDTH && hoverCell.y < HEIGHT) {
+    if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < W && hoverCell.y < H) {
       drawHoverCell(ctx, hoverCell.x, hoverCell.y, size)
     }
     // shape preview overlay
@@ -109,10 +111,10 @@ export function PixelCanvas() {
         size,
       )
     }
-  }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY])
+  }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H])
 
   return (
-  <div className="w-full h-full bg-surface-muted">
+    <div className="w-full h-full bg-surface-muted">
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}
