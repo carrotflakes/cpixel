@@ -43,6 +43,7 @@ export type PixelState = {
   transparentIndex: number
   tool?: 'brush' | 'bucket' | 'line' | 'rect'
   setColor: (c: string) => void
+  setColorLive: (c: string) => void
   // layer ops
   addLayer: () => void
   removeLayer: (id: string) => void
@@ -159,6 +160,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const next = [c, ...existing.filter(v => norm(v) !== norm(c))].slice(0, 10)
     return { color: c, recentColors: next }
   }),
+  // setColorLive updates only the current color for live previews (e.g., <input type="color"> drag)
+  // It intentionally does not modify recentColors or history.
+  setColorLive: (c) => set({ color: c }),
   removePaletteIndex: (idx) => set((s) => {
     const n = s.palette.length
     if (idx < 0 || idx >= n || n <= 1) return {}

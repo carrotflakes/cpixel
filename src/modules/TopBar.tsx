@@ -9,6 +9,7 @@ export function TopBar() {
   const color = usePixelStore(s => s.color)
   const recent = usePixelStore(s => s.recentColors)
   const setColor = usePixelStore(s => s.setColor)
+  const setColorLive = usePixelStore(s => s.setColorLive)
   const mode = usePixelStore(s => s.mode)
   const setMode = usePixelStore(s => s.setMode)
   const clear = usePixelStore(s => s.clear)
@@ -62,7 +63,13 @@ export function TopBar() {
     <div className="p-2 flex gap-4 items-center">
       <div className="flex items-center gap-2">
         <label className="text-sm">Color</label>
-        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-7 w-10" />
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColorLive(e.target.value)}
+          onBlur={(e) => setColor(e.target.value)}
+          className="h-7 w-10"
+        />
       </div>
       <div className="hidden sm:flex items-center gap-1">
         {recent?.map((c) => (
