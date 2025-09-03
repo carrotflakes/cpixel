@@ -5,6 +5,7 @@ export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const size = usePixelStore(s => s.pixelSize)
   const color = usePixelStore(s => s.color)
+  const setColor = usePixelStore(s => s.setColor)
   const setAt = usePixelStore(s => s.setAt)
   const data = usePixelStore(s => s.data)
   const viewX = usePixelStore(s => s.viewX)
@@ -19,6 +20,7 @@ export function PixelCanvas() {
   // cache small helper canvases
   const checkerTileRef = useRef<HTMLCanvasElement | null>(null)
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const panModRef = useRef(false) // Space key held
 
   // Clamp view so content stays within or is centered if smaller than viewport
   const clampViewToBounds = (
@@ -78,6 +80,33 @@ export function PixelCanvas() {
       sessionStorage.setItem('cpixel:view', JSON.stringify({ size, viewX, viewY }))
     } catch {}
   }, [size, viewX, viewY])
+
+  // Track Space key for pan modifier (desktop/trackpad friendly)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        if (!panModRef.current) {
+          panModRef.current = true
+          // indicate grab if not currently panning
+          if (canvasRef.current && !dragState.current.panning) canvasRef.current.style.cursor = 'grab'
+        }
+        e.preventDefault()
+      }
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        panModRef.current = false
+        if (canvasRef.current && !dragState.current.panning) canvasRef.current.style.cursor = 'crosshair'
+        e.preventDefault()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, { capture: true })
+    window.addEventListener('keyup', onKeyUp, { capture: true })
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, { capture: true } as any)
+      window.removeEventListener('keyup', onKeyUp, { capture: true } as any)
+    }
+  }, [])
 
   useEffect(() => {
     const cvs = canvasRef.current
@@ -180,6 +209,13 @@ export function PixelCanvas() {
     if (e.pointerType === 'touch') return // do not draw on touch; handled via touch events
     const { x, y } = pickPoint(e.clientX, e.clientY)
     if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return
+    // Eyedropper: Alt to pick color under cursor (no drawing)
+    if (e.altKey) {
+      const rgba = data[y * WIDTH + x]
+      setColor(rgbaToCSSHex(rgba))
+      e.preventDefault()
+      return
+    }
     if (e.buttons & 1) {
       setAt(x, y, parseCSSColor(color))
     } else if (e.buttons & 2) {
@@ -189,7 +225,8 @@ export function PixelCanvas() {
 
   const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.button === 1) {
+    const wantPan = e.button === 1 || (e.button === 0 && (panModRef.current || e.ctrlKey))
+    if (wantPan) {
       dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
   // visual feedback
@@ -197,7 +234,7 @@ export function PixelCanvas() {
       e.preventDefault()
       return
     }
-    onPointer(e)
+    onPointer(e)  
   }
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (dragState.current.panning) {
@@ -411,4 +448,14 @@ function parseCSSColor(css: string): number {
   }
   // fallback black
   return 0x000000ff
+}
+
+function rgbaToCSSHex(rgba: number): string {
+  const r = (rgba >>> 24) & 0xff
+  const g = (rgba >>> 16) & 0xff
+  const b = (rgba >>> 8) & 0xff
+  const a = (rgba >>> 0) & 0xff
+  const hex = (n: number) => n.toString(16).padStart(2, '0')
+  if (a === 0xff) return `#${hex(r)}${hex(g)}${hex(b)}`
+  return `#${hex(r)}${hex(g)}${hex(b)}${hex(a)}`
 }
