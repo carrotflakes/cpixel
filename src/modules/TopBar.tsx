@@ -5,6 +5,7 @@ import { FaEraser } from 'react-icons/fa'
 import { LuDownload, LuPaintbrush, LuPaintBucket, LuChevronRight, LuCheck, LuSquare, LuSlash } from 'react-icons/lu'
 import { FaEllipsisV } from 'react-icons/fa'
 import { CanvasSizeDialog } from './CanvasSizeDialog'
+import { GoogleDrive } from './utils/googleDrive'
 
 export function TopBar() {
   const color = usePixelStore(s => s.color)
@@ -26,18 +27,32 @@ export function TopBar() {
   const menuRootRef = useRef<HTMLDivElement | null>(null)
   const modeSubRef = useRef<HTMLDivElement | null>(null)
   const exportSubRef = useRef<HTMLDivElement | null>(null)
+  const driveSubRef = useRef<HTMLDivElement | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
-  const [openSub, setOpenSub] = useState<null | 'mode' | 'export'>(null)
+  const [openSub, setOpenSub] = useState<null | 'mode' | 'export' | 'drive'>(null)
   const [modePos, setModePos] = useState<{ x: number, y: number } | null>(null)
   const [exportPos, setExportPos] = useState<{ x: number, y: number } | null>(null)
+  const [drivePos, setDrivePos] = useState<{ x: number, y: number } | null>(null)
   // Recent colors popover
   const recentBtnRef = useRef<HTMLButtonElement | null>(null)
   const recentRootRef = useRef<HTMLDivElement | null>(null)
   const [recentOpen, setRecentOpen] = useState(false)
   const [recentPos, setRecentPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
   const [sizeOpen, setSizeOpen] = useState(false)
+  // Drive state
+  const [driveOpen, setDriveOpen] = useState<null | 'menu' | 'open' | 'save'>(null)
+  const [driveFiles, setDriveFiles] = useState<{ id: string; name: string; modifiedTime?: string }[]>([])
+  const [driveBusy, setDriveBusy] = useState(false)
+  const [driveError, setDriveError] = useState<string | null>(null)
+  const [driveFilename, setDriveFilename] = useState<string>('cpixel.json')
+  const [driveFileId, setDriveFileId] = useState<string | undefined>(undefined)
+  const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (window as any).VITE_GOOGLE_CLIENT_ID
 
+  useEffect(() => {
+    // init GIS token client if clientId provided
+    GoogleDrive.init(clientId).catch(() => { })
+  }, [])
   useEffect(() => {
     if (!menuOpen) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenuOpen(false); setOpenSub(null) } }
@@ -47,7 +62,8 @@ export function TopBar() {
       const insideRoot = menuRootRef.current && t && menuRootRef.current.contains(t)
       const insideMode = modeSubRef.current && t && modeSubRef.current.contains(t)
       const insideExport = exportSubRef.current && t && exportSubRef.current.contains(t)
-      if (insideMore || insideRoot || insideMode || insideExport) return
+      const insideDrive = driveSubRef.current && t && driveSubRef.current.contains(t)
+      if (insideMore || insideRoot || insideMode || insideExport || insideDrive) return
       setMenuOpen(false); setOpenSub(null)
     }
     window.addEventListener('keydown', onKey, { capture: true })
@@ -88,6 +104,8 @@ export function TopBar() {
     setOpenSub(null)
     setModePos(null)
     setExportPos(null)
+    setDrivePos(null)
+    setDriveOpen(null)
   }
 
   return (
@@ -257,6 +275,23 @@ export function TopBar() {
           </button>
           <button
             role="menuitem"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center justify-between gap-2"
+            onClick={() => {
+              if (openSub === 'drive') { setOpenSub(null); return }
+              const MAIN_W = 208, SUB_W = 220, margin = 8
+              const rightX = menuPos.x + MAIN_W
+              const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
+              const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
+              const y = Math.min(window.innerHeight - 140 - margin, menuPos.y + 68)
+              setDrivePos({ x, y })
+              setOpenSub('drive')
+            }}
+          >
+            <span>Google Drive</span>
+            <LuChevronRight aria-hidden />
+          </button>
+          <button
+            role="menuitem"
             className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
             onClick={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}
           >
@@ -334,6 +369,61 @@ export function TopBar() {
             </div>,
             document.body
           )}
+          {openSub === 'drive' && drivePos && createPortal(
+            <div
+              role="menu"
+              className="fixed z-[1001] min-w-56 rounded-md border border-border bg-elevated shadow-lg text-sm py-1"
+              style={{ left: drivePos.x, top: drivePos.y }}
+              ref={driveSubRef}
+            >
+              <button
+                className="w-full text-left px-3 py-2 hover:bg-surface-muted"
+                onClick={async () => {
+                  setDriveError(null)
+                  try {
+                    await GoogleDrive.signIn('consent')
+                    setDriveOpen('menu')
+                  } catch (e: any) {
+                    setDriveError(e?.message || 'Sign-in failed')
+                  }
+                }}
+              >
+                {GoogleDrive.isSignedIn() ? 'Signed in' : 'Sign in'}
+              </button>
+              <button
+                className="w-full text-left px-3 py-2 hover:bg-surface-muted"
+                onClick={async () => {
+                  setDriveOpen('open')
+                  setDriveBusy(true)
+                  setDriveError(null)
+                  try {
+                    const files = await GoogleDrive.listFiles('cpixel')
+                    setDriveFiles(files)
+                  } catch (e: any) {
+                    setDriveError(e?.message || 'Failed to list files')
+                  } finally {
+                    setDriveBusy(false)
+                  }
+                }}
+              >
+                Open from Drive…
+              </button>
+              <button
+                className="w-full text-left px-3 py-2 hover:bg-surface-muted"
+                onClick={async () => {
+                  setDriveOpen('save')
+                  setDriveFilename('cpixel.json')
+                  setDriveFileId(undefined)
+                }}
+              >
+                Save to Drive…
+              </button>
+              {driveError && (
+                <div className="px-3 py-2 text-xs text-red-600">{driveError}</div>
+              )}
+            </div>,
+            document.body
+          )}
         </div>,
         document.body
       )}
@@ -368,6 +458,117 @@ export function TopBar() {
         onCancel={() => setSizeOpen(false)}
         onSubmit={(w, h) => { resizeCanvas(w, h); setSizeOpen(false) }}
       />
+
+      {driveOpen === 'open' && createPortal(
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40" role="dialog" aria-label="Open from Google Drive">
+          <div className="min-w-80 max-w-[90vw] max-h-[80vh] overflow-auto rounded-md border border-border bg-elevated shadow-lg">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+              <div className="font-medium">Open from Google Drive</div>
+              <button className="text-sm" onClick={() => setDriveOpen(null)}>Close</button>
+            </div>
+            <div className="p-3">
+              {driveBusy ? (
+                <div className="text-sm text-muted">Loading…</div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {driveFiles.map((f) => (
+                    <li key={f.id}>
+                      <button
+                        className="w-full text-left px-2 py-2 hover:bg-surface-muted"
+                        onClick={async () => {
+                          setDriveBusy(true)
+                          setDriveError(null)
+                          try {
+                            const obj = await GoogleDrive.openFile(f.id)
+                            importJSON(obj)
+                            setDriveOpen(null)
+                            setMenuOpen(false)
+                            setOpenSub(null)
+                          } catch (e: any) {
+                            setDriveError(e?.message || 'Failed to open file')
+                          } finally {
+                            setDriveBusy(false)
+                          }
+                        }}
+                      >
+                        <div className="text-sm">{f.name}</div>
+                        {f.modifiedTime && <div className="text-xs text-muted">{new Date(f.modifiedTime).toLocaleString()}</div>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {driveError && <div className="mt-2 text-xs text-red-600">{driveError}</div>}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {driveOpen === 'save' && createPortal(
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40" role="dialog" aria-label="Save to Google Drive">
+          <div className="min-w-80 max-w-[90vw] rounded-md border border-border bg-elevated shadow-lg">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+              <div className="font-medium">Save to Google Drive</div>
+              <button className="text-sm" onClick={() => setDriveOpen(null)}>Close</button>
+            </div>
+            <div className="p-3 space-y-3">
+              <div className="text-sm">Filename</div>
+              <input
+                className="w-full px-2 py-1 border border-border rounded bg-surface"
+                value={driveFilename}
+                onChange={(e) => setDriveFilename(e.target.value)}
+                placeholder="cpixel.json"
+              />
+              <div className="flex gap-2 justify-end">
+                <button className="px-3 py-1 border border-border rounded" onClick={() => setDriveOpen(null)}>Cancel</button>
+                <button
+                  className="px-3 py-1 border border-border rounded bg-surface-muted"
+                  onClick={async () => {
+                    setDriveBusy(true)
+                    setDriveError(null)
+                    try {
+                      const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors, width, height } = usePixelStore.getState()
+                      const payload = {
+                        app: 'cpixel' as const,
+                        version: 1 as const,
+                        width,
+                        height,
+                        mode,
+                        layers: layers.map(l => ({
+                          id: l.id,
+                          visible: l.visible,
+                          locked: l.locked,
+                          data: l.data ? Array.from(l.data) : undefined,
+                          indices: l.indices ? Array.from(l.indices) : undefined,
+                        })),
+                        activeLayerId,
+                        palette: Array.from(palette ?? new Uint32Array(0)),
+                        transparentIndex,
+                        color,
+                        recentColors: recentColors ?? [],
+                      }
+                      const name = driveFilename && /\.json$/i.test(driveFilename) ? driveFilename : `${driveFilename || 'cpixel'}.json`
+                      await GoogleDrive.saveJSON(name, payload, driveFileId)
+                      setDriveOpen(null)
+                      setMenuOpen(false)
+                      setOpenSub(null)
+                    } catch (e: any) {
+                      setDriveError(e?.message || 'Failed to save')
+                    } finally {
+                      setDriveBusy(false)
+                    }
+                  }}
+                >
+                  {driveBusy ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              {driveError && <div className="text-xs text-red-600">{driveError}</div>}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

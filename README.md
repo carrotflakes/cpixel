@@ -12,3 +12,19 @@ Run
    pnpm dev
 3. Build
    pnpm build
+
+## Google Drive integration (optional)
+
+To enable saving/loading JSON to Google Drive:
+
+- Create an OAuth 2.0 Client ID (Web application) in Google Cloud Console.
+- Add Authorized JavaScript origins for your dev/prod URLs (e.g., http://localhost:5173).
+- Set the environment variable with your client ID:
+
+   - For local dev, create `.env.local` with:
+
+      VITE_GOOGLE_CLIENT_ID=your-oauth-client-id.apps.googleusercontent.com
+
+- Scope used: drive.file (app-created files).
+
+In the app, open More → Google Drive to sign in, Open, or Save.
