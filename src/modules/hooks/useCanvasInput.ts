@@ -40,6 +40,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const panModRef = useRef(false)
   const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
+  const mouseStroke = useRef<{ lastX?: number; lastY?: number; active: boolean; erase: boolean }>({ active: false, erase: false })
   const touches = useRef<{
     id1?: number
     id2?: number
@@ -106,7 +107,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') return
-    const { x, y } = pickPoint(e.clientX, e.clientY)
+  // If this were a touch-derived PointerEvent with multiple contacts, bail
+  if ((e as any).isPrimary === false) return
+  const { x, y } = pickPoint(e.clientX, e.clientY)
     if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) { setHoverCell(null); clearHoverInfo(); return }
     setHoverCell({ x, y })
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, WIDTH, HEIGHT)
@@ -118,12 +121,43 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       return
     }
     if (tool !== 'bucket') {
-      if (e.buttons & 1) setAt(x, y, parseCSSColor(color))
-      else if (e.buttons & 2) setAt(x, y, 0x00000000)
+      const left = (e.buttons & 1) !== 0
+      const right = (e.buttons & 2) !== 0
+      const pressed = left || right
+      if (pressed) {
+        const erase = right
+        const rgba = erase ? 0x00000000 : parseCSSColor(color)
+        if (!mouseStroke.current.active) {
+          mouseStroke.current.active = true
+          mouseStroke.current.erase = erase
+          mouseStroke.current.lastX = x
+          mouseStroke.current.lastY = y
+          // seed first pixel
+          setAt(x, y, rgba)
+        } else {
+          // if erase mode changed mid-stroke, reset seed
+          if (mouseStroke.current.erase !== erase) {
+            mouseStroke.current.erase = erase
+            mouseStroke.current.lastX = x
+            mouseStroke.current.lastY = y
+            setAt(x, y, rgba)
+          } else if (mouseStroke.current.lastX !== undefined && mouseStroke.current.lastY !== undefined) {
+            usePixelStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, rgba)
+            mouseStroke.current.lastX = x
+            mouseStroke.current.lastY = y
+          }
+        }
+      } else {
+        // button released
+        mouseStroke.current.active = false
+        mouseStroke.current.lastX = undefined
+        mouseStroke.current.lastY = undefined
+      }
     }
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === 'touch') return
     const wantPan = e.button === 1 || (e.button === 0 && (panModRef.current || e.ctrlKey))
     if (wantPan) {
       dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
@@ -142,8 +176,23 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         const contiguous = !e.shiftKey
         if (e.button === 0) {
           if (tool === 'bucket') { fillBucket(x, y, parseCSSColor(color), contiguous) }
+          else {
+            // start mouse stroke drawing
+            mouseStroke.current.active = true
+            mouseStroke.current.erase = false
+            mouseStroke.current.lastX = x
+            mouseStroke.current.lastY = y
+            setAt(x, y, parseCSSColor(color))
+          }
         } else if (e.button === 2) {
           if (tool === 'bucket') { fillBucket(x, y, 0x00000000, contiguous) }
+          else {
+            mouseStroke.current.active = true
+            mouseStroke.current.erase = true
+            mouseStroke.current.lastX = x
+            mouseStroke.current.lastY = y
+            setAt(x, y, 0x00000000)
+          }
         }
       }
     }
@@ -151,6 +200,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === 'touch') return
     if (dragState.current.panning) {
       const dx = e.clientX - dragState.current.lastX
       const dy = e.clientY - dragState.current.lastY
@@ -178,7 +228,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     onPointer(e)
   }
 
-  const onPointerUp = () => {
+  const onPointerUp = (e?: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e && e.pointerType === 'touch') return
     dragState.current.panning = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
     if (shapePreview.kind) {
@@ -194,6 +245,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       return
     }
     endStroke()
+  mouseStroke.current.active = false
+  mouseStroke.current.lastX = undefined
+  mouseStroke.current.lastY = undefined
   }
 
   const onPointerLeave = () => { setHoverCell(null); clearHoverInfo() }
@@ -223,6 +277,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const onTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches.length === 1) {
+      // ignore if already in multi-touch gesture
+      if (touches.current.multi) return
       const t = e.touches[0]
       if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
       touches.current.isDrawing = false
@@ -251,6 +307,10 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       }, TOUCH_HOLD_MS)
     } else if (e.touches.length === 2) {
       if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
+      // if a single-finger stroke was active, end it before switching to gesture
+      if (touches.current.isDrawing) {
+        endStroke()
+      }
       touches.current.isDrawing = false
       touches.current.multi = true
       touches.current = { ...touches.current, id1: e.touches[0].identifier, id2: e.touches[1].identifier }
@@ -263,11 +323,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches.length === 1 && touches.current.id1 === undefined) {
+      if (touches.current.multi) return
       const t = e.touches[0]
       const dx0 = (touches.current.startX ?? t.clientX) - t.clientX
       const dy0 = (touches.current.startY ?? t.clientY) - t.clientY
       const moved = Math.hypot(dx0, dy0)
-  if (!touches.current.isDrawing && moved >= TOUCH_MOVE_PX) {
+      if (!touches.current.isDrawing && moved >= TOUCH_MOVE_PX) {
         touches.current.isDrawing = true
         beginStroke()
         if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
@@ -275,11 +336,16 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       if (touches.current.isDrawing) {
         const { x, y } = pickPoint(t.clientX, t.clientY)
         if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
-          if (x !== touches.current.lastPixX || y !== touches.current.lastPixY) {
-            setAt(x, y, parseCSSColor(color))
-            touches.current.lastPixX = x
-            touches.current.lastPixY = y
+          const rgba = parseCSSColor(color)
+          const lx = touches.current.lastPixX
+          const ly = touches.current.lastPixY
+          if (lx === undefined || ly === undefined) {
+            setAt(x, y, rgba)
+          } else if (lx !== x || ly !== y) {
+            usePixelStore.getState().drawLine(lx, ly, x, y, rgba)
           }
+          touches.current.lastPixX = x
+          touches.current.lastPixY = y
         }
         e.preventDefault()
       }
