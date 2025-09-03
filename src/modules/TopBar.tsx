@@ -21,15 +21,15 @@ export function TopBar() {
   const modeSubRef = useRef<HTMLDivElement | null>(null)
   const exportSubRef = useRef<HTMLDivElement | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [menuPos, setMenuPos] = useState<{x:number,y:number}>({x:0,y:0})
+  const [menuPos, setMenuPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
   const [openSub, setOpenSub] = useState<null | 'mode' | 'export'>(null)
-  const [modePos, setModePos] = useState<{x:number,y:number} | null>(null)
-  const [exportPos, setExportPos] = useState<{x:number,y:number} | null>(null)
+  const [modePos, setModePos] = useState<{ x: number, y: number } | null>(null)
+  const [exportPos, setExportPos] = useState<{ x: number, y: number } | null>(null)
   // Recent colors popover
   const recentBtnRef = useRef<HTMLButtonElement | null>(null)
   const recentRootRef = useRef<HTMLDivElement | null>(null)
   const [recentOpen, setRecentOpen] = useState(false)
-  const [recentPos, setRecentPos] = useState<{x:number,y:number}>({x:0,y:0})
+  const [recentPos, setRecentPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
 
   useEffect(() => {
     if (!menuOpen) return
@@ -86,13 +86,13 @@ export function TopBar() {
   return (
     <div className="p-2 flex gap-4 items-center">
       <div className="flex items-center gap-2">
-        <label className="text-sm">Color</label>
+        <label className="text-sm text-muted">Color</label>
         <input
           type="color"
           value={color}
           onChange={(e) => setColorLive(e.target.value)}
           onBlur={(e) => setColor(e.target.value)}
-          className="h-7 w-10"
+          className="h-7 w-10 rounded border border-border bg-surface"
         />
       </div>
       <div className="hidden sm:flex items-center gap-1">
@@ -101,7 +101,7 @@ export function TopBar() {
             key={c}
             title={c}
             aria-label={`Use ${c}`}
-            className="w-6 h-6 rounded border border-black/20"
+            className="w-6 h-6 rounded border border-border"
             style={{ background: c }}
             onClick={() => setColor(c)}
           />
@@ -109,7 +109,7 @@ export function TopBar() {
         {Math.max(0, (recent?.length || 0) - 4) > 0 && (
           <button
             ref={recentBtnRef}
-            className="w-6 h-6 rounded border border-gray-300 bg-white text-[10px] leading-6 text-gray-700 hover:bg-gray-50"
+            className="w-6 h-6 rounded border border-border bg-surface text-[10px] leading-6 text-muted hover:bg-surface-muted"
             title="Show all recent colors"
             aria-haspopup="dialog"
             aria-expanded={recentOpen}
@@ -128,10 +128,10 @@ export function TopBar() {
         )}
       </div>
       <div className="flex items-center gap-2 ml-auto">
-        <label className="text-sm">Tool</label>
-        <div className="inline-flex rounded border border-gray-300 overflow-hidden">
+        <label className="text-sm text-muted">Tool</label>
+        <div className="inline-flex rounded border border-border overflow-hidden">
           <button
-            className={`px-2 py-1 text-sm inline-flex items-center gap-1 ${tool === 'brush' ? 'bg-gray-200' : 'bg-white'} hover:bg-gray-100`}
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 ${tool === 'brush' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
             onClick={() => setTool('brush')}
             aria-pressed={tool === 'brush'}
             title="Brush"
@@ -140,7 +140,7 @@ export function TopBar() {
             <span className="hidden sm:inline">Brush</span>
           </button>
           <button
-            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-gray-300 ${tool === 'bucket' ? 'bg-gray-200' : 'bg-white'} hover:bg-gray-100`}
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'bucket' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
             onClick={() => setTool('bucket')}
             aria-pressed={tool === 'bucket'}
             title="Bucket"
@@ -149,7 +149,7 @@ export function TopBar() {
             <span className="hidden sm:inline">Bucket</span>
           </button>
           <button
-            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-gray-300 ${tool === 'line' ? 'bg-gray-200' : 'bg-white'} hover:bg-gray-100`}
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'line' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
             onClick={() => setTool('line')}
             aria-pressed={tool === 'line'}
             title="Line"
@@ -158,7 +158,7 @@ export function TopBar() {
             <span className="hidden sm:inline">Line</span>
           </button>
           <button
-            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-gray-300 ${tool === 'rect' ? 'bg-gray-200' : 'bg-white'} hover:bg-gray-100`}
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'rect' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
             onClick={() => setTool('rect')}
             aria-pressed={tool === 'rect'}
             title="Rect"
@@ -170,26 +170,26 @@ export function TopBar() {
       </div>
       <button
         ref={moreBtnRef}
-        className="px-2 py-1 rounded border border-gray-300 bg-white text-sm inline-flex items-center gap-1"
+        className="px-2 py-1 rounded border border-border bg-surface text-sm inline-flex items-center gap-1 hover:bg-surface-muted"
         onClick={openMore}
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         title="More"
       >
-  <FaEllipsisV aria-hidden />
+        <FaEllipsisV aria-hidden />
         <span className="hidden sm:inline">More</span>
       </button>
       {menuOpen && createPortal(
         <div
           role="menu"
-          className="fixed z-[1000] min-w-52 rounded-md border border-gray-300 bg-white shadow-lg text-sm py-1"
+          className="fixed z-[1000] min-w-52 rounded-md border border-border bg-elevated shadow-lg text-sm py-1"
           ref={menuRootRef}
           style={{ left: menuPos.x, top: menuPos.y }}
           onContextMenu={(e) => e.preventDefault()}
         >
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center justify-between gap-2"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center justify-between gap-2"
             onClick={() => {
               if (openSub === 'mode') { setOpenSub(null); return }
               const MAIN_W = 208, SUB_W = 180, margin = 8
@@ -206,7 +206,7 @@ export function TopBar() {
           </button>
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center justify-between gap-2"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center justify-between gap-2"
             onClick={() => {
               if (openSub === 'export') { setOpenSub(null); return }
               const MAIN_W = 208, SUB_W = 180, margin = 8
@@ -221,42 +221,42 @@ export function TopBar() {
             <span>Export</span>
             <LuChevronRight aria-hidden />
           </button>
-          <div className="my-1 h-px bg-gray-200" />
+          <div className="my-1 h-px bg-border" />
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700 inline-flex items-center gap-2"
+            className="w-full text-left px-3 py-2 hover:bg-red-50/70 text-red-700 inline-flex items-center gap-2"
             onClick={() => { clear(); setMenuOpen(false); setOpenSub(null) }}
           >
             <FaEraser aria-hidden />
             <span>Clear</span>
           </button>
 
-      {openSub === 'mode' && modePos && createPortal(
+          {openSub === 'mode' && modePos && createPortal(
             <div
               role="menu"
-              className="fixed z-[1001] min-w-40 rounded-md border border-gray-300 bg-white shadow-lg text-sm py-1"
-        style={{ left: modePos.x, top: modePos.y }}
+              className="fixed z-[1001] min-w-40 rounded-md border border-border bg-elevated shadow-lg text-sm py-1"
+              style={{ left: modePos.x, top: modePos.y }}
               ref={modeSubRef}
             >
-              <button className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center gap-2" onClick={() => { setMode('truecolor'); setMenuOpen(false); setOpenSub(null) }}>
+              <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { setMode('truecolor'); setMenuOpen(false); setOpenSub(null) }}>
                 {mode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
                 <span>Truecolor</span>
               </button>
-              <button className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center gap-2" onClick={() => { setMode('indexed'); setMenuOpen(false); setOpenSub(null) }}>
+              <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { setMode('indexed'); setMenuOpen(false); setOpenSub(null) }}>
                 {mode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
                 <span>Indexed</span>
               </button>
             </div>,
             document.body
           )}
-      {openSub === 'export' && exportPos && createPortal(
+          {openSub === 'export' && exportPos && createPortal(
             <div
               role="menu"
-              className="fixed z-[1001] min-w-40 rounded-md border border-gray-300 bg-white shadow-lg text-sm py-1"
-        style={{ left: exportPos.x, top: exportPos.y }}
+              className="fixed z-[1001] min-w-40 rounded-md border border-border bg-elevated shadow-lg text-sm py-1"
+              style={{ left: exportPos.x, top: exportPos.y }}
               ref={exportSubRef}
             >
-              <button className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center gap-2" onClick={() => { exportPNG(); setMenuOpen(false); setOpenSub(null) }}>
+              <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { exportPNG(); setMenuOpen(false); setOpenSub(null) }}>
                 <LuDownload aria-hidden />
                 <span>PNG</span>
               </button>
@@ -269,7 +269,7 @@ export function TopBar() {
       {recentOpen && createPortal(
         <div
           ref={recentRootRef}
-          className="fixed z-[1000] min-w-44 max-w-72 rounded-md border border-gray-300 bg-white shadow-lg p-2"
+          className="fixed z-[1000] min-w-44 max-w-72 rounded-md border border-border bg-elevated shadow-lg p-2"
           style={{ left: recentPos.x, top: recentPos.y }}
           role="dialog"
           aria-label="Recent colors"
@@ -281,7 +281,7 @@ export function TopBar() {
                 key={c}
                 title={c}
                 aria-label={`Use ${c}`}
-                className="w-6 h-6 rounded border border-black/20"
+                className="w-6 h-6 rounded border border-border"
                 style={{ background: c }}
                 onClick={() => { setColor(c); setRecentOpen(false) }}
               />

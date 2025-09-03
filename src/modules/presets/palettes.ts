@@ -59,13 +59,13 @@ export const PALETTE_PRESETS: PalettePreset[] = [
   { id: 'pico8', name: 'PICO-8 (16)', colors: PICO8, transparentIndex: 0 },
   { id: 'gb-dmg', name: 'Game Boy (DMG, 4)', colors: GB_DMG, transparentIndex: 0 },
   {
-    id: 'wplace-free', name: 'WPLACE (Free)', colors: new Uint32Array([
+    id: 'wplace-free', name: 'wplace (Free)', colors: new Uint32Array([
       0x00000000,
       ...WPLACE_COLORS.filter(c => !c.locked).map(c => parseCSSColor(c.code))
     ]), transparentIndex: 0
   },
   {
-    id: 'wplace', name: 'WPLACE', colors: new Uint32Array([
+    id: 'wplace', name: 'wplace', colors: new Uint32Array([
       0x00000000,
       ...WPLACE_COLORS.map(c => parseCSSColor(c.code))
     ]), transparentIndex: 0

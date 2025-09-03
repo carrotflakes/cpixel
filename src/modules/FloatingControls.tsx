@@ -9,7 +9,7 @@ export function FloatingControls() {
   // hide on large screens, show on mobile; keep simple responsive CSS
   // buttons are accessible and big enough for touch
   return (
-    <div className="pointer-events-none fixed bottom-3 left-1/2 -translate-x-1/2 md:hidden">
+    <div className="pointer-events-none pb-2 md:hidden flex justify-center">
       <div className="pointer-events-auto flex gap-3 bg-black/60 text-white rounded-full px-4 py-2 shadow-lg backdrop-blur-sm">
         <button
           type="button"

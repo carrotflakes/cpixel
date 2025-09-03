@@ -112,7 +112,7 @@ export function PixelCanvas() {
   }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY])
 
   return (
-    <div className="w-full h-full bg-gray-300">
+  <div className="w-full h-full bg-surface-muted">
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}

@@ -1,25 +1,25 @@
-import { PixelCanvas } from './PixelCanvas'
-import { TopBar } from './TopBar'
-import { FloatingControls } from './FloatingControls.tsx'
-import { StatusBar } from './StatusBar'
-import { PalettePanel } from './PalettePanel'
-import { LayersPanel } from './LayersPanel'
+import { PixelCanvas } from "./PixelCanvas";
+import { TopBar } from "./TopBar";
+import { FloatingControls } from "./FloatingControls.tsx";
+import { StatusBar } from "./StatusBar";
+import { PalettePanel } from "./PalettePanel";
+import { LayersPanel } from "./LayersPanel";
 
 export function App() {
   return (
-    <div className="w-dvw h-dvh flex flex-col items-stretch overflow-hidden text-gray-800 dark:text-gray-100">
-      <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-300">
+    <div className="w-dvw h-dvh flex flex-col items-stretch overflow-hidden text-content bg-base">
+      <div className="bg-surface border-b border-border">
         <TopBar />
       </div>
-      <div className="grow min-h-0 bg-gray-200 dark:bg-gray-800">
+      <div className="grow min-h-0 bg-surface-muted">
         <PixelCanvas />
-        <FloatingControls />
         <LayersPanel />
       </div>
-      <PalettePanel />
-      <div className="bg-gray-50 dark:bg-gray-800">
+      <div className="absolute bottom-0 left-0 right-0">
+        <FloatingControls />
+        <PalettePanel />
         <StatusBar />
       </div>
     </div>
-  )
+  );
 }

@@ -76,20 +76,20 @@ export function PalettePanel() {
   }
 
   return (
-    <div ref={panelRef} className="px-3 py-2 border-t border-gray-300 bg-white/70 dark:bg-gray-900/40 backdrop-blur relative">
+    <div ref={panelRef} className="px-3 py-2 border-t border-border bg-surface/70 backdrop-blur relative">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm">Palette ({palette.length}/256)</span>
-        <button className="px-2 py-1 text-xs rounded bg-gray-800 text-white" onClick={onAddFromPicker}>Add current color</button>
+        <span className="text-sm text-muted">Palette ({palette.length}/256)</span>
+        <button className="px-2 py-1 text-xs rounded bg-accent text-white" onClick={onAddFromPicker}>Add current color</button>
         <button
-          className="px-2 py-1 text-xs rounded border border-gray-300 bg-white"
+          className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted"
           onClick={() => setPresetsOpen(v => !v)}
           aria-expanded={presetsOpen}
         >Presets</button>
-        <label className="text-sm ml-3">Transparent</label>
+        <label className="text-sm ml-3 text-muted">Transparent</label>
         <select
           value={transparentIndex}
           onChange={(e) => setTransparentIndex(parseInt(e.target.value, 10))}
-          className="px-2 py-1 rounded border border-gray-300 bg-white text-sm"
+          className="px-2 py-1 rounded border border-border bg-surface text-sm"
         >
           {Array.from({ length: palette.length }).map((_, i) => (
             <option key={i} value={i}>{i}</option>
@@ -97,16 +97,16 @@ export function PalettePanel() {
         </select>
       </div>
       {presetsOpen && (
-        <div ref={presetsRef} className="mb-3 p-2 rounded border border-gray-300 bg-white shadow-sm">
+        <div ref={presetsRef} className="mb-3 p-2 rounded border border-border bg-elevated shadow-sm">
           <div className="grid gap-2 sm:grid-cols-2">
             {PALETTE_PRESETS.map(p => (
               <button
                 key={p.id}
-                className="text-left p-2 rounded border border-gray-200 hover:bg-gray-50"
+                className="text-left p-2 rounded border border-border hover:bg-surface-muted"
                 onClick={() => { applyPalettePreset(p.colors, p.transparentIndex); setPresetsOpen(false) }}
                 title={`Apply ${p.name}`}
               >
-                <div className="text-xs font-medium mb-2">{p.name}</div>
+                <div className="text-xs font-medium mb-2 text-content">{p.name}</div>
                 <div className="flex flex-wrap gap-1">
                   {Array.from(p.colors.slice(0, 32)).map((c, i) => {
                     const isTransparent = (p.transparentIndex ?? -1) === i || ((c >>> 0) & 0xff) === 0
@@ -116,12 +116,12 @@ export function PalettePanel() {
                     return (
                       <span
                         key={i}
-                        className="w-4 h-4 inline-block rounded border border-black/10"
+                        className="w-4 h-4 inline-block rounded border border-border"
                         style={style}
                       />
                     )
                   })}
-                  {p.colors.length > 32 && <span className="text-[10px] text-gray-500 ml-1">+{p.colors.length - 32}</span>}
+                  {p.colors.length > 32 && <span className="text-[10px] text-muted ml-1">+{p.colors.length - 32}</span>}
                 </div>
               </button>
             ))}
@@ -138,7 +138,7 @@ export function PalettePanel() {
             <button
               key={i}
               title={`#${i}`}
-              className={`w-7 h-7 rounded border ${i === transparentIndex ? 'border-blue-600 border-2' : 'border-black/20'}`}
+              className={`w-7 h-7 rounded border ${i === transparentIndex ? 'border-accent border-2' : 'border-border'}`}
               style={style}
               onClick={(e) => {
                 if (suppressClickRef.current) {
@@ -186,14 +186,14 @@ export function PalettePanel() {
       {menu?.open && createPortal(
         <div
           role="menu"
-          className="fixed z-[1000] min-w-32 rounded-md border border-gray-300 bg-white shadow-lg text-sm"
+          className="fixed z-[1000] min-w-32 rounded-md border border-border bg-elevated shadow-lg text-sm"
           ref={menuRef}
           style={{ top: menu.y, left: menu.x }}
           onContextMenu={(e) => e.preventDefault()}
         >
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center gap-2"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
             onClick={() => { setTransparentIndex(menu.index); setMenu(null) }}
             disabled={menu.index === transparentIndex}
           >
@@ -202,7 +202,7 @@ export function PalettePanel() {
           </button>
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-gray-100 disabled:opacity-50 inline-flex items-center gap-2"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted disabled:opacity-50 inline-flex items-center gap-2"
             onClick={() => { movePaletteIndex(menu.index, Math.max(0, menu.index - 1)); setMenu(null) }}
             disabled={menu.index === 0}
           >
@@ -211,7 +211,7 @@ export function PalettePanel() {
           </button>
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-gray-100 disabled:opacity-50 inline-flex items-center gap-2"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted disabled:opacity-50 inline-flex items-center gap-2"
             onClick={() => { movePaletteIndex(menu.index, Math.min(palette.length - 1, menu.index + 1)); setMenu(null) }}
             disabled={menu.index === palette.length - 1}
           >
@@ -220,7 +220,7 @@ export function PalettePanel() {
           </button>
           <button
             role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700 disabled:opacity-50 inline-flex items-center gap-2"
+            className="w-full text-left px-3 py-2 hover:bg-red-50/70 text-red-700 disabled:opacity-50 inline-flex items-center gap-2"
             onClick={() => { removePaletteIndex(menu.index); setMenu(null) }}
             disabled={palette.length <= 1}
           >
