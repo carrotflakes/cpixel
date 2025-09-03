@@ -147,6 +147,15 @@ export function TopBar() {
             <span className="hidden sm:inline">Brush</span>
           </button>
           <button
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'eraser' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+            onClick={() => setTool('eraser')}
+            aria-pressed={tool === 'eraser'}
+            title="Eraser"
+          >
+            <FaEraser aria-hidden />
+            <span className="hidden sm:inline">Eraser</span>
+          </button>
+          <button
             className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'bucket' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
             onClick={() => setTool('bucket')}
             aria-pressed={tool === 'bucket'}

@@ -109,9 +109,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') return
-  // If this were a touch-derived PointerEvent with multiple contacts, bail
-  if ((e as any).isPrimary === false) return
-  const { x, y } = pickPoint(e.clientX, e.clientY)
+    // If this were a touch-derived PointerEvent with multiple contacts, bail
+    if ((e as any).isPrimary === false) return
+    const { x, y } = pickPoint(e.clientX, e.clientY)
     if (x < 0 || y < 0 || x >= W || y >= H) { setHoverCell(null); clearHoverInfo(); return }
     setHoverCell({ x, y })
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
@@ -127,7 +127,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const right = (e.buttons & 2) !== 0
       const pressed = left || right
       if (pressed) {
-        const erase = right
+        const erase = tool === 'eraser' ? left || right : right
         const rgba = erase ? 0x00000000 : parseCSSColor(color)
         if (!mouseStroke.current.active) {
           mouseStroke.current.active = true
@@ -169,7 +169,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       return
     }
     const { x, y } = pickPoint(e.clientX, e.clientY)
-  if (x >= 0 && y >= 0 && x < W && y < H) {
+    if (x >= 0 && y >= 0 && x < W && y < H) {
       if (tool === 'line' || tool === 'rect') {
         setShapePreview({ kind: tool, startX: x, startY: y, curX: x, curY: y })
         beginStroke()
@@ -181,10 +181,10 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           else {
             // start mouse stroke drawing
             mouseStroke.current.active = true
-            mouseStroke.current.erase = false
+            mouseStroke.current.erase = tool === 'eraser'
             mouseStroke.current.lastX = x
             mouseStroke.current.lastY = y
-            setAt(x, y, parseCSSColor(color))
+            setAt(x, y, tool === 'eraser' ? 0x00000000 : parseCSSColor(color))
           }
         } else if (e.button === 2) {
           if (tool === 'bucket') { fillBucket(x, y, 0x00000000, contiguous) }
@@ -211,8 +211,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const rect = canvasRef.current!.getBoundingClientRect()
       const vw = rect.width
       const vh = rect.height
-  const cw = W * size
-  const ch = H * size
+      const cw = W * size
+      const ch = H * size
       let nvx = viewX + dx
       let nvy = viewY + dy
         ; ({ vx: nvx, vy: nvy } = clampViewToBounds(nvx, nvy, vw, vh, cw, ch))
@@ -222,7 +222,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
     if (shapePreview.kind) {
       const { x, y } = pickPoint(e.clientX, e.clientY)
-  setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
+      setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
       // force re-render via hover change to show dashed preview
       setHoverCell((h) => h ? { ...h } : { x: -1, y: -1 })
       return
@@ -236,7 +236,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
     if (shapePreview.kind) {
       const s = shapePreview
-      const rgba = parseCSSColor(color)
+      const rgba = tool === 'eraser' ? 0x00000000 : parseCSSColor(color)
       if (s.kind === 'line') {
         usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
       } else if (s.kind === 'rect') {
@@ -247,9 +247,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       return
     }
     endStroke()
-  mouseStroke.current.active = false
-  mouseStroke.current.lastX = undefined
-  mouseStroke.current.lastY = undefined
+    mouseStroke.current.active = false
+    mouseStroke.current.lastX = undefined
+    mouseStroke.current.lastY = undefined
   }
 
   const onPointerLeave = () => { setHoverCell(null); clearHoverInfo() }
@@ -265,9 +265,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const ratio = nextSize / size
     const newVX = viewX - (Cx - viewX) * (ratio - 1)
     const newVY = viewY - (Cy - viewY) * (ratio - 1)
-  const { vx: cvx2, vy: cvy2 } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
-  setPixelSize(nextSize)
-  setView(Math.round(cvx2), Math.round(cvy2))
+    const { vx: cvx2, vy: cvy2 } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
+    setPixelSize(nextSize)
+    setView(Math.round(cvx2), Math.round(cvy2))
     e.preventDefault()
   }
 
@@ -294,14 +294,14 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (touches.current.isDrawing) return
         if (touches.current.multi) return
         const { x, y } = pickPoint(touches.current.startX!, touches.current.startY!)
-  if (x >= 0 && y >= 0 && x < W && y < H) {
+        if (x >= 0 && y >= 0 && x < W && y < H) {
           beginStroke()
           if (tool === 'bucket') {
             fillBucket(x, y, parseCSSColor(color), true)
             endStroke()
           } else {
             touches.current.isDrawing = true
-            setAt(x, y, parseCSSColor(color))
+            setAt(x, y, tool === 'eraser' ? 0x00000000 : parseCSSColor(color))
             touches.current.lastPixX = x
             touches.current.lastPixY = y
           }
@@ -337,8 +337,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       }
       if (touches.current.isDrawing) {
         const { x, y } = pickPoint(t.clientX, t.clientY)
-  if (x >= 0 && y >= 0 && x < W && y < H) {
-          const rgba = parseCSSColor(color)
+        if (x >= 0 && y >= 0 && x < W && y < H) {
+          const rgba = tool === 'eraser' ? 0x00000000 : parseCSSColor(color)
           const lx = touches.current.lastPixX
           const ly = touches.current.lastPixY
           if (lx === undefined || ly === undefined) {
@@ -356,7 +356,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const t1 = getTouchById(e, touches.current.id1)
     const t2 = getTouchById(e, touches.current.id2)
     if (t1 && t2 && touches.current.lastDist && touches.current.lastX !== undefined && touches.current.lastY !== undefined) {
-  touches.current.multi = true
+      touches.current.multi = true
       const cx = (t1.clientX + t2.clientX) / 2
       const cy = (t1.clientY + t2.clientY) / 2
       const d = dist(t1.clientX, t1.clientY, t2.clientX, t2.clientY)
@@ -373,7 +373,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const v1y = viewY + dy
       const newVX = v1x - (Cx - v1x) * (ratio - 1)
       const newVY = v1y - (Cy - v1y) * (ratio - 1)
-  const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
+      const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
       setPixelSizeRaw(nextSize)
       setView(Math.round(cvx), Math.round(cvy))
       touches.current.lastDist = d
@@ -389,12 +389,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       if (!touches.current.multi && !touches.current.isDrawing) {
         const t = e.changedTouches[0]
         const { x, y } = pickPoint(t.clientX, t.clientY)
-  if (x >= 0 && y >= 0 && x < W && y < H) {
+        if (x >= 0 && y >= 0 && x < W && y < H) {
           beginStroke()
           if (tool === 'bucket') {
             fillBucket(x, y, parseCSSColor(color), true)
           } else {
-            setAt(x, y, parseCSSColor(color))
+            setAt(x, y, tool === 'eraser' ? 0x00000000 : parseCSSColor(color))
           }
           endStroke()
         }

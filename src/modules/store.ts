@@ -43,7 +43,7 @@ export type PixelState = {
   mode: 'truecolor' | 'indexed'
   palette: Uint32Array
   transparentIndex: number
-  tool?: 'brush' | 'bucket' | 'line' | 'rect'
+  tool?: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser'
   setColor: (c: string) => void
   setColorLive: (c: string) => void
   // layer ops
@@ -59,7 +59,7 @@ export type PixelState = {
   removePaletteIndex: (idx: number) => void
   movePaletteIndex: (from: number, to: number) => void
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
-  setTool: (t: 'brush' | 'bucket' | 'line' | 'rect') => void
+  setTool: (t: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser') => void
   setPixelSize: (n: number) => void
   setPixelSizeRaw: (n: number) => void
   setView: (x: number, y: number) => void
