@@ -18,16 +18,19 @@ export type PixelState = {
   mode: 'truecolor' | 'indexed'
   palette: Uint32Array
   transparentIndex: number
+  tool?: 'brush' | 'bucket'
   setColor: (c: string) => void
   addPaletteColor: (rgba: number) => number
   setTransparentIndex: (idx: number) => void
   removePaletteIndex: (idx: number) => void
   movePaletteIndex: (from: number, to: number) => void
+  setTool: (t: 'brush' | 'bucket') => void
   setPixelSize: (n: number) => void
   setPixelSizeRaw: (n: number) => void
   setView: (x: number, y: number) => void
   panBy: (dx: number, dy: number) => void
   setAt: (x: number, y: number, rgba: number) => void
+  fillBucket: (x: number, y: number, rgba: number, contiguous: boolean) => void
   setMode: (m: 'truecolor' | 'indexed') => void
   // history
   beginStroke: () => void
@@ -61,6 +64,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   color: '#000000',
   recentColors: ['#000000', '#ffffff'],
   mode: 'truecolor',
+  tool: 'brush',
   // simple default palette (16 base colors + transparent at 0)
   palette: new Uint32Array([
     0x00000000, 0xffffffff, 0xff0000ff, 0x00ff00ff, 0x0000ffff, 0xffff00ff, 0xff00ffff, 0x00ffffff,
@@ -73,6 +77,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   _undo: [] as Uint32Array[],
   _redo: [] as Uint32Array[],
   _stroking: false,
+  setTool: (t) => set({ tool: t }),
   setColor: (c) => set((s) => {
     // update recent colors (dedupe, cap to 10)
     const existing = s.recentColors || []
@@ -177,6 +182,65 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const next = new Uint8Array(idx)
       next[i] = writeIndex & 0xff
       return { indices: next }
+    }
+  }),
+  fillBucket: (x, y, rgba, contiguous) => set((s) => {
+    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return {}
+    if (s.mode === 'truecolor') {
+      const src = s.data
+      const w = WIDTH, h = HEIGHT
+      const idx0 = y * w + x
+      const target = src[idx0] >>> 0
+      const replacement = rgba >>> 0
+      if (target === replacement) return {}
+      const out = new Uint32Array(src)
+      if (contiguous) {
+        const stack: number[] = [x, y]
+        while (stack.length) {
+          const cy = stack.pop() as number
+          const cx = stack.pop() as number
+          const i = cy * w + cx
+          if (cx < 0 || cy < 0 || cx >= w || cy >= h) continue
+          if ((out[i] >>> 0) !== target) continue
+          out[i] = replacement
+          stack.push(cx + 1, cy)
+          stack.push(cx - 1, cy)
+          stack.push(cx, cy + 1)
+          stack.push(cx, cy - 1)
+        }
+      } else {
+        for (let i = 0; i < out.length; i++) if ((out[i] >>> 0) === target) out[i] = replacement
+      }
+      return { data: out }
+    } else {
+      // indexed mode
+      const idxArr = s.indices ?? new Uint8Array(WIDTH * HEIGHT)
+      const w = WIDTH, h = HEIGHT
+      const i0 = y * w + x
+      const targetIdx = idxArr[i0] ?? s.transparentIndex
+      const replacementIdx = (rgba >>> 0) === 0x00000000
+        ? s.transparentIndex
+        : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      if (targetIdx === replacementIdx) return {}
+      const out = new Uint8Array(idxArr)
+      if (contiguous) {
+        const stack: number[] = [x, y]
+        while (stack.length) {
+          const cy = stack.pop() as number
+          const cx = stack.pop() as number
+          if (cx < 0 || cy < 0 || cx >= w || cy >= h) continue
+          const i = cy * w + cx
+          if ((out[i] ?? s.transparentIndex) !== targetIdx) continue
+          out[i] = replacementIdx & 0xff
+          stack.push(cx + 1, cy)
+          stack.push(cx - 1, cy)
+          stack.push(cx, cy + 1)
+          stack.push(cx, cy - 1)
+        }
+      } else {
+        for (let i = 0; i < out.length; i++) if ((out[i] ?? s.transparentIndex) === targetIdx) out[i] = replacementIdx & 0xff
+      }
+      return { indices: out }
     }
   }),
   setMode: (m) => set((s) => {

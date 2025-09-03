@@ -133,7 +133,8 @@ Phase 1 – Core editor polish (UX/stability)
 
 Phase 2 – Drawing tools and ergonomics
 - Eyedropper: press and hold a modifier (e.g., Alt/Ctrl) to pick color from canvas
-- Line/Rectangle/Ellipse tools (pixel-perfect Bresenham variants); fill tool (flood fill)
+- Line/Rectangle/Ellipse tools (pixel-perfect Bresenham variants)
+- Fill tool (flood fill) – in progress
 - Brush preview: hover cell highlight and active tool preview
 - Undo/Redo: history stack (bounded), coalesce strokes; keyboard shortcuts (Ctrl/Cmd+Z/Y)
 - Color palette: swatches, add/remove, recent colors
@@ -146,6 +147,11 @@ Phase 2b – Color management: Indexed + Truecolor (dual-mode)
 - Conversion: truecolor→indexed (simple quantize first), indexed→truecolor (expand)
 - I/O: PNG stays RGBA; project JSON includes `{ mode, palette, pixels }`
 - Limits: `MAX_COLORS` (e.g., 16/32/64/256)
+
+Phase 2c – Palette UX polish (TODO)
+- Drag-and-drop palette reorder (+ keyboard support), persist order
+- Palette import/export (JSON, copy/paste hex, optional .gpl import)
+- Truecolor → Indexed quantization with palette size and optional dithering
 
 Phase 3 – File I/O and persistence
 - Local persistence: autosave latest canvas to localStorage

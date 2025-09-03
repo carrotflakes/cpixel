@@ -10,6 +10,7 @@ export function PixelCanvas() {
   const color = usePixelStore(s => s.color)
   const setColor = usePixelStore(s => s.setColor)
   const setAt = usePixelStore(s => s.setAt)
+  const fillBucket = usePixelStore(s => s.fillBucket)
   const beginStroke = usePixelStore(s => s.beginStroke)
   const endStroke = usePixelStore(s => s.endStroke)
   const undo = usePixelStore(s => s.undo)
@@ -19,6 +20,7 @@ export function PixelCanvas() {
   const indices = usePixelStore(s => s.indices)
   const palette = usePixelStore(s => s.palette)
   const transparentIndex = usePixelStore(s => s.transparentIndex)
+  const tool = usePixelStore(s => s.tool)
   const viewX = usePixelStore(s => s.viewX)
   const viewY = usePixelStore(s => s.viewY)
   const setPixelSize = usePixelStore(s => s.setPixelSize)
@@ -239,17 +241,20 @@ export function PixelCanvas() {
       e.preventDefault()
       return
     }
+    const contiguous = !e.shiftKey // Shift = global fill; default contiguous
     if (e.buttons & 1) {
-      setAt(x, y, parseCSSColor(color))
+      if (tool === 'bucket') fillBucket(x, y, parseCSSColor(color), contiguous)
+      else setAt(x, y, parseCSSColor(color))
     } else if (e.buttons & 2) {
-      setAt(x, y, 0x00000000) // erase
+      if (tool === 'bucket') fillBucket(x, y, 0x00000000, contiguous)
+      else setAt(x, y, 0x00000000) // erase
     }
   }
 
   const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const wantPan = e.button === 1 || (e.button === 0 && (panModRef.current || e.ctrlKey))
-    if (wantPan) {
+  if (wantPan) {
       dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
   // visual feedback
@@ -261,8 +266,15 @@ export function PixelCanvas() {
     const { x, y } = pickPoint(e.clientX, e.clientY)
     if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
       if (e.button === 0 || e.button === 2) beginStroke()
+      // For bucket, apply immediately on mouse down so it fills once per click
+      const contiguous = !e.shiftKey
+      if (e.button === 0) {
+        if (tool === 'bucket') { fillBucket(x, y, parseCSSColor(color), contiguous) }
+      } else if (e.button === 2) {
+        if (tool === 'bucket') { fillBucket(x, y, 0x00000000, contiguous) }
+      }
     }
-    onPointer(e)  
+    onPointer(e)
   }
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (dragState.current.panning) {
@@ -348,13 +360,18 @@ export function PixelCanvas() {
         // start drawing after hold
         if (touches.current.isDrawing) return
         if (touches.current.multi) return // suppressed by multi-touch
-        touches.current.isDrawing = true
-        beginStroke()
         const { x, y } = pickPoint(touches.current.startX!, touches.current.startY!)
         if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
-          setAt(x, y, parseCSSColor(color))
-          touches.current.lastPixX = x
-          touches.current.lastPixY = y
+          beginStroke()
+          if (tool === 'bucket') {
+            fillBucket(x, y, parseCSSColor(color), true)
+            endStroke()
+          } else {
+            touches.current.isDrawing = true
+            setAt(x, y, parseCSSColor(color))
+            touches.current.lastPixX = x
+            touches.current.lastPixY = y
+          }
         }
       }, TOUCH_HOLD_MS)
     } else if (e.touches.length === 2) {
@@ -434,7 +451,11 @@ export function PixelCanvas() {
         const { x, y } = pickPoint(t.clientX, t.clientY)
         if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
           beginStroke()
-          setAt(x, y, parseCSSColor(color))
+          if (tool === 'bucket') {
+            fillBucket(x, y, parseCSSColor(color), true)
+          } else {
+            setAt(x, y, parseCSSColor(color))
+          }
           endStroke()
         }
       }
