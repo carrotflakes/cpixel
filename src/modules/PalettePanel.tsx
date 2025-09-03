@@ -108,13 +108,19 @@ export function PalettePanel() {
               >
                 <div className="text-xs font-medium mb-2">{p.name}</div>
                 <div className="flex flex-wrap gap-1">
-                  {Array.from(p.colors.slice(0, 32)).map((c, i) => (
-                    <span
-                      key={i}
-                      className="w-4 h-4 inline-block rounded border border-black/10"
-                      style={{ background: rgbaToCSSHex(c) }}
-                    />
-                  ))}
+                  {Array.from(p.colors.slice(0, 32)).map((c, i) => {
+                    const isTransparent = (p.transparentIndex ?? -1) === i || ((c >>> 0) & 0xff) === 0
+                    const style = isTransparent
+                      ? { backgroundImage: 'repeating-conic-gradient(#cccccc 0% 25%, transparent 0% 50%)', backgroundSize: '8px 8px', backgroundColor: '#ffffff' }
+                      : { background: rgbaToCSSHex(c) }
+                    return (
+                      <span
+                        key={i}
+                        className="w-4 h-4 inline-block rounded border border-black/10"
+                        style={style}
+                      />
+                    )
+                  })}
                   {p.colors.length > 32 && <span className="text-[10px] text-gray-500 ml-1">+{p.colors.length - 32}</span>}
                 </div>
               </button>
@@ -123,52 +129,58 @@ export function PalettePanel() {
         </div>
       )}
       <div className="flex flex-wrap gap-3">
-        {Array.from(palette).map((rgba, i) => (
-          <button
-            key={i}
-            title={`#${i}`}
-            className={`w-7 h-7 rounded border ${i === transparentIndex ? 'border-blue-600 border-2' : 'border-black/20'}`}
-            style={{ background: rgbaToCSSHex(rgba) }}
-            onClick={(e) => {
-              if (suppressClickRef.current) {
-                e.preventDefault()
-                e.stopPropagation()
-                suppressClickRef.current = false
-                return
-              }
-              setColor(rgbaToCSSHex(rgba))
-            }}
-            onContextMenu={(e) => { e.preventDefault(); openMenuAt(e.clientX, e.clientY, i) }}
-            onPointerDown={(e) => {
-              if (e.pointerType === 'touch') {
-                if (longPressRef.current?.timer) window.clearTimeout(longPressRef.current.timer)
-                const timer = window.setTimeout(() => {
-                  openMenuAt(e.clientX, e.clientY, i)
-                }, 500)
-                longPressRef.current = { timer, index: i }
-                touchStartPos.current = { x: e.clientX, y: e.clientY }
-              }
-            }}
-            onPointerMove={(e) => {
-              if (e.pointerType === 'touch' && touchStartPos.current) {
-                const dx = e.clientX - touchStartPos.current.x
-                const dy = e.clientY - touchStartPos.current.y
-                if (dx * dx + dy * dy > 16) {
-                  if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
-                  touchStartPos.current = null
+        {Array.from(palette).map((rgba, i) => {
+          const isTransparent = i === transparentIndex || ((rgba >>> 0) & 0xff) === 0
+          const style = isTransparent
+            ? { backgroundImage: 'repeating-conic-gradient(#cccccc 0% 25%, transparent 0% 50%)', backgroundSize: '8px 8px', backgroundColor: '#ffffff' }
+            : { background: rgbaToCSSHex(rgba) }
+          return (
+            <button
+              key={i}
+              title={`#${i}`}
+              className={`w-7 h-7 rounded border ${i === transparentIndex ? 'border-blue-600 border-2' : 'border-black/20'}`}
+              style={style}
+              onClick={(e) => {
+                if (suppressClickRef.current) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  suppressClickRef.current = false
+                  return
                 }
-              }
-            }}
-            onPointerUp={() => {
-              if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
-              touchStartPos.current = null
-            }}
-            onPointerCancel={() => {
-              if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
-              touchStartPos.current = null
-            }}
-          />
-        ))}
+                setColor(rgbaToCSSHex(rgba))
+              }}
+              onContextMenu={(e) => { e.preventDefault(); openMenuAt(e.clientX, e.clientY, i) }}
+              onPointerDown={(e) => {
+                if (e.pointerType === 'touch') {
+                  if (longPressRef.current?.timer) window.clearTimeout(longPressRef.current.timer)
+                  const timer = window.setTimeout(() => {
+                    openMenuAt(e.clientX, e.clientY, i)
+                  }, 500)
+                  longPressRef.current = { timer, index: i }
+                  touchStartPos.current = { x: e.clientX, y: e.clientY }
+                }
+              }}
+              onPointerMove={(e) => {
+                if (e.pointerType === 'touch' && touchStartPos.current) {
+                  const dx = e.clientX - touchStartPos.current.x
+                  const dy = e.clientY - touchStartPos.current.y
+                  if (dx * dx + dy * dy > 16) {
+                    if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
+                    touchStartPos.current = null
+                  }
+                }
+              }}
+              onPointerUp={() => {
+                if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
+                touchStartPos.current = null
+              }}
+              onPointerCancel={() => {
+                if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
+                touchStartPos.current = null
+              }}
+            />
+          )
+        })}
       </div>
 
       {menu?.open && createPortal(
