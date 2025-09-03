@@ -20,6 +20,8 @@ export function PixelCanvas() {
   const setPixelSize = usePixelStore(s => s.setPixelSize)
   const setPixelSizeRaw = usePixelStore(s => s.setPixelSizeRaw)
   const setView = usePixelStore(s => s.setView)
+  const setHoverInfo = usePixelStore(s => s.setHoverInfo)
+  const clearHoverInfo = usePixelStore(s => s.clearHoverInfo)
   // const panBy = usePixelStore(s => s.panBy)
 
   const scaledW = WIDTH * size
@@ -206,9 +208,10 @@ export function PixelCanvas() {
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') return // do not draw on touch; handled via touch events
     const { x, y } = pickPoint(e.clientX, e.clientY)
-  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) { setHoverCell(null); return }
+  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) { setHoverCell(null); clearHoverInfo(); return }
   // track hover
   setHoverCell({ x, y })
+  setHoverInfo(x, y, data[y * WIDTH + x])
     // Eyedropper: Alt to pick color under cursor (no drawing)
     if (e.altKey) {
       const rgba = data[y * WIDTH + x]
@@ -267,7 +270,7 @@ export function PixelCanvas() {
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
   endStroke()
   }
-  const onPointerLeave = () => { setHoverCell(null) }
+  const onPointerLeave = () => { setHoverCell(null); clearHoverInfo() }
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect()

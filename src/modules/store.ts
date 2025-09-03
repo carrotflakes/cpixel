@@ -12,6 +12,7 @@ export type PixelState = {
   viewX: number
   viewY: number
   color: string
+  recentColors: string[]
   setColor: (c: string) => void
   setPixelSize: (n: number) => void
   setPixelSizeRaw: (n: number) => void
@@ -29,6 +30,12 @@ export type PixelState = {
   _undo?: Uint32Array[]
   _redo?: Uint32Array[]
   _stroking?: boolean
+  // hover info for status bar
+  hoverX?: number
+  hoverY?: number
+  hoverRGBA?: number
+  setHoverInfo: (x: number, y: number, rgba: number) => void
+  clearHoverInfo: () => void
   clear: () => void
   exportPNG: () => void
 }
@@ -41,13 +48,20 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   viewX: 0,
   viewY: 0,
   color: '#000000',
+  recentColors: ['#000000', '#ffffff'],
   canUndo: false,
   canRedo: false,
   // internal history state
   _undo: [] as Uint32Array[],
   _redo: [] as Uint32Array[],
   _stroking: false,
-  setColor: (c) => set({ color: c }),
+  setColor: (c) => set((s) => {
+    // update recent colors (dedupe, cap to 10)
+    const existing = s.recentColors || []
+    const norm = (x: string) => x.toLowerCase()
+    const next = [c, ...existing.filter(v => norm(v) !== norm(c))].slice(0, 10)
+    return { color: c, recentColors: next }
+  }),
   setPixelSize: (n) => set({ pixelSize: clamp(Math.round(n), MIN_SIZE, MAX_SIZE) }),
   // Allows fractional pixel sizes (used for pinch-zoom). Still clamped to bounds.
   setPixelSizeRaw: (n) => set({ pixelSize: clamp(n, MIN_SIZE, MAX_SIZE) }),
@@ -59,6 +73,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     next[y * WIDTH + x] = rgba >>> 0
     return { data: next }
   }),
+  setHoverInfo: (x, y, rgba) => set({ hoverX: x, hoverY: y, hoverRGBA: rgba }),
+  clearHoverInfo: () => set({ hoverX: undefined, hoverY: undefined, hoverRGBA: undefined }),
   beginStroke: () => set((s: any) => {
     if (s._stroking) return {}
     const snap = new Uint32Array(s.data)
