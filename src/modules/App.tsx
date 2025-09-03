@@ -3,6 +3,7 @@ import { TopBar } from './TopBar'
 import { FloatingControls } from './FloatingControls.tsx'
 import { StatusBar } from './StatusBar'
 import { PalettePanel } from './PalettePanel'
+import { LayersPanel } from './LayersPanel'
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
       <div className="grow min-h-0 bg-gray-200 dark:bg-gray-800">
         <PixelCanvas />
         <FloatingControls />
+        <LayersPanel />
       </div>
       <PalettePanel />
       <div className="bg-gray-50 dark:bg-gray-800">

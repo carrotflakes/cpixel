@@ -15,9 +15,8 @@ export function PixelCanvas() {
   const endStroke = usePixelStore(s => s.endStroke)
   const undo = usePixelStore(s => s.undo)
   const redo = usePixelStore(s => s.redo)
-  const data = usePixelStore(s => s.data)
+  const layers = usePixelStore(s => s.layers)
   const mode = usePixelStore(s => s.mode)
-  const indices = usePixelStore(s => s.indices)
   const palette = usePixelStore(s => s.palette)
   const transparentIndex = usePixelStore(s => s.transparentIndex)
   const tool = usePixelStore(s => s.tool)
@@ -66,7 +65,7 @@ export function PixelCanvas() {
           return
         }
       }
-    } catch {}
+    } catch { }
     // center if no saved state
     const rect = cvs.getBoundingClientRect()
     const vw = rect.width
@@ -83,7 +82,7 @@ export function PixelCanvas() {
   useEffect(() => {
     try {
       sessionStorage.setItem('cpixel:view', JSON.stringify({ size, viewX, viewY }))
-    } catch {}
+    } catch { }
   }, [size, viewX, viewY])
 
   // Track Space key for pan modifier (desktop/trackpad friendly)
@@ -128,61 +127,72 @@ export function PixelCanvas() {
       cvs.height = needH
     }
 
-    ctx.setTransform(1,0,0,1,0,0)
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.clearRect(0, 0, cvs.width, cvs.height)
     ctx.scale(dpr, dpr)
     ctx.imageSmoothingEnabled = false
-  // translate to current view (rounded for crisper grid in CSS px space)
-  const vx = Math.round(viewX)
-  const vy = Math.round(viewY)
-  // draw checkerboard in screen space so it doesn't follow pan/zoom (cached tile)
-  const light = '#f0f0f0'
-  const dark = '#d7d7d7'
-  const tile = 12 // CSS px per checker tile
-  if (!checkerTileRef.current || checkerTileRef.current.width !== tile * 2) {
-    const patt = document.createElement('canvas')
-    patt.width = tile * 2
-    patt.height = tile * 2
-    const pctx = patt.getContext('2d')!
-    pctx.fillStyle = light
-    pctx.fillRect(0, 0, tile, tile)
-    pctx.fillRect(tile, tile, tile, tile)
-    pctx.fillStyle = dark
-    pctx.fillRect(tile, 0, tile, tile)
-    pctx.fillRect(0, tile, tile, tile)
-    checkerTileRef.current = patt
-  }
-  const pattern = ctx.createPattern(checkerTileRef.current!, 'repeat')!
-  ctx.fillStyle = pattern
-  ctx.fillRect(vx, vy, scaledW, scaledH)
-  // now translate for drawing content and grid
-  ctx.translate(vx, vy)
+    // translate to current view (rounded for crisper grid in CSS px space)
+    const vx = Math.round(viewX)
+    const vy = Math.round(viewY)
+    // draw checkerboard in screen space so it doesn't follow pan/zoom (cached tile)
+    const light = '#f0f0f0'
+    const dark = '#d7d7d7'
+    const tile = 12 // CSS px per checker tile
+    if (!checkerTileRef.current || checkerTileRef.current.width !== tile * 2) {
+      const patt = document.createElement('canvas')
+      patt.width = tile * 2
+      patt.height = tile * 2
+      const pctx = patt.getContext('2d')!
+      pctx.fillStyle = light
+      pctx.fillRect(0, 0, tile, tile)
+      pctx.fillRect(tile, tile, tile, tile)
+      pctx.fillStyle = dark
+      pctx.fillRect(tile, 0, tile, tile)
+      pctx.fillRect(0, tile, tile, tile)
+      checkerTileRef.current = patt
+    }
+    const pattern = ctx.createPattern(checkerTileRef.current!, 'repeat')!
+    ctx.fillStyle = pattern
+    ctx.fillRect(vx, vy, scaledW, scaledH)
+    // now translate for drawing content and grid
+    ctx.translate(vx, vy)
     // draw bitmap on top (alpha respected)
     const img = ctx.createImageData(WIDTH, HEIGHT)
-    if (mode === 'truecolor') {
-      for (let y = 0; y < HEIGHT; y++) {
-        for (let x = 0; x < WIDTH; x++) {
-          const i = (y * WIDTH + x) * 4
-          const rgba = data[y * WIDTH + x]
-          img.data[i+0] = (rgba >>> 24) & 0xff
-          img.data[i+1] = (rgba >>> 16) & 0xff
-          img.data[i+2] = (rgba >>> 8) & 0xff
-          img.data[i+3] = (rgba >>> 0) & 0xff
+    // composite visible layers bottom->top
+    for (let y = 0; y < HEIGHT; y++) {
+      for (let x = 0; x < WIDTH; x++) {
+        let out = 0x00000000
+        for (let li = 0; li < layers.length; li++) {
+          const L = layers[li]
+          if (!L.visible) continue
+          let rgba = 0x00000000
+          if (mode === 'truecolor') {
+            rgba = (L.data ?? new Uint32Array(WIDTH * HEIGHT))[y * WIDTH + x] >>> 0
+          } else {
+            const pi = (L.indices ?? new Uint8Array(WIDTH * HEIGHT))[y * WIDTH + x] ?? transparentIndex
+            rgba = palette[pi] ?? 0x00000000
+          }
+          const aS = rgba & 0xff
+          if (aS === 0) continue
+          if ((out & 0xff) === 255) break
+          const rS = (rgba >>> 24) & 0xff
+          const gS = (rgba >>> 16) & 0xff
+          const bS = (rgba >>> 8) & 0xff
+          const rD = (out >>> 24) & 0xff
+          const gD = (out >>> 16) & 0xff
+          const bD = (out >>> 8) & 0xff
+          const aD = out & 0xff
+          const aO = aS + ((aD * (255 - aS) + 127) / 255 | 0)
+          const rO = ((rS * aS + rD * aD * (255 - aS) / 255 + 127) / 255) | 0
+          const gO = ((gS * aS + gD * aD * (255 - aS) / 255 + 127) / 255) | 0
+          const bO = ((bS * aS + bD * aD * (255 - aS) / 255 + 127) / 255) | 0
+          out = (rO << 24) | (gO << 16) | (bO << 8) | (aO & 0xff)
         }
-      }
-    } else {
-      const idx = indices ?? new Uint8Array(WIDTH * HEIGHT)
-      for (let y = 0; y < HEIGHT; y++) {
-        for (let x = 0; x < WIDTH; x++) {
-          const p = y * WIDTH + x
-          const pi = idx[p] ?? transparentIndex
-          const rgba = palette[pi] ?? 0x00000000
-          const i = p * 4
-          img.data[i+0] = (rgba >>> 24) & 0xff
-          img.data[i+1] = (rgba >>> 16) & 0xff
-          img.data[i+2] = (rgba >>> 8) & 0xff
-          img.data[i+3] = (rgba >>> 0) & 0xff
-        }
+        const i = (y * WIDTH + x) * 4
+        img.data[i + 0] = (out >>> 24) & 0xff
+        img.data[i + 1] = (out >>> 16) & 0xff
+        img.data[i + 2] = (out >>> 8) & 0xff
+        img.data[i + 3] = (out >>> 0) & 0xff
       }
     }
     if (!tmpCanvasRef.current) {
@@ -197,24 +207,24 @@ export function PixelCanvas() {
     tmpCanvasRef.current.getContext('2d')!.putImageData(img, 0, 0)
     ctx.drawImage(tmpCanvasRef.current, 0, 0, WIDTH, HEIGHT, 0, 0, scaledW, scaledH)
 
-  // border around pixel area
+    // border around pixel area
     ctx.strokeStyle = 'rgba(0,0,0,0.3)'
     ctx.lineWidth = 1
-    ctx.strokeRect(0.5, 0.5, scaledW-1, scaledH-1)
+    ctx.strokeRect(0.5, 0.5, scaledW - 1, scaledH - 1)
 
     // grid
     ctx.strokeStyle = 'rgba(0,0,0,0.15)'
     ctx.lineWidth = 1
     for (let x = 0; x <= WIDTH; x++) {
       ctx.beginPath();
-      ctx.moveTo(x*size+0.5, 0)
-      ctx.lineTo(x*size+0.5, scaledH)
+      ctx.moveTo(x * size + 0.5, 0)
+      ctx.lineTo(x * size + 0.5, scaledH)
       ctx.stroke()
     }
     for (let y = 0; y <= HEIGHT; y++) {
       ctx.beginPath();
-      ctx.moveTo(0, y*size+0.5)
-      ctx.lineTo(scaledW, y*size+0.5)
+      ctx.moveTo(0, y * size + 0.5)
+      ctx.lineTo(scaledW, y * size + 0.5)
       ctx.stroke()
     }
     // hover highlight
@@ -249,7 +259,7 @@ export function PixelCanvas() {
       }
       ctx.restore()
     }
-  }, [data, indices, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y])
+  }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y])
 
   const pickPoint = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -261,13 +271,66 @@ export function PixelCanvas() {
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') return // do not draw on touch; handled via touch events
     const { x, y } = pickPoint(e.clientX, e.clientY)
-  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) { setHoverCell(null); clearHoverInfo(); return }
-  // track hover
-  setHoverCell({ x, y })
-  setHoverInfo(x, y, data[y * WIDTH + x])
+    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) { setHoverCell(null); clearHoverInfo(); return }
+    // track hover
+    setHoverCell({ x, y })
+    // compute composited RGBA at hover point
+    let hov = 0x00000000
+    for (let li = 0; li < layers.length; li++) {
+      const L = layers[li]
+      if (!L.visible) continue
+      let rgba = 0x00000000
+      if (mode === 'truecolor') rgba = (L.data ?? new Uint32Array(WIDTH * HEIGHT))[y * WIDTH + x] >>> 0
+      else {
+        const pi = (L.indices ?? new Uint8Array(WIDTH * HEIGHT))[y * WIDTH + x] ?? transparentIndex
+        rgba = palette[pi] ?? 0x00000000
+      }
+      const aS = rgba & 0xff
+      if (aS === 0) continue
+      if ((hov & 0xff) === 255) break
+      const rS = (rgba >>> 24) & 0xff
+      const gS = (rgba >>> 16) & 0xff
+      const bS = (rgba >>> 8) & 0xff
+      const rD = (hov >>> 24) & 0xff
+      const gD = (hov >>> 16) & 0xff
+      const bD = (hov >>> 8) & 0xff
+      const aD = hov & 0xff
+      const aO = aS + ((aD * (255 - aS) + 127) / 255 | 0)
+      const rO = ((rS * aS + rD * aD * (255 - aS) / 255 + 127) / 255) | 0
+      const gO = ((gS * aS + gD * aD * (255 - aS) / 255 + 127) / 255) | 0
+      const bO = ((bS * aS + bD * aD * (255 - aS) / 255 + 127) / 255) | 0
+      hov = (rO << 24) | (gO << 16) | (bO << 8) | (aO & 0xff)
+    }
+    setHoverInfo(x, y, hov)
     // Eyedropper: Alt to pick color under cursor (no drawing)
     if (e.altKey) {
-      const rgba = mode === 'truecolor' ? data[y * WIDTH + x] : palette[(indices ?? new Uint8Array())[y * WIDTH + x] ?? transparentIndex] ?? 0x00000000
+      // eyedrop from composited color
+      let rgba = 0x00000000
+      for (let li = 0; li < layers.length; li++) {
+        const L = layers[li]
+        if (!L.visible) continue
+        let src = 0x00000000
+        if (mode === 'truecolor') src = (L.data ?? new Uint32Array(WIDTH * HEIGHT))[y * WIDTH + x] >>> 0
+        else {
+          const pi = (L.indices ?? new Uint8Array(WIDTH * HEIGHT))[y * WIDTH + x] ?? transparentIndex
+          src = palette[pi] ?? 0x00000000
+        }
+        const aS = src & 0xff
+        if (aS === 0) continue
+        const rS = (src >>> 24) & 0xff
+        const gS = (src >>> 16) & 0xff
+        const bS = (src >>> 8) & 0xff
+        const aD = rgba & 0xff
+        const rD = (rgba >>> 24) & 0xff
+        const gD = (rgba >>> 16) & 0xff
+        const bD = (rgba >>> 8) & 0xff
+        const aO = aS + ((aD * (255 - aS) + 127) / 255 | 0)
+        const rO = ((rS * aS + rD * aD * (255 - aS) / 255 + 127) / 255) | 0
+        const gO = ((gS * aS + gD * aD * (255 - aS) / 255 + 127) / 255) | 0
+        const bO = ((bS * aS + bD * aD * (255 - aS) / 255 + 127) / 255) | 0
+        rgba = (rO << 24) | (gO << 16) | (bO << 8) | (aO & 0xff)
+        if ((rgba & 0xff) === 255) break
+      }
       setColor(rgbaToCSSHex(rgba))
       e.preventDefault()
       return
@@ -283,12 +346,12 @@ export function PixelCanvas() {
 
   const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-  const wantPan = e.button === 1 || (e.button === 0 && (panModRef.current || e.ctrlKey))
-  if (wantPan) {
+    const wantPan = e.button === 1 || (e.button === 0 && (panModRef.current || e.ctrlKey))
+    if (wantPan) {
       dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
-      ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-  // visual feedback
-  if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
+        ; (e.target as HTMLElement).setPointerCapture(e.pointerId)
+      // visual feedback
+      if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
       e.preventDefault()
       return
     }
@@ -317,16 +380,16 @@ export function PixelCanvas() {
       const dy = e.clientY - dragState.current.lastY
       dragState.current.lastX = e.clientX
       dragState.current.lastY = e.clientY
-  // soft clamp pan to keep content near viewport
-  const rect = canvasRef.current!.getBoundingClientRect()
-  const vw = rect.width
-  const vh = rect.height
-  const cw = WIDTH * size
-  const ch = HEIGHT * size
-  let nvx = viewX + dx
-  let nvy = viewY + dy
-  ;({ vx: nvx, vy: nvy } = clampViewToBounds(nvx, nvy, vw, vh, cw, ch))
-  setView(Math.round(nvx), Math.round(nvy))
+      // soft clamp pan to keep content near viewport
+      const rect = canvasRef.current!.getBoundingClientRect()
+      const vw = rect.width
+      const vh = rect.height
+      const cw = WIDTH * size
+      const ch = HEIGHT * size
+      let nvx = viewX + dx
+      let nvy = viewY + dy
+        ; ({ vx: nvx, vy: nvy } = clampViewToBounds(nvx, nvy, vw, vh, cw, ch))
+      setView(Math.round(nvx), Math.round(nvy))
       e.preventDefault()
       return
     }
@@ -370,10 +433,10 @@ export function PixelCanvas() {
     const ratio = nextSize / size
     const newVX = viewX - (Cx - viewX) * (ratio - 1)
     const newVY = viewY - (Cy - viewY) * (ratio - 1)
-  // clamp to viewport after zoom
-  const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, WIDTH * nextSize, HEIGHT * nextSize)
-  setPixelSize(nextSize)
-  setView(Math.round(cvx), Math.round(cvy))
+    // clamp to viewport after zoom
+    const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, WIDTH * nextSize, HEIGHT * nextSize)
+    setPixelSize(nextSize)
+    setView(Math.round(cvx), Math.round(cvy))
     e.preventDefault()
   }
 
@@ -393,7 +456,7 @@ export function PixelCanvas() {
     timer?: number
     lastPixX?: number
     lastPixY?: number
-  multi?: boolean
+    multi?: boolean
   }>({})
   const getTouchById = (e: React.TouchEvent, id?: number) => Array.from(e.touches).find(t => t.identifier === id)
   const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by)
@@ -480,16 +543,16 @@ export function PixelCanvas() {
       const dx = cx - touches.current.lastX
       const dy = cy - touches.current.lastY
       const k = d / touches.current.lastDist
-  const nextSize = clamp(size * k, MIN_SIZE, MAX_SIZE)
-  const ratio = nextSize / size
+      const nextSize = clamp(size * k, MIN_SIZE, MAX_SIZE)
+      const ratio = nextSize / size
 
-  const v1x = viewX + dx
-  const v1y = viewY + dy
-  const newVX = v1x - (Cx - v1x) * (ratio - 1)
-  const newVY = v1y - (Cy - v1y) * (ratio - 1)
-  const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, WIDTH * nextSize, HEIGHT * nextSize)
-  setPixelSizeRaw(nextSize)
-  setView(Math.round(cvx), Math.round(cvy))
+      const v1x = viewX + dx
+      const v1y = viewY + dy
+      const newVX = v1x - (Cx - v1x) * (ratio - 1)
+      const newVY = v1y - (Cy - v1y) * (ratio - 1)
+      const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, WIDTH * nextSize, HEIGHT * nextSize)
+      setPixelSizeRaw(nextSize)
+      setView(Math.round(cvx), Math.round(cvy))
       touches.current.lastDist = d
       touches.current.lastX = cx
       touches.current.lastY = cy
@@ -541,15 +604,15 @@ export function PixelCanvas() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-  onPointerLeave={onPointerLeave}
+        onPointerLeave={onPointerLeave}
         onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-  className="w-full h-full block shadow rounded touch-none cursor-crosshair focus:outline-2 focus:outline-blue-500"
-  tabIndex={0}
-  aria-label="Pixel canvas"
+        className="w-full h-full block shadow rounded touch-none cursor-crosshair focus:outline-2 focus:outline-blue-500"
+        tabIndex={0}
+        aria-label="Pixel canvas"
       />
     </div>
   )
