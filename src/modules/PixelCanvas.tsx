@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePixelStore, MIN_SIZE, MAX_SIZE } from './store'
 import { compositeImageData } from './utils/composite'
-import { drawBorder, drawChecker, drawGrid, drawHoverCell, drawShapePreview, ensureHiDPICanvas, getCheckerPatternCanvas } from './utils/canvasDraw'
+import { drawBorder, drawChecker, drawGrid, drawHoverCell, drawShapePreview, ensureHiDPICanvas, getCheckerPatternCanvas, drawSelectionOverlay } from './utils/canvasDraw'
 import { useCanvasInput } from './hooks/useCanvasInput'
 
 export function PixelCanvas() {
@@ -18,12 +18,19 @@ export function PixelCanvas() {
   const viewY = usePixelStore(s => s.viewY)
   const setPixelSizeRaw = usePixelStore(s => s.setPixelSizeRaw)
   const setView = usePixelStore(s => s.setView)
+  const selectionMask = usePixelStore(s => s.selectionMask)
+  const selectionBounds = usePixelStore(s => s.selectionBounds)
+  const selectionOffsetX = usePixelStore(s => s.selectionOffsetX)
+  const selectionOffsetY = usePixelStore(s => s.selectionOffsetY)
+  const selectionFloating = usePixelStore(s => s.selectionFloating)
 
   const scaledW = W * size
   const scaledH = H * size
   // cache small helper canvases
   const checkerTileRef = useRef<HTMLCanvasElement | null>(null)
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const floatCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [antsPhase, setAntsPhase] = useState(0)
 
   // One-time init: restore previous view/zoom or center initially
   const inited = useRef(false)
@@ -65,6 +72,19 @@ export function PixelCanvas() {
     } catch { }
   }, [size, viewX, viewY])
 
+  // Animate marching ants
+  useEffect(() => {
+    let raf = 0
+    let last = performance.now()
+    const tick = (t: number) => {
+      const dt = t - last
+      if (dt > 80) { setAntsPhase(p => (p + 1) % 1000); last = t }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
   useEffect(() => {
     const cvs = canvasRef.current
     if (!cvs) return
@@ -95,7 +115,7 @@ export function PixelCanvas() {
     // border and grid
     drawBorder(ctx, scaledW, scaledH)
     drawGrid(ctx, W, H, size)
-    // hover highlight
+  // hover highlight
     if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < W && hoverCell.y < H) {
       drawHoverCell(ctx, hoverCell.x, hoverCell.y, size)
     }
@@ -111,7 +131,50 @@ export function PixelCanvas() {
         size,
       )
     }
-  }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H])
+
+    // selection overlay and floating
+    if (selectionMask && selectionBounds) {
+      // Optional: dim outside selection
+      drawSelectionOverlay(ctx, selectionMask, W, H, size)
+      // Draw marching ants rect at current offset
+      const dx = (selectionOffsetX ?? 0)
+      const dy = (selectionOffsetY ?? 0)
+      const s = size
+      const left = (selectionBounds.left + dx) * s + 0.5
+      const top = (selectionBounds.top + dy) * s + 0.5
+      const width = (selectionBounds.right - selectionBounds.left + 1) * s - 1
+      const height = (selectionBounds.bottom - selectionBounds.top + 1) * s - 1
+      ctx.save()
+      ctx.strokeStyle = '#000'
+      ctx.setLineDash([4, 3])
+      ctx.lineDashOffset = -antsPhase
+      ctx.strokeRect(left, top, width, height)
+      ctx.restore()
+
+      // draw floating pixels if any
+      if (selectionFloating) {
+        const bw = selectionBounds.right - selectionBounds.left + 1
+        const bh = selectionBounds.bottom - selectionBounds.top + 1
+        if (!floatCanvasRef.current) floatCanvasRef.current = document.createElement('canvas')
+        if (floatCanvasRef.current.width !== bw || floatCanvasRef.current.height !== bh) {
+          floatCanvasRef.current.width = bw
+          floatCanvasRef.current.height = bh
+        }
+        const fctx = floatCanvasRef.current.getContext('2d')!
+        const img = fctx.createImageData(bw, bh)
+        const src = selectionFloating
+        for (let i = 0, p = 0; i < src.length; i++, p += 4) {
+          const rgba = src[i] >>> 0
+          img.data[p] = (rgba >>> 24) & 0xff
+          img.data[p + 1] = (rgba >>> 16) & 0xff
+          img.data[p + 2] = (rgba >>> 8) & 0xff
+          img.data[p + 3] = rgba & 0xff
+        }
+        fctx.putImageData(img, 0, 0)
+        ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selectionBounds.left + dx) * s, (selectionBounds.top + dy) * s, bw * s, bh * s)
+      }
+    }
+  }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase])
 
   return (
     <div className="w-full h-full bg-surface-muted">

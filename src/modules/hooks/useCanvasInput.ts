@@ -3,6 +3,7 @@ import { usePixelStore, MIN_SIZE, MAX_SIZE } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel } from '../utils/composite'
+import { isPointInMask, polygonToMask } from '../utils/selection'
 
 export type ShapePreview = {
   kind: 'line' | 'rect' | null
@@ -34,6 +35,13 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const setView = usePixelStore(s => s.setView)
   const setHoverInfo = usePixelStore(s => s.setHoverInfo)
   const clearHoverInfo = usePixelStore(s => s.clearHoverInfo)
+  const selectionMask = usePixelStore(s => s.selectionMask)
+  const setSelectionRect = usePixelStore(s => s.setSelectionRect)
+  const setSelectionMask = usePixelStore(s => s.setSelectionMask)
+  const clearSelection = usePixelStore(s => s.clearSelection)
+  const beginSelectionDrag = usePixelStore(s => s.beginSelectionDrag)
+  const setSelectionOffset = usePixelStore(s => s.setSelectionOffset)
+  const commitSelectionMove = usePixelStore(s => s.commitSelectionMove)
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
 
@@ -43,6 +51,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const panModRef = useRef(false)
   const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
   const mouseStroke = useRef<{ lastX?: number; lastY?: number; active: boolean; erase: boolean }>({ active: false, erase: false })
+  const selectionDrag = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
+  const rectSelecting = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
+  const lassoPath = useRef<{ x: number; y: number }[] | null>(null)
   const touches = useRef<{
     id1?: number
     id2?: number
@@ -57,6 +68,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     lastPixX?: number
     lastPixY?: number
     multi?: boolean
+    selDragging?: boolean
+    selStartX?: number
+    selStartY?: number
+    selRect?: boolean
+    lasso?: boolean
   }>({})
 
   // Helpers
@@ -69,11 +85,13 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
   const rgbaFor = (erase: boolean) => (erase ? 0x00000000 : parseCSSColor(color))
   const isShapeTool = () => tool === 'line' || tool === 'rect'
+  const isSelectionTool = () => tool === 'select-rect' || tool === 'lasso'
   const isBucketTool = () => tool === 'bucket'
   const updateHover = (x: number, y: number) => {
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
     setHoverInfo(x, y, hov)
   }
+  const pointInSelection = (x: number, y: number) => isPointInMask(selectionMask, W, H, x, y)
   const startShapeAt = (x: number, y: number) => {
     setShapePreview({ kind: tool as 'line' | 'rect', startX: x, startY: y, curX: x, curY: y })
     beginStroke()
@@ -114,6 +132,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           if (canvasRef.current && !dragState.current.panning) canvasRef.current.style.cursor = 'grab'
         }
         e.preventDefault()
+      } else if (e.key === 'Escape') {
+        clearSelection()
+        e.preventDefault()
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
@@ -129,7 +150,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       window.removeEventListener('keydown', onKeyDown as any, { capture: true } as any)
       window.removeEventListener('keyup', onKeyUp as any, { capture: true } as any)
     }
-  }, [canvasRef])
+  }, [canvasRef, clearSelection])
 
   // Undo/Redo keyboard shortcuts
   useEffect(() => {
@@ -154,6 +175,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (!inBounds(x, y)) { setHoverCell(null); clearHoverInfo(); return }
     setHoverCell({ x, y })
     updateHover(x, y)
+  // Selection tools: only hover/update, do not paint via move
+  if (isSelectionTool()) return
     if (e.altKey) {
       const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
       setColor(rgbaToCSSHex(rgba))
@@ -199,6 +222,28 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
     const { x, y } = pickPoint(e.clientX, e.clientY)
     if (inBounds(x, y)) {
+      if (isSelectionTool()) {
+        // drag move if inside selection, else start creating
+        if (selectionMask && pointInSelection(x, y)) {
+          beginStroke()
+          beginSelectionDrag()
+          selectionDrag.current = { active: true, startX: x, startY: y }
+          e.preventDefault()
+          return
+        }
+        if (tool === 'select-rect') {
+          rectSelecting.current = { active: true, startX: x, startY: y }
+          setSelectionRect(x, y, x, y)
+          e.preventDefault()
+          return
+        } else if (tool === 'lasso') {
+          lassoPath.current = [{ x, y }]
+          const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
+          setSelectionMask(mask, bounds)
+          e.preventDefault()
+          return
+        }
+      }
       if (isShapeTool()) {
         startShapeAt(x, y)
       } else {
@@ -223,6 +268,30 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') return
+    // Selection drag/create
+    if (selectionDrag.current.active) {
+      const { x, y } = pickPoint(e.clientX, e.clientY)
+      setSelectionOffset(x - selectionDrag.current.startX, y - selectionDrag.current.startY)
+      e.preventDefault()
+      return
+    }
+    if (rectSelecting.current.active && tool === 'select-rect') {
+      const { x, y } = pickPoint(e.clientX, e.clientY)
+      setSelectionRect(rectSelecting.current.startX, rectSelecting.current.startY, x, y)
+      e.preventDefault()
+      return
+    }
+    if (lassoPath.current && tool === 'lasso') {
+      const { x, y } = pickPoint(e.clientX, e.clientY)
+      const last = lassoPath.current[lassoPath.current.length - 1]
+      if (!last || last.x !== x || last.y !== y) {
+        lassoPath.current.push({ x, y })
+        const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
+        setSelectionMask(mask, bounds)
+      }
+      e.preventDefault()
+      return
+    }
     if (dragState.current.panning) {
       const dx = e.clientX - dragState.current.lastX
       const dy = e.clientY - dragState.current.lastY
@@ -252,6 +321,23 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (e && e.pointerType === 'touch') return
     dragState.current.panning = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
+    if (selectionDrag.current.active) {
+      commitSelectionMove()
+      endStroke()
+      selectionDrag.current.active = false
+      return
+    }
+    if (rectSelecting.current.active) {
+      rectSelecting.current.active = false
+      return
+    }
+    if (lassoPath.current) {
+      const pts = lassoPath.current
+      const { mask, bounds } = polygonToMask(W, H, pts)
+      setSelectionMask(mask, bounds)
+      lassoPath.current = null
+      return
+    }
     if (shapePreview.kind) {
       commitShape(tool === 'eraser')
       return
@@ -299,6 +385,32 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       touches.current.lastPixX = undefined
       touches.current.lastPixY = undefined
 
+      // Selection tools (touch): start drag or creation immediately
+      if (isSelectionTool()) {
+        const { x, y } = pickPoint(t.clientX, t.clientY)
+        if (inBounds(x, y)) {
+          if (selectionMask && pointInSelection(x, y)) {
+            beginStroke()
+            beginSelectionDrag()
+            touches.current.selDragging = true
+            touches.current.selStartX = x
+            touches.current.selStartY = y
+          } else if (tool === 'select-rect') {
+            touches.current.selRect = true
+            touches.current.selStartX = x
+            touches.current.selStartY = y
+            setSelectionRect(x, y, x, y)
+          } else if (tool === 'lasso') {
+            touches.current.lasso = true
+            lassoPath.current = [{ x, y }]
+            const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
+            setSelectionMask(mask, bounds)
+          }
+          e.preventDefault()
+          return
+        }
+      }
+
       // Touch: begin shape drawing immediately for line/rect
       if (isShapeTool()) {
         const { x, y } = pickPoint(t.clientX, t.clientY)
@@ -342,6 +454,31 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
 
   const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // Selection interactions on touch
+    if (isSelectionTool() && e.touches.length === 1) {
+      const t = e.touches[0]
+      const { x, y } = pickPoint(t.clientX, t.clientY)
+      if (touches.current.selDragging && touches.current.selStartX !== undefined && touches.current.selStartY !== undefined) {
+        setSelectionOffset(x - touches.current.selStartX, y - touches.current.selStartY)
+        e.preventDefault()
+        return
+      }
+      if (touches.current.selRect && touches.current.selStartX !== undefined && touches.current.selStartY !== undefined) {
+        setSelectionRect(touches.current.selStartX, touches.current.selStartY, x, y)
+        e.preventDefault()
+        return
+      }
+      if (touches.current.lasso && lassoPath.current) {
+        const last = lassoPath.current[lassoPath.current.length - 1]
+        if (!last || last.x !== x || last.y !== y) {
+          lassoPath.current.push({ x, y })
+          const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
+          setSelectionMask(mask, bounds)
+        }
+        e.preventDefault()
+        return
+      }
+    }
     // If shaping (line/rect), update preview and skip brush logic
     if (shapePreview.kind && e.touches.length === 1) {
       const t = e.touches[0]
@@ -415,6 +552,23 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
 
   const onTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // Selection end handling
+    if (isSelectionTool()) {
+      if (touches.current.selDragging) {
+        commitSelectionMove()
+        endStroke()
+      }
+      if (touches.current.lasso && lassoPath.current) {
+        const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
+        setSelectionMask(mask, bounds)
+      }
+      touches.current.selDragging = false
+      touches.current.selRect = false
+      touches.current.lasso = false
+      lassoPath.current = null
+      touches.current = {}
+      return
+    }
     // If a shape is active, commit it first and exit to avoid brush single-tap
     if (shapePreview.kind) {
       commitShape(false)

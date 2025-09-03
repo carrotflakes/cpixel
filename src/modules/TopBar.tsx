@@ -182,6 +182,24 @@ export function TopBar() {
             <LuSquare aria-hidden />
             <span className="hidden sm:inline">Rect</span>
           </button>
+          <button
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'select-rect' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+            onClick={() => setTool('select-rect')}
+            aria-pressed={tool === 'select-rect'}
+            title="Rect Select"
+          >
+            <span className="w-4 h-4 inline-block border border-current" aria-hidden />
+            <span className="hidden sm:inline">Select</span>
+          </button>
+          <button
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'lasso' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+            onClick={() => setTool('lasso')}
+            aria-pressed={tool === 'lasso'}
+            title="Lasso"
+          >
+            <span className="w-4 h-4 inline-block rounded-full border border-current" aria-hidden />
+            <span className="hidden sm:inline">Lasso</span>
+          </button>
         </div>
       </div>
       <button

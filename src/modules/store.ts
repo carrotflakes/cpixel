@@ -43,7 +43,7 @@ export type PixelState = {
   mode: 'truecolor' | 'indexed'
   palette: Uint32Array
   transparentIndex: number
-  tool?: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser'
+  tool?: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'lasso'
   setColor: (c: string) => void
   setColorLive: (c: string) => void
   // layer ops
@@ -59,7 +59,7 @@ export type PixelState = {
   removePaletteIndex: (idx: number) => void
   movePaletteIndex: (from: number, to: number) => void
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
-  setTool: (t: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser') => void
+  setTool: (t: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'lasso') => void
   setPixelSize: (n: number) => void
   setPixelSizeRaw: (n: number) => void
   setView: (x: number, y: number) => void
@@ -69,6 +69,18 @@ export type PixelState = {
   drawRect: (x0: number, y0: number, x1: number, y1: number, rgba: number) => void
   fillBucket: (x: number, y: number, rgba: number, contiguous: boolean) => void
   setMode: (m: 'truecolor' | 'indexed') => void
+  // selection
+  selectionMask?: Uint8Array
+  selectionBounds?: { left: number; top: number; right: number; bottom: number }
+  selectionOffsetX?: number
+  selectionOffsetY?: number
+  selectionFloating?: Uint32Array // RGBA buffer of width*height (bounds)
+  setSelectionRect: (x0: number, y0: number, x1: number, y1: number) => void
+  setSelectionMask: (mask: Uint8Array, bounds: { left: number; top: number; right: number; bottom: number }) => void
+  clearSelection: () => void
+  beginSelectionDrag: () => void
+  setSelectionOffset: (dx: number, dy: number) => void
+  commitSelectionMove: () => void
   // history
   beginStroke: () => void
   endStroke: () => void
@@ -117,11 +129,16 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   _undo: [] as any[],
   _redo: [] as any[],
   _stroking: false,
+  selectionMask: undefined,
+  selectionBounds: undefined,
+  selectionOffsetX: 0,
+  selectionOffsetY: 0,
+  selectionFloating: undefined,
   addLayer: () => set((s) => {
     const id = 'L' + (s.layers.length + 1)
     const layer: Layer = s.mode === 'truecolor'
-  ? { id, visible: true, locked: false, data: new Uint32Array(s.width * s.height) }
-  : { id, visible: true, locked: false, indices: new Uint8Array(s.width * s.height) }
+      ? { id, visible: true, locked: false, data: new Uint32Array(s.width * s.height) }
+      : { id, visible: true, locked: false, indices: new Uint8Array(s.width * s.height) }
     return { layers: [layer, ...s.layers], activeLayerId: id }
   }),
   removeLayer: (id) => set((s) => {
@@ -479,6 +496,132 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         return { id: l.id, visible: l.visible, locked: l.locked, data } as Layer
       })
       return { mode: 'truecolor', layers }
+    }
+  }),
+  // Selection APIs
+  setSelectionRect: (x0, y0, x1, y1) => set((s) => {
+    const W = s.width, H = s.height
+    const left = Math.max(0, Math.min(x0 | 0, x1 | 0))
+    const right = Math.min(W - 1, Math.max(x0 | 0, x1 | 0))
+    const top = Math.max(0, Math.min(y0 | 0, y1 | 0))
+    const bottom = Math.min(H - 1, Math.max(y0 | 0, y1 | 0))
+    const mask = new Uint8Array(W * H)
+    for (let y = top; y <= bottom; y++) {
+      const row = y * W
+      mask.fill(1, row + left, row + right + 1)
+    }
+    return { selectionMask: mask, selectionBounds: { left, top, right, bottom }, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: undefined }
+  }),
+  setSelectionMask: (mask, bounds) => set(() => ({ selectionMask: mask, selectionBounds: bounds, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: undefined })),
+  clearSelection: () => set({ selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: undefined }),
+  beginSelectionDrag: () => set((s) => {
+    const { selectionMask, selectionBounds } = s
+    if (!selectionMask || !selectionBounds) return {}
+    const W = s.width, H = s.height
+    const li = s.layers.findIndex(l => l.id === s.activeLayerId)
+    if (li < 0) return {}
+    const layer = s.layers[li]
+    if (layer.locked) return {}
+    const bw = selectionBounds.right - selectionBounds.left + 1
+    const bh = selectionBounds.bottom - selectionBounds.top + 1
+    const float = new Uint32Array(bw * bh)
+    if (s.mode === 'truecolor') {
+      const data = layer.data ?? new Uint32Array(W * H)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
+          if (selectionMask[i]) {
+            float[fi] = data[i] >>> 0
+          } else {
+            float[fi] = 0
+          }
+        }
+      }
+      // clear selected pixels in layer (cut)
+      const out = new Uint32Array(data)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          if (selectionMask[i]) out[i] = 0
+        }
+      }
+      const layers = s.layers.slice()
+      layers[li] = { ...layer, data: out }
+      return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers }
+    } else {
+      // indexed -> convert to RGBA float; clear indices to transparentIndex
+      const idx = layer.indices ?? new Uint8Array(W * H)
+      const pal = s.palette
+      const ti = s.transparentIndex
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
+          if (selectionMask[i]) float[fi] = pal[idx[i] ?? ti] >>> 0
+          else float[fi] = 0
+        }
+      }
+      const out = new Uint8Array(idx)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          if (selectionMask[i]) out[i] = ti & 0xff
+        }
+      }
+      const layers = s.layers.slice()
+      layers[li] = { ...layer, indices: out }
+      return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers }
+    }
+  }),
+  setSelectionOffset: (dx, dy) => set({ selectionOffsetX: dx | 0, selectionOffsetY: dy | 0 }),
+  commitSelectionMove: () => set((s) => {
+    const { selectionMask, selectionBounds, selectionFloating } = s
+    if (!selectionMask || !selectionBounds || !selectionFloating) return {}
+    const dx = (s.selectionOffsetX ?? 0) | 0
+    const dy = (s.selectionOffsetY ?? 0) | 0
+    const W = s.width, H = s.height
+    const li = s.layers.findIndex(l => l.id === s.activeLayerId)
+    if (li < 0) return {}
+    const layer = s.layers[li]
+    if (layer.locked) return {}
+    const bw = selectionBounds.right - selectionBounds.left + 1
+    const bh = selectionBounds.bottom - selectionBounds.top + 1
+    const dstLeft = selectionBounds.left + dx
+    const dstTop = selectionBounds.top + dy
+    if (s.mode === 'truecolor') {
+      const src = layer.data ?? new Uint32Array(W * H)
+      const out = new Uint32Array(src)
+      for (let y = 0; y < bh; y++) {
+        for (let x = 0; x < bw; x++) {
+          const pix = selectionFloating[y * bw + x] >>> 0
+          if ((pix & 0xff) === 0) continue
+          const X = dstLeft + x
+          const Y = dstTop + y
+          if (X < 0 || Y < 0 || X >= W || Y >= H) continue
+          out[Y * W + X] = pix
+        }
+      }
+      const layers = s.layers.slice()
+      layers[li] = { ...layer, data: out }
+      return { layers, selectionFloating: undefined, selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0 }
+    } else {
+      const idx = layer.indices ?? new Uint8Array(W * H)
+      const out = new Uint8Array(idx)
+      for (let y = 0; y < bh; y++) {
+        for (let x = 0; x < bw; x++) {
+          const pix = selectionFloating[y * bw + x] >>> 0
+          if ((pix & 0xff) === 0) continue
+          const X = dstLeft + x
+          const Y = dstTop + y
+          if (X < 0 || Y < 0 || X >= W || Y >= H) continue
+          const pi = nearestIndexInPalette(s.palette, pix, s.transparentIndex)
+          out[Y * W + X] = pi & 0xff
+        }
+      }
+      const layers = s.layers.slice()
+      layers[li] = { ...layer, indices: out }
+      return { layers, selectionFloating: undefined, selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0 }
     }
   }),
   setHoverInfo: (x, y, rgba) => set({ hoverX: x, hoverY: y, hoverRGBA: rgba }),

@@ -99,3 +99,52 @@ export function drawShapePreview(
   }
   ctx.restore()
 }
+
+export function drawSelectionMarchingAnts(
+  ctx: CanvasRenderingContext2D,
+  mask: Uint8Array,
+  W: number,
+  H: number,
+  size: number,
+  phase: number = 0
+) {
+  // Simple marching ants around mask bounds (not per-pixel outline for perf)
+  // Find bounds
+  let left = W, right = -1, top = H, bottom = -1
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (mask[y * W + x]) {
+        if (x < left) left = x
+        if (x > right) right = x
+        if (y < top) top = y
+        if (y > bottom) bottom = y
+      }
+    }
+  }
+  if (right < left || bottom < top) return
+  const s = size
+  ctx.save()
+  ctx.strokeStyle = '#000'
+  ctx.setLineDash([4, 3])
+  ctx.lineDashOffset = -phase
+  ctx.strokeRect(left * s + 0.5, top * s + 0.5, (right - left + 1) * s - 1, (bottom - top + 1) * s - 1)
+  ctx.restore()
+}
+
+export function drawSelectionOverlay(
+  ctx: CanvasRenderingContext2D,
+  mask: Uint8Array,
+  W: number,
+  H: number,
+  size: number
+) {
+  // Dim non-selected area with a translucent veil
+  ctx.save()
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!mask[y * W + x]) ctx.fillRect(x * size, y * size, size, size)
+    }
+  }
+  ctx.restore()
+}
