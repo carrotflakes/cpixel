@@ -290,6 +290,17 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       touches.current.startTime = performance.now()
       touches.current.lastPixX = undefined
       touches.current.lastPixY = undefined
+      
+      // Touch: begin shape drawing immediately for line/rect
+      if (tool === 'line' || tool === 'rect') {
+        const { x, y } = pickPoint(t.clientX, t.clientY)
+        if (x >= 0 && y >= 0 && x < W && y < H) {
+          beginStroke()
+          setShapePreview({ kind: tool, startX: x, startY: y, curX: x, curY: y })
+        }
+        e.preventDefault()
+        return
+      }
       touches.current.timer = window.setTimeout(() => {
         if (touches.current.isDrawing) return
         if (touches.current.multi) return
@@ -324,7 +335,22 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
 
   const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // If shaping (line/rect), update preview and skip brush logic
+    if (shapePreview.kind && e.touches.length === 1) {
+      const t = e.touches[0]
+      const { x, y } = pickPoint(t.clientX, t.clientY)
+      setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
+      // force re-render via hover change to show dashed preview
+      setHoverCell((h) => (h ? { ...h } : { x: -1, y: -1 }))
+      e.preventDefault()
+      return
+    }
     if (e.touches.length === 1 && touches.current.id1 === undefined) {
+      // For bucket tool, do not start brush strokes on move; also cancel any hold timer
+      if (tool === 'bucket') {
+        if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
+        return
+      }
       if (touches.current.multi) return
       const t = e.touches[0]
       const dx0 = (touches.current.startX ?? t.clientX) - t.clientX
@@ -384,6 +410,20 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
 
   const onTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    // If a shape is active, commit it first and exit to avoid brush single-tap
+    if (shapePreview.kind) {
+      const s = shapePreview
+      const rgba = parseCSSColor(color)
+      if (s.kind === 'line') {
+        usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
+      } else if (s.kind === 'rect') {
+        usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
+      }
+      setShapePreview({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
+      endStroke()
+      touches.current = {}
+      return
+    }
     if (e.touches.length === 0) {
       if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
       if (!touches.current.multi && !touches.current.isDrawing) {
