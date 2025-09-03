@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { clamp } from './utils/view'
 import { nearestIndexInPalette } from './utils/color'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
+import { normalizeImportedJSON } from './utils/io'
 
 function equalU32(a: Uint32Array, b: Uint32Array) {
   if (a === b) return true
@@ -86,6 +87,8 @@ export type PixelState = {
   clearHoverInfo: () => void
   clear: () => void
   exportPNG: () => void
+  exportJSON: () => void
+  importJSON: (data: unknown) => void
 }
 
 // clamp imported from utils
@@ -640,5 +643,56 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     a.href = cvs.toDataURL('image/png')
     a.download = 'cpixel.png'
     a.click()
+  },
+  exportJSON: () => {
+    const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors } = get()
+    const payload = {
+      app: 'cpixel' as const,
+      version: 1 as const,
+      width: WIDTH,
+      height: HEIGHT,
+      mode,
+      layers: layers.map(l => ({
+        id: l.id,
+        visible: l.visible,
+        locked: l.locked,
+        data: l.data ? Array.from(l.data) : undefined,
+        indices: l.indices ? Array.from(l.indices) : undefined,
+      })),
+      activeLayerId,
+      palette: Array.from(palette ?? new Uint32Array(0)),
+      transparentIndex,
+      color,
+      recentColors: recentColors ?? [],
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'cpixel.json'
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  },
+  importJSON: (data: unknown) => {
+    const current = get()
+    const normalized = normalizeImportedJSON(data, {
+      palette: current.palette,
+      color: current.color,
+      recentColors: current.recentColors,
+    }, WIDTH, HEIGHT)
+    if (!normalized) return
+    const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors } = normalized
+    set({
+      mode,
+      layers: layers.length > 0 ? layers : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
+      activeLayerId,
+      palette,
+      transparentIndex,
+      color,
+      recentColors,
+      _undo: [],
+      _redo: [],
+      canUndo: false,
+      canRedo: false,
+    })
   },
 }))

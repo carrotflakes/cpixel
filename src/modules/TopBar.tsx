@@ -14,6 +14,8 @@ export function TopBar() {
   const setMode = usePixelStore(s => s.setMode)
   const clear = usePixelStore(s => s.clear)
   const exportPNG = usePixelStore(s => s.exportPNG)
+  const exportJSON = usePixelStore(s => s.exportJSON)
+  const importJSON = usePixelStore(s => s.importJSON)
   const tool = usePixelStore(s => s.tool)
   const setTool = usePixelStore(s => s.setTool)
   const moreBtnRef = useRef<HTMLButtonElement | null>(null)
@@ -221,6 +223,32 @@ export function TopBar() {
             <span>Export</span>
             <LuChevronRight aria-hidden />
           </button>
+          <button
+            role="menuitem"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
+            onClick={() => {
+              // open a hidden file input for JSON import
+              const input = document.createElement('input')
+              input.type = 'file'
+              input.accept = 'application/json,.json'
+              input.onchange = async () => {
+                const f = input.files?.[0]
+                if (!f) return
+                try {
+                  const text = await f.text()
+                  const obj = JSON.parse(text)
+                  importJSON(obj)
+                } catch (e) {
+                  console.error('Import failed', e)
+                }
+              }
+              input.click()
+              setMenuOpen(false)
+              setOpenSub(null)
+            }}
+          >
+            <span>Import JSON…</span>
+          </button>
           <div className="my-1 h-px bg-border" />
           <button
             role="menuitem"
@@ -259,6 +287,10 @@ export function TopBar() {
               <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { exportPNG(); setMenuOpen(false); setOpenSub(null) }}>
                 <LuDownload aria-hidden />
                 <span>PNG</span>
+              </button>
+              <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { exportJSON(); setMenuOpen(false); setOpenSub(null) }}>
+                <LuDownload aria-hidden />
+                <span>Project JSON</span>
               </button>
             </div>,
             document.body
