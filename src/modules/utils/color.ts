@@ -40,3 +40,23 @@ export function rgbaToCSSHex(rgba: number): string {
   if (a === 0xff) return `#${hex(r)}${hex(g)}${hex(b)}`
   return `#${hex(r)}${hex(g)}${hex(b)}${hex(a)}`
 }
+
+// Simple squared distance in RGB space (ignore alpha for nearest-color search)
+const dist2 = (a: RGBA, b: RGBA) => {
+  const dr = a.r - b.r
+  const dg = a.g - b.g
+  const db = a.b - b.b
+  return dr*dr + dg*dg + db*db
+}
+
+export function nearestIndexInPalette(palette: Uint32Array, rgba: number, fallback = 0): number {
+  if (!palette || palette.length === 0) return fallback
+  const c = unpackRGBA(rgba)
+  let best = 0
+  let bestD = Number.POSITIVE_INFINITY
+  for (let i = 0; i < palette.length; i++) {
+    const d = dist2(c, unpackRGBA(palette[i]))
+    if (d < bestD) { bestD = d; best = i }
+  }
+  return best
+}

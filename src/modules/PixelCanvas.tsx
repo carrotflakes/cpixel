@@ -15,6 +15,10 @@ export function PixelCanvas() {
   const undo = usePixelStore(s => s.undo)
   const redo = usePixelStore(s => s.redo)
   const data = usePixelStore(s => s.data)
+  const mode = usePixelStore(s => s.mode)
+  const indices = usePixelStore(s => s.indices)
+  const palette = usePixelStore(s => s.palette)
+  const transparentIndex = usePixelStore(s => s.transparentIndex)
   const viewX = usePixelStore(s => s.viewX)
   const viewY = usePixelStore(s => s.viewY)
   const setPixelSize = usePixelStore(s => s.setPixelSize)
@@ -146,14 +150,30 @@ export function PixelCanvas() {
   ctx.translate(vx, vy)
     // draw bitmap on top (alpha respected)
     const img = ctx.createImageData(WIDTH, HEIGHT)
-    for (let y = 0; y < HEIGHT; y++) {
-      for (let x = 0; x < WIDTH; x++) {
-        const i = (y * WIDTH + x) * 4
-        const rgba = data[y * WIDTH + x]
-        img.data[i+0] = (rgba >>> 24) & 0xff
-        img.data[i+1] = (rgba >>> 16) & 0xff
-        img.data[i+2] = (rgba >>> 8) & 0xff
-        img.data[i+3] = (rgba >>> 0) & 0xff
+    if (mode === 'truecolor') {
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const i = (y * WIDTH + x) * 4
+          const rgba = data[y * WIDTH + x]
+          img.data[i+0] = (rgba >>> 24) & 0xff
+          img.data[i+1] = (rgba >>> 16) & 0xff
+          img.data[i+2] = (rgba >>> 8) & 0xff
+          img.data[i+3] = (rgba >>> 0) & 0xff
+        }
+      }
+    } else {
+      const idx = indices ?? new Uint8Array(WIDTH * HEIGHT)
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const p = y * WIDTH + x
+          const pi = idx[p] ?? transparentIndex
+          const rgba = palette[pi] ?? 0x00000000
+          const i = p * 4
+          img.data[i+0] = (rgba >>> 24) & 0xff
+          img.data[i+1] = (rgba >>> 16) & 0xff
+          img.data[i+2] = (rgba >>> 8) & 0xff
+          img.data[i+3] = (rgba >>> 0) & 0xff
+        }
       }
     }
     if (!tmpCanvasRef.current) {
@@ -196,7 +216,7 @@ export function PixelCanvas() {
       ctx.strokeRect(hoverCell.x * size + 0.5, hoverCell.y * size + 0.5, size - 1, size - 1)
       ctx.restore()
     }
-  }, [data, size, viewX, viewY, hoverCell?.x, hoverCell?.y])
+  }, [data, indices, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y])
 
   const pickPoint = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -214,7 +234,7 @@ export function PixelCanvas() {
   setHoverInfo(x, y, data[y * WIDTH + x])
     // Eyedropper: Alt to pick color under cursor (no drawing)
     if (e.altKey) {
-      const rgba = data[y * WIDTH + x]
+      const rgba = mode === 'truecolor' ? data[y * WIDTH + x] : palette[(indices ?? new Uint8Array())[y * WIDTH + x] ?? transparentIndex] ?? 0x00000000
       setColor(rgbaToCSSHex(rgba))
       e.preventDefault()
       return
