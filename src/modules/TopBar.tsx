@@ -1,6 +1,9 @@
+import { useEffect, useRef, useState } from 'react'
 import { usePixelStore } from './store'
+import { createPortal } from 'react-dom'
 import { FaEraser } from 'react-icons/fa'
-import { LuDownload, LuPaintbrush, LuPaintBucket } from 'react-icons/lu'
+import { LuDownload, LuPaintbrush, LuPaintBucket, LuChevronRight, LuCheck } from 'react-icons/lu'
+import { FaEllipsisV } from 'react-icons/fa'
 
 export function TopBar() {
   const color = usePixelStore(s => s.color)
@@ -12,6 +15,48 @@ export function TopBar() {
   const exportPNG = usePixelStore(s => s.exportPNG)
   const tool = usePixelStore(s => s.tool)
   const setTool = usePixelStore(s => s.setTool)
+  const moreBtnRef = useRef<HTMLButtonElement | null>(null)
+  const menuRootRef = useRef<HTMLDivElement | null>(null)
+  const modeSubRef = useRef<HTMLDivElement | null>(null)
+  const exportSubRef = useRef<HTMLDivElement | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState<{x:number,y:number}>({x:0,y:0})
+  const [openSub, setOpenSub] = useState<null | 'mode' | 'export'>(null)
+  const [modePos, setModePos] = useState<{x:number,y:number} | null>(null)
+  const [exportPos, setExportPos] = useState<{x:number,y:number} | null>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenuOpen(false); setOpenSub(null) } }
+    const onDown = (e: MouseEvent | PointerEvent) => {
+      const t = e.target as Node | null
+      const insideMore = moreBtnRef.current && t && moreBtnRef.current.contains(t)
+      const insideRoot = menuRootRef.current && t && menuRootRef.current.contains(t)
+      const insideMode = modeSubRef.current && t && modeSubRef.current.contains(t)
+      const insideExport = exportSubRef.current && t && exportSubRef.current.contains(t)
+      if (insideMore || insideRoot || insideMode || insideExport) return
+      setMenuOpen(false); setOpenSub(null)
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    window.addEventListener('pointerdown', onDown, { capture: true })
+    return () => {
+      window.removeEventListener('keydown', onKey, { capture: true } as any)
+      window.removeEventListener('pointerdown', onDown, { capture: true } as any)
+    }
+  }, [menuOpen])
+
+  const openMore = () => {
+    if (!moreBtnRef.current) return
+    const r = moreBtnRef.current.getBoundingClientRect()
+    const margin = 6
+    const x = Math.min(window.innerWidth - 220 - margin, Math.max(margin, r.right - 200))
+    const y = Math.min(window.innerHeight - 10 - margin, r.bottom + margin)
+    setMenuPos({ x, y })
+    setMenuOpen(v => !v)
+    setOpenSub(null)
+    setModePos(null)
+    setExportPos(null)
+  }
 
   return (
     <div className="p-2 flex gap-4 items-center">
@@ -54,25 +99,104 @@ export function TopBar() {
           </button>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <label className="text-sm">Mode</label>
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as any)}
-          className="px-2 py-1 rounded border border-gray-300 bg-white text-sm"
+      <button
+        ref={moreBtnRef}
+        className="px-2 py-1 rounded border border-gray-300 bg-white text-sm inline-flex items-center gap-1"
+        onClick={openMore}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        title="More"
+      >
+  <FaEllipsisV aria-hidden />
+        <span className="hidden sm:inline">More</span>
+      </button>
+      {menuOpen && createPortal(
+        <div
+          role="menu"
+          className="fixed z-[1000] min-w-52 rounded-md border border-gray-300 bg-white shadow-lg text-sm py-1"
+          ref={menuRootRef}
+          style={{ left: menuPos.x, top: menuPos.y }}
+          onContextMenu={(e) => e.preventDefault()}
         >
-          <option value="truecolor">Truecolor</option>
-          <option value="indexed">Indexed</option>
-        </select>
-      </div>
-      <button className="px-3 py-1 rounded bg-gray-800 text-white text-sm inline-flex items-center gap-1" onClick={clear}>
-        <FaEraser aria-hidden />
-        <span>Clear</span>
-      </button>
-      <button className="px-3 py-1 rounded bg-blue-600 text-white text-sm inline-flex items-center gap-1" onClick={exportPNG}>
-        <LuDownload aria-hidden />
-        <span>Export PNG</span>
-      </button>
+          <button
+            role="menuitem"
+            className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center justify-between gap-2"
+            onClick={() => {
+              if (openSub === 'mode') { setOpenSub(null); return }
+              const MAIN_W = 208, SUB_W = 180, margin = 8
+              const rightX = menuPos.x + MAIN_W
+              const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
+              const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
+              const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 4)
+              setModePos({ x, y })
+              setOpenSub('mode')
+            }}
+          >
+            <span>Mode</span>
+            <LuChevronRight aria-hidden />
+          </button>
+          <button
+            role="menuitem"
+            className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center justify-between gap-2"
+            onClick={() => {
+              if (openSub === 'export') { setOpenSub(null); return }
+              const MAIN_W = 208, SUB_W = 180, margin = 8
+              const rightX = menuPos.x + MAIN_W
+              const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
+              const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
+              const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 36)
+              setExportPos({ x, y })
+              setOpenSub('export')
+            }}
+          >
+            <span>Export</span>
+            <LuChevronRight aria-hidden />
+          </button>
+          <div className="my-1 h-px bg-gray-200" />
+          <button
+            role="menuitem"
+            className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700 inline-flex items-center gap-2"
+            onClick={() => { clear(); setMenuOpen(false); setOpenSub(null) }}
+          >
+            <FaEraser aria-hidden />
+            <span>Clear</span>
+          </button>
+
+      {openSub === 'mode' && modePos && createPortal(
+            <div
+              role="menu"
+              className="fixed z-[1001] min-w-40 rounded-md border border-gray-300 bg-white shadow-lg text-sm py-1"
+        style={{ left: modePos.x, top: modePos.y }}
+              ref={modeSubRef}
+            >
+              <button className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center gap-2" onClick={() => { setMode('truecolor'); setMenuOpen(false); setOpenSub(null) }}>
+                {mode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+                <span>Truecolor</span>
+              </button>
+              <button className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center gap-2" onClick={() => { setMode('indexed'); setMenuOpen(false); setOpenSub(null) }}>
+                {mode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+                <span>Indexed</span>
+              </button>
+            </div>,
+            document.body
+          )}
+      {openSub === 'export' && exportPos && createPortal(
+            <div
+              role="menu"
+              className="fixed z-[1001] min-w-40 rounded-md border border-gray-300 bg-white shadow-lg text-sm py-1"
+        style={{ left: exportPos.x, top: exportPos.y }}
+              ref={exportSubRef}
+            >
+              <button className="w-full text-left px-3 py-2 hover:bg-gray-100 inline-flex items-center gap-2" onClick={() => { exportPNG(); setMenuOpen(false); setOpenSub(null) }}>
+                <LuDownload aria-hidden />
+                <span>PNG</span>
+              </button>
+            </div>,
+            document.body
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
