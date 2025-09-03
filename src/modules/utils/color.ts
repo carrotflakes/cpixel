@@ -52,11 +52,14 @@ const dist2 = (a: RGBA, b: RGBA) => {
 export function nearestIndexInPalette(palette: Uint32Array, rgba: number, fallback = 0): number {
   if (!palette || palette.length === 0) return fallback
   const c = unpackRGBA(rgba)
-  let best = 0
+  let best = -1
   let bestD = Number.POSITIVE_INFINITY
   for (let i = 0; i < palette.length; i++) {
-    const d = dist2(c, unpackRGBA(palette[i]))
+    const pi = palette[i] >>> 0
+    const a = pi & 0xff
+    if (a === 0) continue // skip fully transparent entries (e.g., transparentIndex)
+    const d = dist2(c, unpackRGBA(pi))
     if (d < bestD) { bestD = d; best = i }
   }
-  return best
+  return best >= 0 ? best : fallback
 }
