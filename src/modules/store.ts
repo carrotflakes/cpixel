@@ -17,6 +17,17 @@ export type PixelState = {
   setView: (x: number, y: number) => void
   panBy: (dx: number, dy: number) => void
   setAt: (x: number, y: number, rgba: number) => void
+  // history
+  beginStroke: () => void
+  endStroke: () => void
+  undo: () => void
+  redo: () => void
+  canUndo?: boolean
+  canRedo?: boolean
+  // private/internal fields (optional to satisfy TS when mutating with set)
+  _undo?: Uint32Array[]
+  _redo?: Uint32Array[]
+  _stroking?: boolean
   clear: () => void
   exportPNG: () => void
 }
@@ -29,6 +40,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   viewX: 0,
   viewY: 0,
   color: '#000000',
+  canUndo: false,
+  canRedo: false,
+  // internal history state
+  _undo: [] as Uint32Array[],
+  _redo: [] as Uint32Array[],
+  _stroking: false,
   setColor: (c) => set({ color: c }),
   setPixelSize: (n) => set({ pixelSize: clamp(Math.round(n), MIN_SIZE, MAX_SIZE) }),
   // Allows fractional pixel sizes (used for pinch-zoom). Still clamped to bounds.
@@ -41,7 +58,32 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     next[y * WIDTH + x] = rgba >>> 0
     return { data: next }
   }),
-  clear: () => set({ data: new Uint32Array(WIDTH * HEIGHT) }),
+  beginStroke: () => set((s: any) => {
+    if (s._stroking) return {}
+    const snap = new Uint32Array(s.data)
+    const undo = s._undo ? [...s._undo, snap] : [snap]
+    return { _undo: undo, _redo: [], _stroking: true, canUndo: true, canRedo: false }
+  }),
+  endStroke: () => set((s: any) => (s._stroking ? { _stroking: false } : {})),
+  undo: () => set((s: any) => {
+    if (!s._undo || s._undo.length === 0) return {}
+    const prev = s._undo[s._undo.length - 1]
+    const undo = s._undo.slice(0, -1)
+    const redo = (s._redo || []).concat([new Uint32Array(s.data)])
+    return { data: new Uint32Array(prev), _undo: undo, _redo: redo, canUndo: undo.length > 0, canRedo: true }
+  }),
+  redo: () => set((s: any) => {
+    if (!s._redo || s._redo.length === 0) return {}
+    const next = s._redo[s._redo.length - 1]
+    const redo = s._redo.slice(0, -1)
+    const undo = (s._undo || []).concat([new Uint32Array(s.data)])
+    return { data: new Uint32Array(next), _undo: undo, _redo: redo, canUndo: true, canRedo: redo.length > 0 }
+  }),
+  clear: () => set((s: any) => {
+    const snap = new Uint32Array(s.data)
+    const undo = (s._undo || []).concat([snap])
+    return { data: new Uint32Array(WIDTH * HEIGHT), _undo: undo, _redo: [], canUndo: true, canRedo: false }
+  }),
   exportPNG: () => {
     const { data } = get()
     const cvs = document.createElement('canvas')

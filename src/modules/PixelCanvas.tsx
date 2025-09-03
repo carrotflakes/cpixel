@@ -1,12 +1,17 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePixelStore, WIDTH, HEIGHT, MIN_SIZE, MAX_SIZE } from './store'
 
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null)
   const size = usePixelStore(s => s.pixelSize)
   const color = usePixelStore(s => s.color)
   const setColor = usePixelStore(s => s.setColor)
   const setAt = usePixelStore(s => s.setAt)
+  const beginStroke = usePixelStore(s => s.beginStroke)
+  const endStroke = usePixelStore(s => s.endStroke)
+  const undo = usePixelStore(s => s.undo)
+  const redo = usePixelStore(s => s.redo)
   const data = usePixelStore(s => s.data)
   const viewX = usePixelStore(s => s.viewX)
   const viewY = usePixelStore(s => s.viewY)
@@ -196,7 +201,15 @@ export function PixelCanvas() {
       ctx.lineTo(scaledW, y*size+0.5)
       ctx.stroke()
     }
-  }, [data, size, viewX, viewY])
+    // hover highlight
+    if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < WIDTH && hoverCell.y < HEIGHT) {
+      ctx.save()
+      ctx.strokeStyle = 'rgba(0,128,255,0.9)'
+      ctx.lineWidth = 2
+      ctx.strokeRect(hoverCell.x * size + 0.5, hoverCell.y * size + 0.5, size - 1, size - 1)
+      ctx.restore()
+    }
+  }, [data, size, viewX, viewY, hoverCell?.x, hoverCell?.y])
 
   const pickPoint = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -208,7 +221,9 @@ export function PixelCanvas() {
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') return // do not draw on touch; handled via touch events
     const { x, y } = pickPoint(e.clientX, e.clientY)
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return
+  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) { setHoverCell(null); return }
+  // track hover
+  setHoverCell({ x, y })
     // Eyedropper: Alt to pick color under cursor (no drawing)
     if (e.altKey) {
       const rgba = data[y * WIDTH + x]
@@ -234,6 +249,11 @@ export function PixelCanvas() {
       e.preventDefault()
       return
     }
+    // begin drawing stroke for history if starting to draw/erase
+    const { x, y } = pickPoint(e.clientX, e.clientY)
+    if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
+      if (e.button === 0 || e.button === 2) beginStroke()
+    }
     onPointer(e)  
   }
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -258,9 +278,11 @@ export function PixelCanvas() {
     onPointer(e)
   }
   const onPointerUp = () => {
-    dragState.current.panning = false
+  dragState.current.panning = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
+  endStroke()
   }
+  const onPointerLeave = () => { setHoverCell(null) }
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -319,6 +341,7 @@ export function PixelCanvas() {
         if (touches.current.isDrawing) return
         if (touches.current.multi) return // suppressed by multi-touch
         touches.current.isDrawing = true
+        beginStroke()
         const { x, y } = pickPoint(touches.current.startX!, touches.current.startY!)
         if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
           setAt(x, y, parseCSSColor(color))
@@ -347,6 +370,7 @@ export function PixelCanvas() {
       // if moved enough, start drawing immediately
       if (!touches.current.isDrawing && moved >= TOUCH_MOVE_PX) {
         touches.current.isDrawing = true
+        beginStroke()
         if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
       }
       if (touches.current.isDrawing) {
@@ -401,12 +425,30 @@ export function PixelCanvas() {
         const t = e.changedTouches[0]
         const { x, y } = pickPoint(t.clientX, t.clientY)
         if (x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT) {
+          beginStroke()
           setAt(x, y, parseCSSColor(color))
+          endStroke()
         }
       }
+      if (touches.current.isDrawing) endStroke()
       touches.current = {}
     }
   }
+
+  // Keyboard shortcuts: Ctrl+Z / Ctrl+Shift+Z for undo/redo; Cmd variants for macOS
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+      const mod = isMac ? e.metaKey : e.ctrlKey
+      if (!mod) return
+      if (e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) { redo(); e.preventDefault() }
+        else { undo(); e.preventDefault() }
+      }
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true } as any)
+  }, [undo, redo])
 
   return (
     <div className="w-full h-full bg-gray-300">
@@ -415,6 +457,7 @@ export function PixelCanvas() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+  onPointerLeave={onPointerLeave}
         onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
         onTouchStart={onTouchStart}

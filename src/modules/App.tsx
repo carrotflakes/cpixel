@@ -1,5 +1,6 @@
 import { PixelCanvas } from './PixelCanvas'
 import { TopBar } from './TopBar'
+import { FloatingControls } from './FloatingControls.tsx'
 
 export function App() {
   return (
@@ -9,6 +10,7 @@ export function App() {
       </div>
       <div className="grow min-h-0 bg-gray-200 dark:bg-gray-800">
         <PixelCanvas />
+  <FloatingControls />
       </div>
     </div>
   )
