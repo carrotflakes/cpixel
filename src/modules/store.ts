@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { clamp } from './utils/view'
 
 export const WIDTH = 64
 export const HEIGHT = 64
@@ -32,7 +33,7 @@ export type PixelState = {
   exportPNG: () => void
 }
 
-const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
+// clamp imported from utils
 
 export const usePixelStore = create<PixelState>((set, get) => ({
   data: new Uint32Array(WIDTH * HEIGHT),

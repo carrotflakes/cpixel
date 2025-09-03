@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePixelStore, WIDTH, HEIGHT, MIN_SIZE, MAX_SIZE } from './store'
+import { parseCSSColor, rgbaToCSSHex } from './utils/color.ts'
+import { clamp, clampViewToBounds } from './utils/view.ts'
 
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -27,24 +29,7 @@ export function PixelCanvas() {
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const panModRef = useRef(false) // Space key held
 
-  // Clamp view so content stays within or is centered if smaller than viewport
-  const clampViewToBounds = (
-    vx: number,
-    vy: number,
-    vw: number,
-    vh: number,
-    cw: number,
-    ch: number,
-  ) => {
-    const clampAxis = (v: number, vSize: number, cSize: number) => {
-  // If content is smaller than viewport, don't clamp (allow free pan)
-  if (cSize <= vSize) return v
-      const min = vSize - cSize
-      const max = 0
-      return Math.max(min, Math.min(max, v))
-    }
-    return { vx: clampAxis(vx, vw, cw), vy: clampAxis(vy, vh, ch) }
-  }
+  // view clamping now imported from utils
 
   // One-time init: restore previous view/zoom or center initially
   const inited = useRef(false)
@@ -322,7 +307,7 @@ export function PixelCanvas() {
   }>({})
   const getTouchById = (e: React.TouchEvent, id?: number) => Array.from(e.touches).find(t => t.identifier === id)
   const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by)
-  const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
+  // clamp imported from utils
 
   const onTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches.length === 1) {
@@ -471,34 +456,4 @@ export function PixelCanvas() {
   )
 }
 
-function parseCSSColor(css: string): number {
-  // expects #rrggbb or #rrggbbaa
-  if (css.startsWith('#')) {
-    const hex = css.slice(1)
-    if (hex.length === 6) {
-      const r = parseInt(hex.slice(0,2),16)
-      const g = parseInt(hex.slice(2,4),16)
-      const b = parseInt(hex.slice(4,6),16)
-      return (r<<24)|(g<<16)|(b<<8)|0xff
-    }
-    if (hex.length === 8) {
-      const r = parseInt(hex.slice(0,2),16)
-      const g = parseInt(hex.slice(2,4),16)
-      const b = parseInt(hex.slice(4,6),16)
-      const a = parseInt(hex.slice(6,8),16)
-      return (r<<24)|(g<<16)|(b<<8)|a
-    }
-  }
-  // fallback black
-  return 0x000000ff
-}
-
-function rgbaToCSSHex(rgba: number): string {
-  const r = (rgba >>> 24) & 0xff
-  const g = (rgba >>> 16) & 0xff
-  const b = (rgba >>> 8) & 0xff
-  const a = (rgba >>> 0) & 0xff
-  const hex = (n: number) => n.toString(16).padStart(2, '0')
-  if (a === 0xff) return `#${hex(r)}${hex(g)}${hex(b)}`
-  return `#${hex(r)}${hex(g)}${hex(b)}${hex(a)}`
-}
+// color helpers moved to utils/color
