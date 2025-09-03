@@ -22,6 +22,7 @@ Conventions
 - `src/modules/store.ts` – Global state (pixels, color, view, pixel size, actions)
 - `src/modules/PixelCanvas.tsx` – Canvas rendering and interactions
 - `src/modules/TopBar.tsx` – Header UI (color, clear, export)
+- `src/modules/utils/fill.ts` – Flood fill helpers used by the Bucket tool
 
 ## State model (store)
 - Canvas size: `WIDTH = 64`, `HEIGHT = 64`
@@ -112,6 +113,14 @@ If you need to expose these as settings later, prefer keeping store constants as
 - Touch: single-finger draw with tap/hold/move threshold; two-finger pan+pinch
 - Prevent accidental taps during two-finger gestures
 - Removed pixel size control from header; wheel/pinch control zoom
+
+Tools
+- Brush: default draw/erase behavior (left = draw, right = erase)
+- Bucket (Fill): flood fill starting at the clicked cell
+  - Default contiguous (4-neighbor) region; hold Shift to fill all pixels of the same color globally
+  - Truecolor: fills exact RGBA matches
+  - Indexed: fills by palette index; erase fills with the transparent index
+  - Undo-friendly: each fill is wrapped in beginStroke/endStroke
 - Pinch zoom allows fractional pixel sizes (wheel remains integer)
 
 ## Notes for contributors

@@ -241,13 +241,12 @@ export function PixelCanvas() {
       e.preventDefault()
       return
     }
-    const contiguous = !e.shiftKey // Shift = global fill; default contiguous
-    if (e.buttons & 1) {
-      if (tool === 'bucket') fillBucket(x, y, parseCSSColor(color), contiguous)
-      else setAt(x, y, parseCSSColor(color))
-    } else if (e.buttons & 2) {
-      if (tool === 'bucket') fillBucket(x, y, 0x00000000, contiguous)
-      else setAt(x, y, 0x00000000) // erase
+    if (tool !== 'bucket') {
+      if (e.buttons & 1) {
+        setAt(x, y, parseCSSColor(color))
+      } else if (e.buttons & 2) {
+        setAt(x, y, 0x00000000) // erase
+      }
     }
   }
 

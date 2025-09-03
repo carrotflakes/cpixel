@@ -1,6 +1,20 @@
 import { create } from 'zustand'
 import { clamp } from './utils/view'
 import { nearestIndexInPalette } from './utils/color'
+import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
+
+function equalU32(a: Uint32Array, b: Uint32Array) {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
+}
+function equalU8(a: Uint8Array, b: Uint8Array) {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
+}
 
 export const WIDTH = 64
 export const HEIGHT = 64
@@ -187,59 +201,18 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   fillBucket: (x, y, rgba, contiguous) => set((s) => {
     if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return {}
     if (s.mode === 'truecolor') {
-      const src = s.data
-      const w = WIDTH, h = HEIGHT
-      const idx0 = y * w + x
-      const target = src[idx0] >>> 0
-      const replacement = rgba >>> 0
-      if (target === replacement) return {}
-      const out = new Uint32Array(src)
-      if (contiguous) {
-        const stack: number[] = [x, y]
-        while (stack.length) {
-          const cy = stack.pop() as number
-          const cx = stack.pop() as number
-          const i = cy * w + cx
-          if (cx < 0 || cy < 0 || cx >= w || cy >= h) continue
-          if ((out[i] >>> 0) !== target) continue
-          out[i] = replacement
-          stack.push(cx + 1, cy)
-          stack.push(cx - 1, cy)
-          stack.push(cx, cy + 1)
-          stack.push(cx, cy - 1)
-        }
-      } else {
-        for (let i = 0; i < out.length; i++) if ((out[i] >>> 0) === target) out[i] = replacement
-      }
+      const out = floodFillTruecolor(s.data, WIDTH, HEIGHT, x, y, rgba, contiguous)
+      // Early out if nothing changed (same color)
+      if (out === s.data || equalU32(out, s.data)) return {}
       return { data: out }
     } else {
       // indexed mode
       const idxArr = s.indices ?? new Uint8Array(WIDTH * HEIGHT)
-      const w = WIDTH, h = HEIGHT
-      const i0 = y * w + x
-      const targetIdx = idxArr[i0] ?? s.transparentIndex
       const replacementIdx = (rgba >>> 0) === 0x00000000
         ? s.transparentIndex
         : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
-      if (targetIdx === replacementIdx) return {}
-      const out = new Uint8Array(idxArr)
-      if (contiguous) {
-        const stack: number[] = [x, y]
-        while (stack.length) {
-          const cy = stack.pop() as number
-          const cx = stack.pop() as number
-          if (cx < 0 || cy < 0 || cx >= w || cy >= h) continue
-          const i = cy * w + cx
-          if ((out[i] ?? s.transparentIndex) !== targetIdx) continue
-          out[i] = replacementIdx & 0xff
-          stack.push(cx + 1, cy)
-          stack.push(cx - 1, cy)
-          stack.push(cx, cy + 1)
-          stack.push(cx, cy - 1)
-        }
-      } else {
-        for (let i = 0; i < out.length; i++) if ((out[i] ?? s.transparentIndex) === targetIdx) out[i] = replacementIdx & 0xff
-      }
+      const out = floodFillIndexed(idxArr, WIDTH, HEIGHT, x, y, replacementIdx, contiguous, s.transparentIndex)
+      if (out === idxArr || equalU8(out, idxArr)) return {}
       return { indices: out }
     }
   }),
