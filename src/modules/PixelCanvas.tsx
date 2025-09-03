@@ -12,10 +12,72 @@ export function PixelCanvas() {
   const setPixelSize = usePixelStore(s => s.setPixelSize)
   const setPixelSizeRaw = usePixelStore(s => s.setPixelSizeRaw)
   const setView = usePixelStore(s => s.setView)
-  const panBy = usePixelStore(s => s.panBy)
+  // const panBy = usePixelStore(s => s.panBy)
 
   const scaledW = WIDTH * size
   const scaledH = HEIGHT * size
+  // cache small helper canvases
+  const checkerTileRef = useRef<HTMLCanvasElement | null>(null)
+  const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  // Clamp view so content stays within or is centered if smaller than viewport
+  const clampViewToBounds = (
+    vx: number,
+    vy: number,
+    vw: number,
+    vh: number,
+    cw: number,
+    ch: number,
+  ) => {
+    const clampAxis = (v: number, vSize: number, cSize: number) => {
+  // If content is smaller than viewport, don't clamp (allow free pan)
+  if (cSize <= vSize) return v
+      const min = vSize - cSize
+      const max = 0
+      return Math.max(min, Math.min(max, v))
+    }
+    return { vx: clampAxis(vx, vw, cw), vy: clampAxis(vy, vh, ch) }
+  }
+
+  // One-time init: restore previous view/zoom or center initially
+  const inited = useRef(false)
+  useEffect(() => {
+    if (inited.current) return
+    const cvs = canvasRef.current
+    if (!cvs) return
+    // try restore from session
+    try {
+      const raw = sessionStorage.getItem('cpixel:view')
+      if (raw) {
+        const saved = JSON.parse(raw) as { size: number; viewX: number; viewY: number } | null
+        if (saved && isFinite(saved.size) && isFinite(saved.viewX) && isFinite(saved.viewY)) {
+          const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
+          const s = clamp(saved.size, MIN_SIZE, MAX_SIZE)
+          setPixelSizeRaw(s)
+          setView(Math.round(saved.viewX), Math.round(saved.viewY))
+          inited.current = true
+          return
+        }
+      }
+    } catch {}
+    // center if no saved state
+    const rect = cvs.getBoundingClientRect()
+    const vw = rect.width
+    const vh = rect.height
+    const cw = WIDTH * size
+    const ch = HEIGHT * size
+    const cx = Math.round((vw - cw) / 2)
+    const cy = Math.round((vh - ch) / 2)
+    setView(cx, cy)
+    inited.current = true
+  }, [size, setPixelSizeRaw, setView])
+
+  // Persist view/zoom to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('cpixel:view', JSON.stringify({ size, viewX, viewY }))
+    } catch {}
+  }, [size, viewX, viewY])
 
   useEffect(() => {
     const cvs = canvasRef.current
@@ -39,21 +101,24 @@ export function PixelCanvas() {
   // translate to current view (rounded for crisper grid in CSS px space)
   const vx = Math.round(viewX)
   const vy = Math.round(viewY)
-  // draw checkerboard in screen space so it doesn't follow pan/zoom
+  // draw checkerboard in screen space so it doesn't follow pan/zoom (cached tile)
   const light = '#f0f0f0'
   const dark = '#d7d7d7'
   const tile = 12 // CSS px per checker tile
-  const patt = document.createElement('canvas')
-  patt.width = tile * 2
-  patt.height = tile * 2
-  const pctx = patt.getContext('2d')!
-  pctx.fillStyle = light
-  pctx.fillRect(0, 0, tile, tile)
-  pctx.fillRect(tile, tile, tile, tile)
-  pctx.fillStyle = dark
-  pctx.fillRect(tile, 0, tile, tile)
-  pctx.fillRect(0, tile, tile, tile)
-  const pattern = ctx.createPattern(patt, 'repeat')!
+  if (!checkerTileRef.current || checkerTileRef.current.width !== tile * 2) {
+    const patt = document.createElement('canvas')
+    patt.width = tile * 2
+    patt.height = tile * 2
+    const pctx = patt.getContext('2d')!
+    pctx.fillStyle = light
+    pctx.fillRect(0, 0, tile, tile)
+    pctx.fillRect(tile, tile, tile, tile)
+    pctx.fillStyle = dark
+    pctx.fillRect(tile, 0, tile, tile)
+    pctx.fillRect(0, tile, tile, tile)
+    checkerTileRef.current = patt
+  }
+  const pattern = ctx.createPattern(checkerTileRef.current!, 'repeat')!
   ctx.fillStyle = pattern
   ctx.fillRect(vx, vy, scaledW, scaledH)
   // now translate for drawing content and grid
@@ -70,11 +135,17 @@ export function PixelCanvas() {
         img.data[i+3] = (rgba >>> 0) & 0xff
       }
     }
-    const tmp = document.createElement('canvas')
-    tmp.width = WIDTH
-    tmp.height = HEIGHT
-    tmp.getContext('2d')!.putImageData(img, 0, 0)
-    ctx.drawImage(tmp, 0, 0, WIDTH, HEIGHT, 0, 0, scaledW, scaledH)
+    if (!tmpCanvasRef.current) {
+      const t = document.createElement('canvas')
+      t.width = WIDTH
+      t.height = HEIGHT
+      tmpCanvasRef.current = t
+    } else if (tmpCanvasRef.current.width !== WIDTH || tmpCanvasRef.current.height !== HEIGHT) {
+      tmpCanvasRef.current.width = WIDTH
+      tmpCanvasRef.current.height = HEIGHT
+    }
+    tmpCanvasRef.current.getContext('2d')!.putImageData(img, 0, 0)
+    ctx.drawImage(tmpCanvasRef.current, 0, 0, WIDTH, HEIGHT, 0, 0, scaledW, scaledH)
 
   // border around pixel area
     ctx.strokeStyle = 'rgba(0,0,0,0.3)'
@@ -121,6 +192,8 @@ export function PixelCanvas() {
     if (e.button === 1) {
       dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
       ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  // visual feedback
+  if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
       e.preventDefault()
       return
     }
@@ -132,13 +205,25 @@ export function PixelCanvas() {
       const dy = e.clientY - dragState.current.lastY
       dragState.current.lastX = e.clientX
       dragState.current.lastY = e.clientY
-      panBy(dx, dy)
+  // soft clamp pan to keep content near viewport
+  const rect = canvasRef.current!.getBoundingClientRect()
+  const vw = rect.width
+  const vh = rect.height
+  const cw = WIDTH * size
+  const ch = HEIGHT * size
+  let nvx = viewX + dx
+  let nvy = viewY + dy
+  ;({ vx: nvx, vy: nvy } = clampViewToBounds(nvx, nvy, vw, vh, cw, ch))
+  setView(Math.round(nvx), Math.round(nvy))
       e.preventDefault()
       return
     }
     onPointer(e)
   }
-  const onPointerUp = () => { dragState.current.panning = false }
+  const onPointerUp = () => {
+    dragState.current.panning = false
+    if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
+  }
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -151,8 +236,10 @@ export function PixelCanvas() {
     const ratio = nextSize / size
     const newVX = viewX - (Cx - viewX) * (ratio - 1)
     const newVY = viewY - (Cy - viewY) * (ratio - 1)
-    setPixelSize(nextSize)
-    setView(Math.round(newVX), Math.round(newVY))
+  // clamp to viewport after zoom
+  const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, WIDTH * nextSize, HEIGHT * nextSize)
+  setPixelSize(nextSize)
+  setView(Math.round(cvx), Math.round(cvy))
     e.preventDefault()
   }
 
@@ -255,13 +342,13 @@ export function PixelCanvas() {
   const nextSize = clamp(size * k, MIN_SIZE, MAX_SIZE)
   const ratio = nextSize / size
 
-      const v1x = viewX + dx
-      const v1y = viewY + dy
-      const newVX = v1x - (Cx - v1x) * (ratio - 1)
-      const newVY = v1y - (Cy - v1y) * (ratio - 1)
-
+  const v1x = viewX + dx
+  const v1y = viewY + dy
+  const newVX = v1x - (Cx - v1x) * (ratio - 1)
+  const newVY = v1y - (Cy - v1y) * (ratio - 1)
+  const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, WIDTH * nextSize, HEIGHT * nextSize)
   setPixelSizeRaw(nextSize)
-      setView(Math.round(newVX), Math.round(newVY))
+  setView(Math.round(cvx), Math.round(cvy))
       touches.current.lastDist = d
       touches.current.lastX = cx
       touches.current.lastY = cy
@@ -296,7 +383,9 @@ export function PixelCanvas() {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        className="w-full h-full block shadow rounded touch-none"
+  className="w-full h-full block shadow rounded touch-none cursor-crosshair focus:outline-2 focus:outline-blue-500"
+  tabIndex={0}
+  aria-label="Pixel canvas"
       />
     </div>
   )

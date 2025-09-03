@@ -155,7 +155,6 @@ Phase 3 – File I/O and persistence
 Phase 4 – Layers and blending (lightweight)
 - Single background layer + one drawable layer to start; later N layers
 - Layer operations: add/remove/reorder, toggle visibility, opacity per layer
-- Simple blending modes: normal, multiply, screen (computed when composing ImageData)
 
 Phase 5 – UI/Workflow
 - Toolbar component with tools and active-state management
@@ -177,4 +176,30 @@ Implementation notes
 - Maintain the non-scaling checker; all layers/tools should render after translating to view
 - Keep pixel math integer-stable; prefer rounding view before drawing borders/grids
 - Coalesce store updates within a frame (e.g., requestAnimationFrame) for heavy tools
+
+## Cross-device support (PC / Phone / Tablet)
+
+Input
+- Pointer Events already unify mouse/touch; continue to use `touch-action: none` on the canvas to own gestures
+- Desktop: wheel zoom + middle-button pan; consider Ctrl+left-drag pan for trackpads without middle button
+- Mobile/Tablet: one-finger draw (tap/hold/move), two-finger pan+pinch; avoid accidental taps during multi-touch (implemented)
+
+Responsive UI
+- Header buttons get larger hit targets on small screens (min 40–48px touch area)
+- Optional compact toolbar for tools; collapsible panels on narrow widths
+- Status indicators (zoom %, coords) adapt to smaller screens (icons over text)
+
+Performance
+- Keep allocations low in move handlers; reuse canvases (done for checker/tmp)
+- Test on mid-range Android/iOS devices; aim for 60fps during pan/zoom/draw
+
+Platform nuances
+- iOS Safari: verify passive listeners aren’t required where `preventDefault()` is called; keep viewport meta to prevent zoom on inputs
+- Android Chrome: ensure pinch works consistently with two-finger gestures
+- Desktop trackpads: consider smooth wheel deltas and fractional zoom steps if desired
+
+Roadmap additions
+- Add trackpad-friendly pan alternative (e.g., Space+drag or Ctrl+drag)
+- Mobile-friendly tool switching UI and quick color swatches
+- Per-device tuning for touch thresholds (hold/move) and hit targets
 
