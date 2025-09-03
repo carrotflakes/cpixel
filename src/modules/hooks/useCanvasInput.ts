@@ -59,11 +59,50 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     multi?: boolean
   }>({})
 
+  // Helpers
   const pickPoint = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect()
     const x = Math.floor((clientX - rect.left - viewX) / size)
     const y = Math.floor((clientY - rect.top - viewY) / size)
     return { x, y }
+  }
+  const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
+  const rgbaFor = (erase: boolean) => (erase ? 0x00000000 : parseCSSColor(color))
+  const isShapeTool = () => tool === 'line' || tool === 'rect'
+  const isBucketTool = () => tool === 'bucket'
+  const updateHover = (x: number, y: number) => {
+    const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
+    setHoverInfo(x, y, hov)
+  }
+  const startShapeAt = (x: number, y: number) => {
+    setShapePreview({ kind: tool as 'line' | 'rect', startX: x, startY: y, curX: x, curY: y })
+    beginStroke()
+  }
+  const updateShapeTo = (x: number, y: number) => {
+    setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
+    // force re-render via hover change to show dashed preview
+    setHoverCell((h) => (h ? { ...h } : { x: -1, y: -1 }))
+  }
+  const commitShape = (erase = false) => {
+    const s = shapePreview
+    if (!s.kind) return
+    const rgba = rgbaFor(erase)
+    if (s.kind === 'line') usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
+    else if (s.kind === 'rect') usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
+    setShapePreview({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
+    endStroke()
+  }
+  const startBrushAt = (x: number, y: number, erase: boolean) => {
+    mouseStroke.current.active = true
+    mouseStroke.current.erase = erase
+    mouseStroke.current.lastX = x
+    mouseStroke.current.lastY = y
+    setAt(x, y, rgbaFor(erase))
+  }
+  const endBrush = () => {
+    mouseStroke.current.active = false
+    mouseStroke.current.lastX = undefined
+    mouseStroke.current.lastY = undefined
   }
 
   // Pan mode while Space key is held
@@ -112,37 +151,29 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     // If this were a touch-derived PointerEvent with multiple contacts, bail
     if ((e as any).isPrimary === false) return
     const { x, y } = pickPoint(e.clientX, e.clientY)
-    if (x < 0 || y < 0 || x >= W || y >= H) { setHoverCell(null); clearHoverInfo(); return }
+    if (!inBounds(x, y)) { setHoverCell(null); clearHoverInfo(); return }
     setHoverCell({ x, y })
-    const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
-    setHoverInfo(x, y, hov)
+    updateHover(x, y)
     if (e.altKey) {
       const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
       setColor(rgbaToCSSHex(rgba))
       e.preventDefault();
       return
     }
-    if (tool !== 'bucket') {
+    if (!isBucketTool()) {
       const left = (e.buttons & 1) !== 0
       const right = (e.buttons & 2) !== 0
       const pressed = left || right
       if (pressed) {
         const erase = tool === 'eraser' ? left || right : right
-        const rgba = erase ? 0x00000000 : parseCSSColor(color)
+        const rgba = rgbaFor(erase)
         if (!mouseStroke.current.active) {
-          mouseStroke.current.active = true
-          mouseStroke.current.erase = erase
-          mouseStroke.current.lastX = x
-          mouseStroke.current.lastY = y
           // seed first pixel
-          setAt(x, y, rgba)
+          startBrushAt(x, y, erase)
         } else {
           // if erase mode changed mid-stroke, reset seed
           if (mouseStroke.current.erase !== erase) {
-            mouseStroke.current.erase = erase
-            mouseStroke.current.lastX = x
-            mouseStroke.current.lastY = y
-            setAt(x, y, rgba)
+            startBrushAt(x, y, erase)
           } else if (mouseStroke.current.lastX !== undefined && mouseStroke.current.lastY !== undefined) {
             usePixelStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, rgba)
             mouseStroke.current.lastX = x
@@ -151,9 +182,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         }
       } else {
         // button released
-        mouseStroke.current.active = false
-        mouseStroke.current.lastX = undefined
-        mouseStroke.current.lastY = undefined
+        endBrush()
       }
     }
   }
@@ -169,31 +198,22 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       return
     }
     const { x, y } = pickPoint(e.clientX, e.clientY)
-    if (x >= 0 && y >= 0 && x < W && y < H) {
-      if (tool === 'line' || tool === 'rect') {
-        setShapePreview({ kind: tool, startX: x, startY: y, curX: x, curY: y })
-        beginStroke()
+    if (inBounds(x, y)) {
+      if (isShapeTool()) {
+        startShapeAt(x, y)
       } else {
         if (e.button === 0 || e.button === 2) beginStroke()
         const contiguous = !e.shiftKey
         if (e.button === 0) {
-          if (tool === 'bucket') { fillBucket(x, y, parseCSSColor(color), contiguous) }
+          if (isBucketTool()) { fillBucket(x, y, parseCSSColor(color), contiguous) }
           else {
             // start mouse stroke drawing
-            mouseStroke.current.active = true
-            mouseStroke.current.erase = tool === 'eraser'
-            mouseStroke.current.lastX = x
-            mouseStroke.current.lastY = y
-            setAt(x, y, tool === 'eraser' ? 0x00000000 : parseCSSColor(color))
+            startBrushAt(x, y, tool === 'eraser')
           }
         } else if (e.button === 2) {
-          if (tool === 'bucket') { fillBucket(x, y, 0x00000000, contiguous) }
+          if (isBucketTool()) { fillBucket(x, y, 0x00000000, contiguous) }
           else {
-            mouseStroke.current.active = true
-            mouseStroke.current.erase = true
-            mouseStroke.current.lastX = x
-            mouseStroke.current.lastY = y
-            setAt(x, y, 0x00000000)
+            startBrushAt(x, y, true)
           }
         }
       }
@@ -222,9 +242,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
     if (shapePreview.kind) {
       const { x, y } = pickPoint(e.clientX, e.clientY)
-      setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
-      // force re-render via hover change to show dashed preview
-      setHoverCell((h) => h ? { ...h } : { x: -1, y: -1 })
+      updateShapeTo(x, y)
       return
     }
     onPointer(e)
@@ -235,21 +253,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     dragState.current.panning = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
     if (shapePreview.kind) {
-      const s = shapePreview
-      const rgba = tool === 'eraser' ? 0x00000000 : parseCSSColor(color)
-      if (s.kind === 'line') {
-        usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
-      } else if (s.kind === 'rect') {
-        usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
-      }
-      setShapePreview({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
-      endStroke()
+      commitShape(tool === 'eraser')
       return
     }
     endStroke()
-    mouseStroke.current.active = false
-    mouseStroke.current.lastX = undefined
-    mouseStroke.current.lastY = undefined
+    endBrush()
   }
 
   const onPointerLeave = () => { setHoverCell(null); clearHoverInfo() }
@@ -290,13 +298,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       touches.current.startTime = performance.now()
       touches.current.lastPixX = undefined
       touches.current.lastPixY = undefined
-      
+
       // Touch: begin shape drawing immediately for line/rect
-      if (tool === 'line' || tool === 'rect') {
+      if (isShapeTool()) {
         const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (x >= 0 && y >= 0 && x < W && y < H) {
-          beginStroke()
-          setShapePreview({ kind: tool, startX: x, startY: y, curX: x, curY: y })
+        if (inBounds(x, y)) {
+          startShapeAt(x, y)
         }
         e.preventDefault()
         return
@@ -305,14 +312,14 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (touches.current.isDrawing) return
         if (touches.current.multi) return
         const { x, y } = pickPoint(touches.current.startX!, touches.current.startY!)
-        if (x >= 0 && y >= 0 && x < W && y < H) {
+        if (inBounds(x, y)) {
           beginStroke()
-          if (tool === 'bucket') {
+          if (isBucketTool()) {
             fillBucket(x, y, parseCSSColor(color), true)
             endStroke()
           } else {
             touches.current.isDrawing = true
-            setAt(x, y, tool === 'eraser' ? 0x00000000 : parseCSSColor(color))
+            setAt(x, y, rgbaFor(tool === 'eraser'))
             touches.current.lastPixX = x
             touches.current.lastPixY = y
           }
@@ -339,15 +346,13 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (shapePreview.kind && e.touches.length === 1) {
       const t = e.touches[0]
       const { x, y } = pickPoint(t.clientX, t.clientY)
-      setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
-      // force re-render via hover change to show dashed preview
-      setHoverCell((h) => (h ? { ...h } : { x: -1, y: -1 }))
+      updateShapeTo(x, y)
       e.preventDefault()
       return
     }
     if (e.touches.length === 1 && touches.current.id1 === undefined) {
       // For bucket tool, do not start brush strokes on move; also cancel any hold timer
-      if (tool === 'bucket') {
+      if (isBucketTool()) {
         if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
         return
       }
@@ -363,8 +368,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       }
       if (touches.current.isDrawing) {
         const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (x >= 0 && y >= 0 && x < W && y < H) {
-          const rgba = tool === 'eraser' ? 0x00000000 : parseCSSColor(color)
+        if (inBounds(x, y)) {
+          const rgba = rgbaFor(tool === 'eraser')
           const lx = touches.current.lastPixX
           const ly = touches.current.lastPixY
           if (lx === undefined || ly === undefined) {
@@ -412,15 +417,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const onTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
     // If a shape is active, commit it first and exit to avoid brush single-tap
     if (shapePreview.kind) {
-      const s = shapePreview
-      const rgba = parseCSSColor(color)
-      if (s.kind === 'line') {
-        usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
-      } else if (s.kind === 'rect') {
-        usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
-      }
-      setShapePreview({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
-      endStroke()
+      commitShape(false)
       touches.current = {}
       return
     }
@@ -429,12 +426,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       if (!touches.current.multi && !touches.current.isDrawing) {
         const t = e.changedTouches[0]
         const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (x >= 0 && y >= 0 && x < W && y < H) {
+        if (inBounds(x, y)) {
           beginStroke()
-          if (tool === 'bucket') {
+          if (isBucketTool()) {
             fillBucket(x, y, parseCSSColor(color), true)
           } else {
-            setAt(x, y, tool === 'eraser' ? 0x00000000 : parseCSSColor(color))
+            setAt(x, y, rgbaFor(tool === 'eraser'))
           }
           endStroke()
         }
