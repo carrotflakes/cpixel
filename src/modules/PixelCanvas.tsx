@@ -187,7 +187,7 @@ export function PixelCanvas() {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        className="w-full h-full block shadow rounded cursor-crosshair focus:outline-2 focus:outline-blue-500"
+        className="w-full h-full block shadow cursor-crosshair focus:outline-2 focus:outline-blue-500"
         tabIndex={0}
         aria-label="Pixel canvas"
       />
