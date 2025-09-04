@@ -32,6 +32,7 @@ export function PixelCanvas() {
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const floatCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const [antsPhase, setAntsPhase] = useState(0)
+  const resizeTick = useWindowResizeRedraw()
 
   // One-time init: restore previous view/zoom or center initially
   const inited = useRef(false)
@@ -178,7 +179,7 @@ export function PixelCanvas() {
         ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selectionBounds.left + dx) * s, (selectionBounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase])
+  }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick])
 
   const overlay = (() => {
     if (!selectionMask || !selectionBounds) return null
@@ -218,4 +219,20 @@ export function PixelCanvas() {
   )
 }
 
-// color helpers moved to utils/color
+// Custom hook: returns a counter that increments on window resize (RAF-throttled)
+function useWindowResizeRedraw() {
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    let raf = 0
+    const onResize = () => {
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => setTick(t => t + 1))
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
+  return tick
+}
