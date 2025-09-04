@@ -14,7 +14,7 @@ export function LayersPanel() {
   const toggleVisible = usePixelStore(s => s.toggleVisible)
   const toggleLocked = usePixelStore(s => s.toggleLocked)
 
-  const [collapsed, setCollapsed] = useState(true)
+  const [collapsed, setCollapsed] = useState(false)
 
   if (collapsed) {
     return (
