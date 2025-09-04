@@ -6,6 +6,7 @@ import { LuDownload, LuPaintbrush, LuPaintBucket, LuChevronRight, LuCheck, LuSqu
 import { FaEllipsisV } from 'react-icons/fa'
 import { CanvasSizeDialog } from './CanvasSizeDialog'
 import { GoogleDrive } from './utils/googleDrive'
+import { ColorPicker, useColorPopover } from './ColorPicker'
 
 export function TopBar() {
   const color = usePixelStore(s => s.color)
@@ -112,13 +113,7 @@ export function TopBar() {
     <div className="p-2 flex gap-4 items-center">
       <div className="flex items-center gap-2">
         <label className="text-sm text-muted">Color</label>
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => setColorLive(e.target.value)}
-          onBlur={(e) => setColor(e.target.value)}
-          className="h-7 w-10 rounded border border-border bg-surface"
-        />
+        <ColorButton color={color} onLive={setColorLive} onDone={setColor} />
       </div>
       <div className="hidden sm:flex items-center gap-1">
         {(recent ?? []).slice(0, 4).map((c) => (
@@ -570,5 +565,31 @@ export function TopBar() {
         document.body
       )}
     </div>
+  )
+}
+
+function ColorButton({ color, onLive, onDone }: { color: string; onLive: (c: string) => void; onDone: (c: string) => void }) {
+  const { open, anchor, btnRef, toggle, close } = useColorPopover()
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className="h-7 w-10 rounded border border-border bg-surface"
+        style={{ background: color }}
+        onClick={toggle}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title={color}
+      />
+      <ColorPicker
+        color={color}
+        open={open}
+        anchor={anchor}
+        onClose={close}
+        onChangeLive={onLive}
+        onChangeDone={(c) => { onDone(c); close() }}
+        showAlpha={false}
+      />
+    </>
   )
 }
