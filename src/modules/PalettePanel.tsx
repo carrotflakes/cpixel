@@ -82,7 +82,6 @@ export function PalettePanel() {
     <div ref={panelRef} className="px-3 py-2 border-t border-border bg-surface/70 backdrop-blur relative">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm text-muted">Palette ({palette.length}/256)</span>
-        <button className="px-2 py-1 text-xs rounded bg-accent text-white" onClick={onAddBlackColor}>Add new color</button>
         <button
           className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted"
           onClick={() => setPresetsOpen(v => !v)}
@@ -196,6 +195,16 @@ export function PalettePanel() {
             </button>
           )
         })}
+        {/* Add new color button at the end */}
+        <button
+          className="w-7 h-7 rounded border border-accent flex items-center justify-center text-accent bg-surface hover:bg-accent/10"
+          title="Add new color"
+          onClick={onAddBlackColor}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
       </div>
 
       {menu?.open && createPortal(
