@@ -15,9 +15,8 @@ export function PalettePanel() {
   const removePaletteIndex = usePixelStore(s => s.removePaletteIndex)
   const movePaletteIndex = usePixelStore(s => s.movePaletteIndex)
   const applyPalettePreset = usePixelStore(s => s.applyPalettePreset)
-  const setColor = usePixelStore(s => s.setColor)
-  const color = usePixelStore(s => s.color)
   const setPaletteColor = usePixelStore(s => s.setPaletteColor)
+  const setColorIndex = usePixelStore(s => s.setColorIndex)
 
   const panelRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -67,10 +66,10 @@ export function PalettePanel() {
 
   if (mode !== 'indexed') return null
 
-  const onAddFromPicker = () => {
-    const rgba = parseCSSColor(color)
+  const onAddBlackColor = () => {
+    const rgba = parseCSSColor('#000000')
     const idx = addPaletteColor(rgba)
-    setColor(rgbaToCSSHex(palette[idx] ?? rgba))
+    setColorIndex(idx)
   }
 
   const openMenuAt = (clientX: number, clientY: number, index: number) => {
@@ -83,7 +82,7 @@ export function PalettePanel() {
     <div ref={panelRef} className="px-3 py-2 border-t border-border bg-surface/70 backdrop-blur relative">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm text-muted">Palette ({palette.length}/256)</span>
-        <button className="px-2 py-1 text-xs rounded bg-accent text-white" onClick={onAddFromPicker}>Add current color</button>
+        <button className="px-2 py-1 text-xs rounded bg-accent text-white" onClick={onAddBlackColor}>Add new color</button>
         <button
           className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted"
           onClick={() => setPresetsOpen(v => !v)}
@@ -153,11 +152,12 @@ export function PalettePanel() {
                   suppressClickRef.current = false
                   return
                 }
-                setColor(rgbaToCSSHex(rgba))
+                setColorIndex(i)
               }}
               onDoubleClick={(e) => {
                 e.preventDefault()
                 const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                setColorIndex(i)
                 setEdit({ open: true, index: i, x: r.left, y: r.bottom + 6 })
               }}
               onContextMenu={(e) => { e.preventDefault(); openMenuAt(e.clientX, e.clientY, i) }}
@@ -215,6 +215,7 @@ export function PalettePanel() {
             role="menuitem"
             className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
             onClick={() => {
+              setColorIndex(menu.index)
               setEdit({ open: true, index: menu.index, x: menu.x, y: menu.y })
               setMenu(null)
             }}

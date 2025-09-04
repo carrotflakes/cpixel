@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { clamp } from './utils/view'
-import { nearestIndexInPalette } from './utils/color'
+import { nearestIndexInPalette, parseCSSColor, rgbaToCSSHex } from './utils/color'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 
@@ -39,6 +39,7 @@ export type PixelState = {
   viewX: number
   viewY: number
   color: string
+  currentPaletteIndex?: number
   recentColors: string[]
   mode: 'truecolor' | 'indexed'
   palette: Uint32Array
@@ -46,6 +47,7 @@ export type PixelState = {
   tool?: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'lasso'
   setColor: (c: string) => void
   setColorLive: (c: string) => void
+  setColorIndex: (i: number) => void
   setPaletteColor: (index: number, rgba: number) => void
   // layer ops
   addLayer: () => void
@@ -115,6 +117,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   viewX: 0,
   viewY: 0,
   color: '#000000',
+  currentPaletteIndex: 1,
   recentColors: ['#000000', '#ffffff'],
   mode: 'truecolor',
   tool: 'brush',
@@ -178,6 +181,13 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   toggleLocked: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l) })),
   setTool: (t) => set({ tool: t }),
   setColor: (c) => set((s) => {
+    if (s.mode === 'indexed') {
+      // In indexed, pick nearest palette index and sync color/index
+      const rgba = parseCSSColor(c)
+      const idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
+      return { color: hex, currentPaletteIndex: idx }
+    }
     // update recent colors (dedupe, cap to 10)
     const existing = s.recentColors || []
     const norm = (x: string) => x.toLowerCase()
@@ -186,7 +196,20 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   }),
   // setColorLive updates only the current color for live previews (e.g., <input type="color"> drag)
   // It intentionally does not modify recentColors or history.
-  setColorLive: (c) => set({ color: c }),
+  setColorLive: (c) => set((s) => {
+    if (s.mode === 'indexed') {
+      const rgba = parseCSSColor(c)
+      const idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
+      return { color: hex, currentPaletteIndex: idx }
+    }
+    return { color: c }
+  }),
+  setColorIndex: (i) => set((s) => {
+    const idx = Math.max(0, Math.min(i | 0, Math.max(0, s.palette.length - 1)))
+    const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
+    return { currentPaletteIndex: idx, color: hex }
+  }),
   setPaletteColor: (index, rgba) => set((s) => {
     const i = index | 0
     if (i < 0 || i >= s.palette.length) return {}
@@ -194,7 +217,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     // Keep the transparent slot actually transparent for clarity
     pal[i] = (i === s.transparentIndex) ? 0x00000000 : (rgba >>> 0)
     if (equalU32(pal, s.palette)) return {}
-    return { palette: pal }
+    // If editing currently selected index, also sync visible color string
+    const patch: any = { palette: pal }
+    if (s.currentPaletteIndex === i) patch.color = rgbaToCSSHex(pal[i] >>> 0)
+    return patch
   }),
   removePaletteIndex: (idx) => set((s) => {
     const n = s.palette.length
@@ -206,6 +232,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     let ti = s.transparentIndex
     if (ti === idx) ti = 0
     else if (ti > idx) ti = ti - 1
+    // compute new current palette index
+    let ci = s.currentPaletteIndex ?? 0
+    if (ci === idx) ci = ti
+    else if (ci > idx) ci = ci - 1
     // remap indices for all layers
     const layers = s.layers.map(l => {
       if (!l.indices) return l
@@ -219,7 +249,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       }
       return { ...l, indices: dst }
     })
-    return { palette: pal, transparentIndex: ti, layers }
+    const colorHex = rgbaToCSSHex(pal[ci] ?? 0)
+    return { palette: pal, transparentIndex: ti, layers, currentPaletteIndex: ci, color: colorHex }
   }),
   movePaletteIndex: (from, to) => set((s) => {
     const n = s.palette.length
@@ -253,7 +284,11 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     })
     // remap transparent index
     const ti = map[s.transparentIndex]
-    return { palette: pal, layers, transparentIndex: ti }
+    // remap current palette index
+    const ci = s.currentPaletteIndex !== undefined ? map[s.currentPaletteIndex] : undefined
+    const patch: any = { palette: pal, layers, transparentIndex: ti }
+    if (ci !== undefined) { patch.currentPaletteIndex = ci; patch.color = rgbaToCSSHex(pal[ci] ?? 0) }
+    return patch
   }),
   applyPalettePreset: (colors, ti = 0) => set((s) => {
     // Limit to 256 colors
@@ -286,7 +321,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         }
         return { ...l, indices: dst }
       })
-      return { palette, transparentIndex, layers }
+      // choose current index nearest to previous selected color
+      const prevRGBA = s.palette[s.currentPaletteIndex ?? s.transparentIndex] ?? 0x00000000
+      let curIdx = transparentIndex
+      if ((prevRGBA >>> 0) !== 0x00000000) curIdx = nearestIndexInPalette(palette, prevRGBA, transparentIndex)
+      const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
+      return { palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex }
     } else {
       // Truecolor -> convert layers to indices under new palette and switch mode
       const layers = s.layers.map(l => {
@@ -309,7 +349,11 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         }
         return { id: l.id, visible: l.visible, locked: l.locked, indices: idx }
       })
-      return { mode: 'indexed', palette, transparentIndex, layers }
+      // choose current index nearest to existing color
+      const prevRGBA = parseCSSColor(s.color)
+      const curIdx = (prevRGBA >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(palette, prevRGBA, transparentIndex)
+      const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
+      return { mode: 'indexed', palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex }
     }
   }),
   addPaletteColor: (rgba) => {
@@ -321,7 +365,14 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const next = new Uint32Array(s.palette.length + 1)
     next.set(s.palette)
     next[s.palette.length] = rgba >>> 0
-    set({ palette: next })
+    set((s) => {
+      // If in indexed mode, select the newly added color
+      if (s.mode === 'indexed') {
+        const idx = next.length - 1
+        return { palette: next, currentPaletteIndex: idx, color: rgbaToCSSHex(next[idx] ?? 0) }
+      }
+      return { palette: next }
+    })
     return next.length - 1
   },
   setTransparentIndex: (idx) => set((s) => {
@@ -329,7 +380,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     // Ensure transparent slot is transparent color for clarity
     const pal = new Uint32Array(s.palette)
     pal[clamped] = 0x00000000
-    return { transparentIndex: clamped, palette: pal }
+    // if current index was transparent and moved, keep index number but color remains transparent
+    const patch: any = { transparentIndex: clamped, palette: pal }
+    if (s.currentPaletteIndex !== undefined) patch.color = rgbaToCSSHex(pal[s.currentPaletteIndex] ?? 0)
+    return patch
   }),
   setPixelSize: (n) => set({ pixelSize: clamp(Math.round(n), MIN_SIZE, MAX_SIZE) }),
   // Allows fractional pixel sizes (used for pinch-zoom). Still clamped to bounds.
@@ -353,7 +407,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     } else {
       const src = layer.indices ?? new Uint8Array(W * H)
       const i = y * W + x
-      const writeIndex = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      const writeIndex = (rgba >>> 0) === 0x00000000
+        ? s.transparentIndex
+        : (s.currentPaletteIndex !== undefined ? s.currentPaletteIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex))
       const next = new Uint8Array(src)
       next[i] = writeIndex & 0xff
       layers[li] = { ...layer, indices: next }
@@ -390,7 +446,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       return { layers }
     } else {
       const idxArr = layer.indices ?? new Uint8Array(W * H)
-      const writeIndex = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      const writeIndex = (rgba >>> 0) === 0x00000000
+        ? s.transparentIndex
+        : (s.currentPaletteIndex !== undefined ? s.currentPaletteIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex))
       const out = new Uint8Array(idxArr)
       let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1
       let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1
@@ -439,7 +497,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       return { layers }
     } else {
       const idxArr = layer.indices ?? new Uint8Array(W * H)
-      const writeIndex = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      const writeIndex = (rgba >>> 0) === 0x00000000
+        ? s.transparentIndex
+        : (s.currentPaletteIndex !== undefined ? s.currentPaletteIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex))
       const out = new Uint8Array(idxArr)
       for (let x = left; x <= right; x++) {
         out[top * W + x] = writeIndex & 0xff
@@ -473,7 +533,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const idxArr = layer.indices ?? new Uint8Array(W * H)
       const replacementIdx = (rgba >>> 0) === 0x00000000
         ? s.transparentIndex
-        : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+        : (s.currentPaletteIndex !== undefined ? s.currentPaletteIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex))
       const out = floodFillIndexed(idxArr, W, H, x, y, replacementIdx, contiguous, s.transparentIndex)
       if (out === idxArr || equalU8(out, idxArr)) return {}
       layers[li] = { ...layer, indices: out }
@@ -493,7 +553,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         }
         return { id: l.id, visible: l.visible, locked: l.locked, indices: idx } as Layer
       })
-      return { mode: 'indexed', layers }
+      // Sync current palette index from current truecolor selection
+      const rgba = parseCSSColor(s.color)
+      const curIdx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      return { mode: 'indexed', layers, currentPaletteIndex: curIdx, color: rgbaToCSSHex(s.palette[curIdx] ?? 0) }
     } else {
       // convert all layers: indices -> truecolor
       const layers = s.layers.map(l => {

@@ -7,12 +7,15 @@ import { FaEllipsisV } from 'react-icons/fa'
 import { CanvasSizeDialog } from './CanvasSizeDialog'
 import { GoogleDrive } from './utils/googleDrive'
 import { ColorPicker, useColorPopover } from './ColorPicker'
+import { parseCSSColor } from './utils/color'
 
 export function TopBar() {
   const color = usePixelStore(s => s.color)
   const recent = usePixelStore(s => s.recentColors)
   const setColor = usePixelStore(s => s.setColor)
   const setColorLive = usePixelStore(s => s.setColorLive)
+  const setPaletteColor = usePixelStore(s => s.setPaletteColor)
+  const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
   const mode = usePixelStore(s => s.mode)
   const setMode = usePixelStore(s => s.setMode)
   const clear = usePixelStore(s => s.clear)
@@ -113,7 +116,23 @@ export function TopBar() {
     <div className="p-2 flex gap-4 items-center">
       <div className="flex items-center gap-2">
         <label className="text-sm text-muted">Color</label>
-        <ColorButton color={color} onLive={setColorLive} onDone={setColor} />
+        <ColorButton
+          color={color}
+          onLive={(hex) => {
+            if (mode === 'indexed' && currentPaletteIndex !== undefined) {
+              setPaletteColor(currentPaletteIndex, parseCSSColor(hex))
+            } else {
+              setColorLive(hex)
+            }
+          }}
+          onDone={(hex) => {
+            if (mode === 'indexed' && currentPaletteIndex !== undefined) {
+              setPaletteColor(currentPaletteIndex, parseCSSColor(hex))
+            } else {
+              setColor(hex)
+            }
+          }}
+        />
       </div>
       <div className="hidden sm:flex items-center gap-1">
         {(recent ?? []).slice(0, 4).map((c) => (
