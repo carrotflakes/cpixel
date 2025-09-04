@@ -402,7 +402,7 @@ export function TopBar() {
               setDriveBusy(true)
               setDriveError(null)
               try {
-                const files = await GoogleDrive.listFiles('cpixel')
+                const files = await GoogleDrive.listFiles()
                 setDriveFiles(files)
               } catch (e: any) {
                 setDriveError(e?.message || 'Failed to list files')

@@ -74,9 +74,12 @@ export const GoogleDrive = {
   async listFiles(querySuffix?: string): Promise<DriveFile[]> {
     const tk = await this.ensureToken()
     const q = [`mimeType = 'application/json'`, 'trashed = false']
-    // Best-effort name heuristic
-    if (querySuffix) q.push(`name contains '${querySuffix.replace(/'/g, "\\'")}'`)
-    else q.push(`name contains 'cpixel'`)
+    // If a name filter is provided, apply it; otherwise, show all JSON files accessible to the app.
+    // With drive.file scope, this will list only files created or opened by this app.
+    if (querySuffix) {
+      const esc = (s: string) => s.replace(/'/g, "\\'")
+      q.push(`name contains '${esc(querySuffix)}'`)
+    }
     const params = new URLSearchParams({
       q: q.join(' and '),
       fields: 'files(id,name,modifiedTime)',
@@ -101,7 +104,7 @@ export const GoogleDrive = {
   },
   async saveJSON(name: string, data: unknown, fileId?: string): Promise<{ id: string; name: string }> {
     const tk = await this.ensureToken()
-    const meta = { name, mimeType: 'application/json' }
+    const meta = { name, mimeType: 'application/json', appProperties: { app: 'cpixel' } }
     const boundary = 'cpixel-' + Math.random().toString(36).slice(2)
     const delimiter = `\r\n--${boundary}\r\n`
     const closeDelim = `\r\n--${boundary}--`
