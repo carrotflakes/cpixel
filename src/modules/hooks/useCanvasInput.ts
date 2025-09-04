@@ -68,6 +68,13 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     lastPixX?: number
     lastPixY?: number
     multi?: boolean
+    // multi-tap detection (2 or 3 finger quick tap)
+    multiCount?: number
+    multiTapStart?: number
+    multiTapMoved?: boolean
+    multiStartCenterX?: number
+    multiStartCenterY?: number
+    multiStartDist?: number // for 2-finger tap movement/scale tolerance
     selDragging?: boolean
     selStartX?: number
     selStartY?: number
@@ -175,8 +182,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (!inBounds(x, y)) { setHoverCell(null); clearHoverInfo(); return }
     setHoverCell({ x, y })
     updateHover(x, y)
-  // Selection tools: only hover/update, do not paint via move
-  if (isSelectionTool()) return
+    // Selection tools: only hover/update, do not paint via move
+    if (isSelectionTool()) return
     if (e.altKey) {
       const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
       setColor(rgbaToCSSHex(rgba))
@@ -368,6 +375,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   // Touch handlers
   const TOUCH_HOLD_MS = 150
   const TOUCH_MOVE_PX = 8
+  const MULTI_TAP_MS = 250 // max duration for multi-finger tap
+  const MULTI_TAP_MOVE_PX = 10 // movement tolerance (in CSS px)
   const getTouchById = (e: React.TouchEvent, id?: number) => Array.from(e.touches).find(t => t.identifier === id)
   const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by)
 
@@ -445,10 +454,34 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       }
       touches.current.isDrawing = false
       touches.current.multi = true
+      // mark as potential 2-finger tap
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2
+      touches.current.multiCount = 2
+      touches.current.multiTapStart = performance.now()
+      touches.current.multiTapMoved = false
+      touches.current.multiStartCenterX = cx
+      touches.current.multiStartCenterY = cy
       touches.current = { ...touches.current, id1: e.touches[0].identifier, id2: e.touches[1].identifier }
       touches.current.lastDist = dist(e.touches[0].clientX, e.touches[0].clientY, e.touches[1].clientX, e.touches[1].clientY)
       touches.current.lastX = (e.touches[0].clientX + e.touches[1].clientX) / 2
       touches.current.lastY = (e.touches[0].clientY + e.touches[1].clientY) / 2
+      e.preventDefault()
+    } else if (e.touches.length === 3) {
+      // Potential 3-finger tap for redo. We don't support 3-finger gestures otherwise.
+      if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
+      if (touches.current.isDrawing) endStroke()
+      touches.current.isDrawing = false
+      touches.current.multi = true
+      touches.current.multiCount = 3
+      touches.current.multiTapStart = performance.now()
+      touches.current.multiTapMoved = false
+      // store center to check movement
+      const t0 = e.touches[0], t1 = e.touches[1], t2 = e.touches[2]
+      const cx = (t0.clientX + t1.clientX + t2.clientX) / 3
+      const cy = (t0.clientY + t1.clientY + t2.clientY) / 3
+      touches.current.multiStartCenterX = cx
+      touches.current.multiStartCenterY = cy
       e.preventDefault()
     }
   }
@@ -521,6 +554,17 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       }
       return
     }
+    // 3-finger movement: if moved too much, cancel multi-tap candidate
+    if (e.touches.length === 3 && touches.current.multiCount === 3 && touches.current.multiStartCenterX !== undefined && touches.current.multiStartCenterY !== undefined) {
+      const t0 = e.touches[0], t1m = e.touches[1], t2m = e.touches[2]
+      const cx = (t0.clientX + t1m.clientX + t2m.clientX) / 3
+      const cy = (t0.clientY + t1m.clientY + t2m.clientY) / 3
+      const move = Math.hypot(cx - touches.current.multiStartCenterX, cy - touches.current.multiStartCenterY)
+      if (move > MULTI_TAP_MOVE_PX) touches.current.multiTapMoved = true
+      // Do not apply any action on move for 3 fingers; just prevent default to avoid browser gestures
+      e.preventDefault()
+      return
+    }
     const t1 = getTouchById(e, touches.current.id1)
     const t2 = getTouchById(e, touches.current.id2)
     if (t1 && t2 && touches.current.lastDist && touches.current.lastX !== undefined && touches.current.lastY !== undefined) {
@@ -534,6 +578,16 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const dx = cx - touches.current.lastX
       const dy = cy - touches.current.lastY
       const k = d / touches.current.lastDist
+      // If this was a potential 2-finger tap, cancel it on movement/scale over tolerance
+      if (touches.current.multiCount === 2 && touches.current.multiTapStart !== undefined) {
+        const movedCenter = Math.hypot(
+          (cx - (touches.current.multiStartCenterX ?? cx)),
+          (cy - (touches.current.multiStartCenterY ?? cy))
+        )
+        if (movedCenter > MULTI_TAP_MOVE_PX || Math.abs(k - 1) > 0.05) {
+          touches.current.multiTapMoved = true
+        }
+      }
       const nextSize = clamp(size * k, MIN_SIZE, MAX_SIZE)
       const ratio = nextSize / size
 
@@ -554,20 +608,26 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const onTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
     // Selection end handling
     if (isSelectionTool()) {
+      let handledSelection = false
       if (touches.current.selDragging) {
         commitSelectionMove()
         endStroke()
+        handledSelection = true
       }
       if (touches.current.lasso && lassoPath.current) {
         const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
         setSelectionMask(mask, bounds)
+        handledSelection = true
       }
-      touches.current.selDragging = false
-      touches.current.selRect = false
-      touches.current.lasso = false
-      lassoPath.current = null
-      touches.current = {}
-      return
+      if (handledSelection) {
+        touches.current.selDragging = false
+        touches.current.selRect = false
+        touches.current.lasso = false
+        lassoPath.current = null
+        touches.current = {}
+        return
+      }
+      // If no active selection gesture, fall through to allow multi-tap (undo/redo)
     }
     // If a shape is active, commit it first and exit to avoid brush single-tap
     if (shapePreview.kind) {
@@ -576,6 +636,22 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       return
     }
     if (e.touches.length === 0) {
+      // Multi-finger tap gestures (undo/redo) when nothing else consumed the gesture
+      if (touches.current.multi && (touches.current.multiCount === 2 || touches.current.multiCount === 3)) {
+        const dur = touches.current.multiTapStart ? (performance.now() - touches.current.multiTapStart) : Infinity
+        const valid = dur <= MULTI_TAP_MS && !touches.current.multiTapMoved
+        if (valid) {
+          if (touches.current.multiCount === 2) {
+            undo()
+            touches.current = {}
+            return
+          } else if (touches.current.multiCount === 3) {
+            redo()
+            touches.current = {}
+            return
+          }
+        }
+      }
       if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
       if (!touches.current.multi && !touches.current.isDrawing) {
         const t = e.changedTouches[0]

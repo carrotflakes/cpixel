@@ -1,6 +1,5 @@
 import { PixelCanvas } from "./PixelCanvas";
 import { TopBar } from "./TopBar";
-import { FloatingControls } from "./FloatingControls.tsx";
 import { StatusBar } from "./StatusBar";
 import { PalettePanel } from "./PalettePanel";
 import { LayersPanel } from "./LayersPanel";
@@ -16,7 +15,6 @@ export function App() {
         <LayersPanel />
       </div>
       <div className="absolute bottom-0 left-0 right-0">
-        <FloatingControls />
         <PalettePanel />
         <StatusBar />
       </div>
