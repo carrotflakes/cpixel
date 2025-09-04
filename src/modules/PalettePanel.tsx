@@ -135,7 +135,7 @@ export function PalettePanel() {
 
       <div className="flex flex-wrap gap-3">
         {Array.from(palette).map((rgba, i) => {
-          const isTransparent = i === transparentIndex || ((rgba >>> 0) & 0xff) === 0
+          const isTransparent = i === transparentIndex
           const style = isTransparent
             ? { backgroundImage: 'repeating-conic-gradient(#cccccc 0% 25%, transparent 0% 50%)', backgroundSize: '8px 8px', backgroundColor: '#ffffff' }
             : { background: rgbaToCSSHex(rgba) }
@@ -143,7 +143,7 @@ export function PalettePanel() {
             <button
               key={i}
               title={`#${i}`}
-              className={`w-7 h-7 rounded border ${i === transparentIndex ? 'border-accent border-2' : 'border-border'}`}
+              className={`w-7 h-7 rounded border border-border relative flex items-center justify-center`}
               style={style}
               onClick={(e) => {
                 if (suppressClickRef.current) {
@@ -189,7 +189,11 @@ export function PalettePanel() {
                 if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
                 touchStartPos.current = null
               }}
-            />
+            >
+              {isTransparent && (
+                <span className="absolute inset-0 flex items-center justify-center pointer-events-none select-none text-base font-bold">t</span>
+              )}
+            </button>
           )
         })}
       </div>

@@ -370,13 +370,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   },
   setTransparentIndex: (idx) => set((s) => {
     const clamped = Math.max(0, Math.min(idx | 0, Math.max(0, s.palette.length - 1)))
-    // Ensure transparent slot is transparent color for clarity
-    const pal = new Uint32Array(s.palette)
-    pal[clamped] = 0x00000000
-    // if current index was transparent and moved, keep index number but color remains transparent
-    const patch: any = { transparentIndex: clamped, palette: pal }
-    if (s.currentPaletteIndex !== undefined) patch.color = rgbaToCSSHex(pal[s.currentPaletteIndex] ?? 0)
-    return patch
+    return { transparentIndex: clamped }
   }),
   setPixelSize: (n) => set({ pixelSize: clamp(Math.round(n), MIN_SIZE, MAX_SIZE) }),
   // Allows fractional pixel sizes (used for pinch-zoom). Still clamped to bounds.

@@ -45,6 +45,7 @@ export function compositePixel(
       rgba = (L.data ?? new Uint32Array(width * height))[y * width + x] >>> 0
     } else {
       const pi = (L.indices ?? new Uint8Array(width * height))[y * width + x] ?? transparentIndex
+      if (pi === transparentIndex) continue
       rgba = palette[pi] ?? 0x00000000
     }
     out = over(rgba, out)
