@@ -27,6 +27,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const mode = usePixelStore(s => s.mode)
   const palette = usePixelStore(s => s.palette)
   const transparentIndex = usePixelStore(s => s.transparentIndex)
+  const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
   const tool = usePixelStore(s => s.tool)
   const viewX = usePixelStore(s => s.viewX)
   const viewY = usePixelStore(s => s.viewY)
@@ -91,6 +92,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
   const rgbaFor = (erase: boolean) => (erase ? 0x00000000 : parseCSSColor(color))
+  const paintFor = (erase: boolean) => (
+    mode === 'indexed'
+      ? (erase ? transparentIndex : currentPaletteIndex) ?? 0
+      : rgbaFor(erase)
+  )
   const isShapeTool = () => tool === 'line' || tool === 'rect'
   const isSelectionTool = () => tool === 'select-rect' || tool === 'lasso'
   const isBucketTool = () => tool === 'bucket'
@@ -111,7 +117,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const commitShape = (erase = false) => {
     const s = shapePreview
     if (!s.kind) return
-    const rgba = rgbaFor(erase)
+    const rgba = paintFor(erase)
     if (s.kind === 'line') usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
     else if (s.kind === 'rect') usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
     setShapePreview({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
@@ -122,7 +128,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     mouseStroke.current.erase = erase
     mouseStroke.current.lastX = x
     mouseStroke.current.lastY = y
-    setAt(x, y, rgbaFor(erase))
+    setAt(x, y, paintFor(erase))
   }
   const endBrush = () => {
     mouseStroke.current.active = false
@@ -196,7 +202,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const pressed = left || right
       if (pressed) {
         const erase = tool === 'eraser' ? left || right : right
-        const rgba = rgbaFor(erase)
+        const rgba = paintFor(erase)
         if (!mouseStroke.current.active) {
           // seed first pixel
           startBrushAt(x, y, erase)
@@ -257,13 +263,13 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (e.button === 0 || e.button === 2) beginStroke()
         const contiguous = !e.shiftKey
         if (e.button === 0) {
-          if (isBucketTool()) { fillBucket(x, y, parseCSSColor(color), contiguous) }
+          if (isBucketTool()) { fillBucket(x, y, paintFor(tool === 'eraser'), contiguous) }
           else {
             // start mouse stroke drawing
             startBrushAt(x, y, tool === 'eraser')
           }
         } else if (e.button === 2) {
-          if (isBucketTool()) { fillBucket(x, y, 0x00000000, contiguous) }
+          if (isBucketTool()) { fillBucket(x, y, paintFor(true), contiguous) }
           else {
             startBrushAt(x, y, true)
           }
@@ -436,11 +442,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (inBounds(x, y)) {
           beginStroke()
           if (isBucketTool()) {
-            fillBucket(x, y, parseCSSColor(color), true)
+            fillBucket(x, y, paintFor(tool === 'eraser'), true)
             endStroke()
           } else {
             touches.current.isDrawing = true
-            setAt(x, y, rgbaFor(tool === 'eraser'))
+            setAt(x, y, paintFor(tool === 'eraser'))
             touches.current.lastPixX = x
             touches.current.lastPixY = y
           }
@@ -539,11 +545,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       if (touches.current.isDrawing) {
         const { x, y } = pickPoint(t.clientX, t.clientY)
         if (inBounds(x, y)) {
-          const rgba = rgbaFor(tool === 'eraser')
+          const rgba = paintFor(tool === 'eraser')
           const lx = touches.current.lastPixX
           const ly = touches.current.lastPixY
           if (lx === undefined || ly === undefined) {
-            setAt(x, y, rgba)
+            setAt(x, y, paintFor(tool === 'eraser'))
           } else if (lx !== x || ly !== y) {
             usePixelStore.getState().drawLine(lx, ly, x, y, rgba)
           }
@@ -659,9 +665,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (inBounds(x, y)) {
           beginStroke()
           if (isBucketTool()) {
-            fillBucket(x, y, parseCSSColor(color), true)
+            fillBucket(x, y, paintFor(tool === 'eraser'), true)
           } else {
-            setAt(x, y, rgbaFor(tool === 'eraser'))
+            setAt(x, y, paintFor(tool === 'eraser'))
           }
           endStroke()
         }
