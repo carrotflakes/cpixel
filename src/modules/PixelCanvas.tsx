@@ -93,11 +93,10 @@ export function PixelCanvas() {
     // translate to current view (rounded for crisper grid in CSS px space)
     const vx = Math.round(viewX)
     const vy = Math.round(viewY)
-    // draw checkerboard in screen space so it doesn't follow pan/zoom (cached tile)
-    if (!checkerTileRef.current) checkerTileRef.current = getCheckerPatternCanvas(12)
-    drawChecker(ctx, vx, vy, scaledW, scaledH, checkerTileRef.current)
-    // now translate for drawing content and grid
+    // draw checkerboard in content space so it follows pan/zoom (cached tile)
+    if (!checkerTileRef.current) checkerTileRef.current = getCheckerPatternCanvas(4)
     ctx.translate(vx, vy)
+    drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, size)
     // draw bitmap on top (alpha respected)
     const img = compositeImageData(layers, mode, palette, transparentIndex, ctx, W, H)
     if (!tmpCanvasRef.current) {

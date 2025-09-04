@@ -29,10 +29,29 @@ export function getCheckerPatternCanvas(tile = 12, light = '#f0f0f0', dark = '#d
   return patt
 }
 
-export function drawChecker(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, tileCanvas: HTMLCanvasElement) {
+export function drawChecker(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  tileCanvas: HTMLCanvasElement,
+  offsetX: number = 0,
+  offsetY: number = 0,
+  scale: number = 1,
+) {
   const pattern = ctx.createPattern(tileCanvas, 'repeat')!
+
+  // DOMMatrix: a c e
+  //            b d f
+  // where a/d are scale, e/f are translate
+  const m = new DOMMatrix()
+  m.a = scale
+  m.d = scale
+  m.e = offsetX
+  m.f = offsetY
+  pattern.setTransform(m)
+
   ctx.fillStyle = pattern
-  ctx.fillRect(x, y, w, h)
+  ctx.fillRect(0, 0, w, h)
 }
 
 export function drawBorder(ctx: CanvasRenderingContext2D, w: number, h: number) {
