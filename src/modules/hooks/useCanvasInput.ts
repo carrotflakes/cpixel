@@ -348,21 +348,21 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const onPointerLeave = () => { setHoverCell(null); clearHoverInfo() }
 
-  const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+  const onWheel = (e: WheelEvent) => {
+    e.preventDefault()
     const rect = canvasRef.current!.getBoundingClientRect()
     const Cx = e.clientX - rect.left
     const Cy = e.clientY - rect.top
     const delta = e.deltaY
     const k = delta > 0 ? 0.9 : 1.1
     const nextSize = clamp(Math.round(size * k), MIN_SIZE, MAX_SIZE)
-    if (nextSize === size) { e.preventDefault(); return }
+    if (nextSize === size) return
     const ratio = nextSize / size
     const newVX = viewX - (Cx - viewX) * (ratio - 1)
     const newVY = viewY - (Cy - viewY) * (ratio - 1)
     const { vx: cvx2, vy: cvy2 } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
     setPixelSize(nextSize)
     setView(Math.round(cvx2), Math.round(cvy2))
-    e.preventDefault()
   }
 
   // Touch handlers
@@ -595,6 +595,17 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
   }
 
+  // We must set the passive to false.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return
+
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', onWheel);
+    }
+  }, [onWheel])
+
   return {
     hoverCell,
     shapePreview,
@@ -602,7 +613,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     onPointerMove,
     onPointerUp,
     onPointerLeave,
-    onWheel,
     onTouchStart,
     onTouchMove,
     onTouchEnd,

@@ -6,7 +6,7 @@ import { useCanvasInput } from './hooks/useCanvasInput'
 
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const { hoverCell, shapePreview, onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onWheel, onTouchStart, onTouchMove, onTouchEnd } = useCanvasInput(canvasRef)
+  const { hoverCell, shapePreview, onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onTouchStart, onTouchMove, onTouchEnd } = useCanvasInput(canvasRef)
   const size = usePixelStore(s => s.pixelSize)
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
@@ -177,19 +177,18 @@ export function PixelCanvas() {
   }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase])
 
   return (
-    <div className="w-full h-full bg-surface-muted">
+    <div className="w-full h-full bg-surface-muted touch-none">
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerLeave}
-        onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        className="w-full h-full block shadow rounded touch-none cursor-crosshair focus:outline-2 focus:outline-blue-500"
+        className="w-full h-full block shadow rounded cursor-crosshair focus:outline-2 focus:outline-blue-500"
         tabIndex={0}
         aria-label="Pixel canvas"
       />
