@@ -46,6 +46,7 @@ export type PixelState = {
   tool?: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'lasso'
   setColor: (c: string) => void
   setColorLive: (c: string) => void
+  setPaletteColor: (index: number, rgba: number) => void
   // layer ops
   addLayer: () => void
   removeLayer: (id: string) => void
@@ -186,6 +187,15 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   // setColorLive updates only the current color for live previews (e.g., <input type="color"> drag)
   // It intentionally does not modify recentColors or history.
   setColorLive: (c) => set({ color: c }),
+  setPaletteColor: (index, rgba) => set((s) => {
+    const i = index | 0
+    if (i < 0 || i >= s.palette.length) return {}
+    const pal = new Uint32Array(s.palette)
+    // Keep the transparent slot actually transparent for clarity
+    pal[i] = (i === s.transparentIndex) ? 0x00000000 : (rgba >>> 0)
+    if (equalU32(pal, s.palette)) return {}
+    return { palette: pal }
+  }),
   removePaletteIndex: (idx) => set((s) => {
     const n = s.palette.length
     if (idx < 0 || idx >= n || n <= 1) return {}

@@ -4,6 +4,7 @@ import { rgbaToCSSHex, parseCSSColor } from './utils/color'
 import { usePixelStore } from './store'
 import { LuPin, LuArrowUp, LuArrowDown, LuTrash2 } from 'react-icons/lu'
 import { PALETTE_PRESETS } from './presets/palettes'
+import { ColorPicker } from './ColorPicker'
 
 export function PalettePanel() {
   const mode = usePixelStore(s => s.mode)
@@ -16,6 +17,8 @@ export function PalettePanel() {
   const applyPalettePreset = usePixelStore(s => s.applyPalettePreset)
   const setColor = usePixelStore(s => s.setColor)
   const color = usePixelStore(s => s.color)
+  const setPaletteColor = usePixelStore(s => s.setPaletteColor)
+
   const panelRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const [menu, setMenu] = useState<{ open: boolean; x: number; y: number; index: number } | null>(null)
@@ -24,12 +27,13 @@ export function PalettePanel() {
   const longPressRef = useRef<{ timer?: number; index?: number } | null>({})
   const suppressClickRef = useRef(false)
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
+  const [edit, setEdit] = useState<{ open: boolean; index: number; x: number; y: number } | null>(null)
 
   useEffect(() => {
     if (mode !== 'indexed') return
     const close = (e: MouseEvent | PointerEvent | KeyboardEvent) => {
       if (e instanceof KeyboardEvent) {
-        if (e.key === 'Escape') setMenu(null)
+        if (e.key === 'Escape') { setMenu(null); setEdit(null); }
         return
       }
       const target = e.target as Node | null
@@ -96,6 +100,7 @@ export function PalettePanel() {
           ))}
         </select>
       </div>
+
       {presetsOpen && (
         <div ref={presetsRef} className="mb-3 p-2 rounded border border-border bg-elevated shadow-sm">
           <div className="grid gap-2 sm:grid-cols-2">
@@ -128,6 +133,7 @@ export function PalettePanel() {
           </div>
         </div>
       )}
+
       <div className="flex flex-wrap gap-3">
         {Array.from(palette).map((rgba, i) => {
           const isTransparent = i === transparentIndex || ((rgba >>> 0) & 0xff) === 0
@@ -148,6 +154,11 @@ export function PalettePanel() {
                   return
                 }
                 setColor(rgbaToCSSHex(rgba))
+              }}
+              onDoubleClick={(e) => {
+                e.preventDefault()
+                const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                setEdit({ open: true, index: i, x: r.left, y: r.bottom + 6 })
               }}
               onContextMenu={(e) => { e.preventDefault(); openMenuAt(e.clientX, e.clientY, i) }}
               onPointerDown={(e) => {
@@ -202,6 +213,16 @@ export function PalettePanel() {
           </button>
           <button
             role="menuitem"
+            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
+            onClick={() => {
+              setEdit({ open: true, index: menu.index, x: menu.x, y: menu.y })
+              setMenu(null)
+            }}
+          >
+            <span>Edit color</span>
+          </button>
+          <button
+            role="menuitem"
             className="w-full text-left px-3 py-2 hover:bg-surface-muted disabled:opacity-50 inline-flex items-center gap-2"
             onClick={() => { movePaletteIndex(menu.index, Math.max(0, menu.index - 1)); setMenu(null) }}
             disabled={menu.index === 0}
@@ -229,6 +250,25 @@ export function PalettePanel() {
           </button>
         </div>,
         document.body
+      )}
+
+      {edit?.open && (
+        <ColorPicker
+          color={rgbaToCSSHex(palette[edit.index] ?? 0)}
+          open={true}
+          anchor={{ x: edit.x, y: edit.y }}
+          showAlpha={true}
+          onClose={() => setEdit(null)}
+          onChangeLive={(hex) => {
+            const rgba = parseCSSColor(hex)
+            setPaletteColor(edit.index, rgba)
+          }}
+          onChangeDone={(hex) => {
+            const rgba = parseCSSColor(hex)
+            setPaletteColor(edit.index, rgba)
+            setEdit(null)
+          }}
+        />
       )}
     </div>
   )
