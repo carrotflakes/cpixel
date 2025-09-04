@@ -46,7 +46,7 @@ export type PixelState = {
   transparentIndex: number
   tool?: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'lasso'
   setColor: (c: string) => void
-  setColorLive: (c: string) => void
+  pushRecentColor: () => void
   setColorIndex: (i: number) => void
   setPaletteColor: (index: number, rgba: number) => void
   // layer ops
@@ -188,22 +188,15 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
       return { color: hex, currentPaletteIndex: idx }
     }
+    return { color: c }
+  }),
+  pushRecentColor: () => set((s) => {
     // update recent colors (dedupe, cap to 10)
+    const c = s.color
     const existing = s.recentColors || []
     const norm = (x: string) => x.toLowerCase()
     const next = [c, ...existing.filter(v => norm(v) !== norm(c))].slice(0, 10)
-    return { color: c, recentColors: next }
-  }),
-  // setColorLive updates only the current color for live previews (e.g., <input type="color"> drag)
-  // It intentionally does not modify recentColors or history.
-  setColorLive: (c) => set((s) => {
-    if (s.mode === 'indexed') {
-      const rgba = parseCSSColor(c)
-      const idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
-      const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
-      return { color: hex, currentPaletteIndex: idx }
-    }
-    return { color: c }
+    return { recentColors: next }
   }),
   setColorIndex: (i) => set((s) => {
     const idx = Math.max(0, Math.min(i | 0, Math.max(0, s.palette.length - 1)))

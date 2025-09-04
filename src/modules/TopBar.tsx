@@ -13,7 +13,7 @@ export function TopBar() {
   const color = usePixelStore(s => s.color)
   const recent = usePixelStore(s => s.recentColors)
   const setColor = usePixelStore(s => s.setColor)
-  const setColorLive = usePixelStore(s => s.setColorLive)
+  const pushRecentColor = usePixelStore(s => s.pushRecentColor)
   const setPaletteColor = usePixelStore(s => s.setPaletteColor)
   const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
   const mode = usePixelStore(s => s.mode)
@@ -122,7 +122,7 @@ export function TopBar() {
             if (mode === 'indexed' && currentPaletteIndex !== undefined) {
               setPaletteColor(currentPaletteIndex, parseCSSColor(hex))
             } else {
-              setColorLive(hex)
+              setColor(hex)
             }
           }}
           onDone={(hex) => {
@@ -130,6 +130,7 @@ export function TopBar() {
               setPaletteColor(currentPaletteIndex, parseCSSColor(hex))
             } else {
               setColor(hex)
+              pushRecentColor()
             }
           }}
         />
