@@ -74,6 +74,10 @@ export function PixelCanvas() {
 
   // Animate marching ants
   useEffect(() => {
+    if (!selectionMask || !selectionBounds) {
+      setAntsPhase(0)
+      return
+    }
     let raf = 0
     let last = performance.now()
     const tick = (t: number) => {
@@ -83,7 +87,7 @@ export function PixelCanvas() {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [])
+  }, [selectionMask, selectionBounds])
 
   useEffect(() => {
     const cvs = canvasRef.current
