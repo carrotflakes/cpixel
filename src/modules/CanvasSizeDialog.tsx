@@ -55,33 +55,33 @@ export function CanvasSizeDialog({ open, initialWidth, initialHeight, onCancel, 
   return createPortal(
     <div className="fixed inset-0 z-[1100]">
       <div className="absolute inset-0 bg-black/30" onClick={onCancel} />
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 min-w-80 max-w-[90vw] rounded-md border border-border bg-elevated shadow-lg p-4">
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(92vw,32rem)] sm:w-[min(90vw,32rem)] rounded-md border border-border bg-elevated shadow-lg p-4">
         <h2 className="text-base font-medium mb-3">Canvas size</h2>
-        <div className="flex gap-3 items-end">
-          <label className="flex flex-col gap-1">
+        <div className="flex flex-wrap gap-3 items-end">
+          <label className="flex flex-col gap-1 flex-1 min-w-[8rem]">
             <span className="text-sm text-muted">Width (px)</span>
             <input
               ref={widthRef}
               type="number"
               min={1}
               inputMode="numeric"
-              className="w-28 rounded border border-border bg-surface p-1"
+              className="w-full sm:w-28 rounded border border-border bg-surface p-1"
               value={wStr}
               onChange={(e) => setWStr(e.target.value)}
             />
           </label>
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 flex-1 min-w-[8rem]">
             <span className="text-sm text-muted">Height (px)</span>
             <input
               type="number"
               min={1}
               inputMode="numeric"
-              className="w-28 rounded border border-border bg-surface p-1"
+              className="w-full sm:w-28 rounded border border-border bg-surface p-1"
               value={hStr}
               onChange={(e) => setHStr(e.target.value)}
             />
           </label>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-0 sm:ml-auto flex gap-2 w-full sm:w-auto justify-end mt-2 sm:mt-0">
             <button className="px-3 py-1 rounded border border-border bg-surface hover:bg-surface-muted" onClick={onCancel}>Cancel</button>
             <button className="px-3 py-1 rounded border border-border bg-surface hover:bg-surface-muted" onClick={submit}>Apply</button>
           </div>
