@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { rgbaToCSSHex, parseCSSColor } from './utils/color'
 import { usePixelStore } from './store'
 import { LuPin, LuArrowUp, LuArrowDown, LuTrash2 } from 'react-icons/lu'
 import { PALETTE_PRESETS } from './presets/palettes'
 import { ColorPicker } from './ColorPicker'
+import { Menu, MenuItem, useContextMenu } from './ui/ContextMenu'
 
 export function PalettePanel() {
   const mode = usePixelStore(s => s.mode)
@@ -19,8 +19,7 @@ export function PalettePanel() {
   const setColorIndex = usePixelStore(s => s.setColorIndex)
 
   const panelRef = useRef<HTMLDivElement | null>(null)
-  const menuRef = useRef<HTMLDivElement | null>(null)
-  const [menu, setMenu] = useState<{ open: boolean; x: number; y: number; index: number } | null>(null)
+  const { menu, openAt: openMenuAt, close: closeMenu, menuRef } = useContextMenu<{ index: number }>()
   const [presetsOpen, setPresetsOpen] = useState(false)
   const presetsRef = useRef<HTMLDivElement | null>(null)
   const longPressRef = useRef<{ timer?: number; index?: number } | null>({})
@@ -32,13 +31,13 @@ export function PalettePanel() {
     if (mode !== 'indexed') return
     const close = (e: MouseEvent | PointerEvent | KeyboardEvent) => {
       if (e instanceof KeyboardEvent) {
-        if (e.key === 'Escape') { setMenu(null); setEdit(null); }
+        if (e.key === 'Escape') { closeMenu(); setEdit(null); }
         return
       }
       const target = e.target as Node | null
       if (menuRef.current && target && menuRef.current.contains(target)) return
       if (presetsRef.current && target && presetsRef.current.contains(target)) return
-      setMenu(null)
+      closeMenu()
       setPresetsOpen(false)
       suppressClickRef.current = false
     }
@@ -50,19 +49,7 @@ export function PalettePanel() {
     }
   }, [mode])
 
-  useEffect(() => {
-    if (!menu?.open) return
-    const el = menuRef.current
-    if (!el) return
-    const w = el.offsetWidth || 160
-    const h = el.offsetHeight || 120
-    const margin = 8
-    const maxX = window.innerWidth - w - margin
-    const maxY = window.innerHeight - h - margin
-    const nextX = Math.max(margin, Math.min(menu.x, maxX))
-    const nextY = Math.max(margin, Math.min(menu.y, maxY))
-    if (nextX !== menu.x || nextY !== menu.y) setMenu(m => (m ? { ...m, x: nextX, y: nextY } : m))
-  }, [menu?.open, menu?.x, menu?.y])
+  // position clamping handled by Menu
 
   if (mode !== 'indexed') return null
 
@@ -72,10 +59,10 @@ export function PalettePanel() {
     setColorIndex(idx)
   }
 
-  const openMenuAt = (clientX: number, clientY: number, index: number) => {
+  const openContextMenu = (clientX: number, clientY: number, index: number) => {
     suppressClickRef.current = true
     const offset = 6
-    setMenu({ open: true, x: clientX + offset, y: clientY + offset, index })
+    openMenuAt(clientX + offset, clientY + offset, { index })
   }
 
   return (
@@ -159,12 +146,12 @@ export function PalettePanel() {
                 setColorIndex(i)
                 setEdit({ open: true, index: i, x: r.left, y: r.bottom + 6 })
               }}
-              onContextMenu={(e) => { e.preventDefault(); openMenuAt(e.clientX, e.clientY, i) }}
+              onContextMenu={(e) => { e.preventDefault(); openContextMenu(e.clientX, e.clientY, i) }}
               onPointerDown={(e) => {
                 if (e.pointerType === 'touch') {
                   if (longPressRef.current?.timer) window.clearTimeout(longPressRef.current.timer)
                   const timer = window.setTimeout(() => {
-                    openMenuAt(e.clientX, e.clientY, i)
+                    openContextMenu(e.clientX, e.clientY, i)
                   }, 500)
                   longPressRef.current = { timer, index: i }
                   touchStartPos.current = { x: e.clientX, y: e.clientY }
@@ -207,64 +194,35 @@ export function PalettePanel() {
         </button>
       </div>
 
-      {menu?.open && createPortal(
-        <div
-          role="menu"
-          className="fixed z-[1000] min-w-32 rounded-md border border-border bg-elevated shadow-lg text-sm"
-          ref={menuRef}
-          style={{ top: menu.y, left: menu.x }}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
-            onClick={() => { setTransparentIndex(menu.index); setMenu(null) }}
-            disabled={menu.index === transparentIndex}
-          >
-            <LuPin aria-hidden />
-            <span>Set transparent</span>
-          </button>
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
-            onClick={() => {
-              setColorIndex(menu.index)
-              setEdit({ open: true, index: menu.index, x: menu.x, y: menu.y })
-              setMenu(null)
-            }}
-          >
-            <span>Edit color</span>
-          </button>
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted disabled:opacity-50 inline-flex items-center gap-2"
-            onClick={() => { movePaletteIndex(menu.index, Math.max(0, menu.index - 1)); setMenu(null) }}
-            disabled={menu.index === 0}
-          >
-            <LuArrowUp aria-hidden />
-            <span>Move up</span>
-          </button>
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted disabled:opacity-50 inline-flex items-center gap-2"
-            onClick={() => { movePaletteIndex(menu.index, Math.min(palette.length - 1, menu.index + 1)); setMenu(null) }}
-            disabled={menu.index === palette.length - 1}
-          >
-            <LuArrowDown aria-hidden />
-            <span>Move down</span>
-          </button>
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-red-50/70 text-red-700 disabled:opacity-50 inline-flex items-center gap-2"
-            onClick={() => { removePaletteIndex(menu.index); setMenu(null) }}
-            disabled={palette.length <= 1}
-          >
-            <LuTrash2 aria-hidden />
-            <span>Remove</span>
-          </button>
-        </div>,
-        document.body
-      )}
+      <Menu open={!!menu && menu.open === true} x={(menu && menu.open ? menu.x : 0) as number} y={(menu && menu.open ? menu.y : 0) as number} menuRef={menuRef}>
+        {menu?.open && (
+          <>
+            <MenuItem onSelect={() => { setTransparentIndex(menu.data!.index); closeMenu() }} disabled={menu.data!.index === transparentIndex}>
+              <LuPin aria-hidden />
+              <span>Set transparent</span>
+            </MenuItem>
+            <MenuItem onSelect={() => {
+              setColorIndex(menu.data!.index)
+              setEdit({ open: true, index: menu.data!.index, x: menu.x, y: menu.y })
+              closeMenu()
+            }}>
+              <span>Edit color</span>
+            </MenuItem>
+            <MenuItem onSelect={() => { movePaletteIndex(menu.data!.index, Math.max(0, menu.data!.index - 1)); closeMenu() }} disabled={menu.data!.index === 0}>
+              <LuArrowUp aria-hidden />
+              <span>Move up</span>
+            </MenuItem>
+            <MenuItem onSelect={() => { movePaletteIndex(menu.data!.index, Math.min(palette.length - 1, menu.data!.index + 1)); closeMenu() }} disabled={menu.data!.index === palette.length - 1}>
+              <LuArrowDown aria-hidden />
+              <span>Move down</span>
+            </MenuItem>
+            <MenuItem onSelect={() => { removePaletteIndex(menu.data!.index); closeMenu() }} disabled={palette.length <= 1} danger>
+              <LuTrash2 aria-hidden />
+              <span>Remove</span>
+            </MenuItem>
+          </>
+        )}
+      </Menu>
 
       {edit?.open && (
         <ColorPicker

@@ -7,6 +7,7 @@ import { FaEllipsisV } from 'react-icons/fa'
 import { CanvasSizeDialog } from './CanvasSizeDialog'
 import { GoogleDrive } from './utils/googleDrive'
 import { ColorPicker, useColorPopover } from './ColorPicker'
+import { Menu, MenuItem, MenuDivider } from './ui/ContextMenu'
 import { parseCSSColor } from './utils/color'
 
 export function TopBar() {
@@ -246,202 +247,153 @@ export function TopBar() {
         <FaEllipsisV aria-hidden />
         <span className="hidden sm:inline">More</span>
       </button>
-      {menuOpen && createPortal(
-        <div
-          role="menu"
-          className="fixed z-[1000] min-w-52 rounded-md border border-border bg-elevated shadow-lg text-sm py-1"
-          ref={menuRootRef}
-          style={{ left: menuPos.x, top: menuPos.y }}
-          onContextMenu={(e) => e.preventDefault()}
+      <Menu open={menuOpen} x={menuPos.x} y={menuPos.y} menuRef={menuRootRef} minWidth={208}>
+        <MenuItem
+          onSelect={() => {
+            if (openSub === 'mode') { setOpenSub(null); return }
+            const MAIN_W = 208, SUB_W = 180, margin = 8
+            const rightX = menuPos.x + MAIN_W
+            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
+            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
+            const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 4)
+            setModePos({ x, y })
+            setOpenSub('mode')
+          }}
         >
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center justify-between gap-2"
-            onClick={() => {
-              if (openSub === 'mode') { setOpenSub(null); return }
-              const MAIN_W = 208, SUB_W = 180, margin = 8
-              const rightX = menuPos.x + MAIN_W
-              const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
-              const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-              const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 4)
-              setModePos({ x, y })
-              setOpenSub('mode')
-            }}
-          >
-            <span>Mode</span>
-            <LuChevronRight aria-hidden />
-          </button>
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center justify-between gap-2"
-            onClick={() => {
-              if (openSub === 'export') { setOpenSub(null); return }
-              const MAIN_W = 208, SUB_W = 180, margin = 8
-              const rightX = menuPos.x + MAIN_W
-              const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
-              const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-              const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 36)
-              setExportPos({ x, y })
-              setOpenSub('export')
-            }}
-          >
-            <span>Export</span>
-            <LuChevronRight aria-hidden />
-          </button>
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center justify-between gap-2"
-            onClick={() => {
-              if (openSub === 'drive') { setOpenSub(null); return }
-              const MAIN_W = 208, SUB_W = 220, margin = 8
-              const rightX = menuPos.x + MAIN_W
-              const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
-              const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-              const y = Math.min(window.innerHeight - 140 - margin, menuPos.y + 68)
-              setDrivePos({ x, y })
-              setOpenSub('drive')
-            }}
-          >
-            <span>Google Drive</span>
-            <LuChevronRight aria-hidden />
-          </button>
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
-            onClick={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}
-          >
-            <span>Canvas size…</span>
-          </button>
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2"
-            onClick={() => {
-              // open a hidden file input for JSON import
-              const input = document.createElement('input')
-              input.type = 'file'
-              input.accept = 'application/json,.json'
-              input.onchange = async () => {
-                const f = input.files?.[0]
-                if (!f) return
-                try {
-                  const text = await f.text()
-                  const obj = JSON.parse(text)
-                  importJSON(obj)
-                } catch (e) {
-                  console.error('Import failed', e)
-                }
+          <span>Mode</span>
+          <LuChevronRight className="ml-auto" aria-hidden />
+        </MenuItem>
+        <MenuItem
+          onSelect={() => {
+            if (openSub === 'export') { setOpenSub(null); return }
+            const MAIN_W = 208, SUB_W = 180, margin = 8
+            const rightX = menuPos.x + MAIN_W
+            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
+            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
+            const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 36)
+            setExportPos({ x, y })
+            setOpenSub('export')
+          }}
+        >
+          <span>Export</span>
+          <LuChevronRight className="ml-auto" aria-hidden />
+        </MenuItem>
+        <MenuItem
+          onSelect={() => {
+            if (openSub === 'drive') { setOpenSub(null); return }
+            const MAIN_W = 208, SUB_W = 220, margin = 8
+            const rightX = menuPos.x + MAIN_W
+            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
+            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
+            const y = Math.min(window.innerHeight - 140 - margin, menuPos.y + 68)
+            setDrivePos({ x, y })
+            setOpenSub('drive')
+          }}
+        >
+          <span>Google Drive</span>
+          <LuChevronRight className="ml-auto" aria-hidden />
+        </MenuItem>
+        <MenuItem
+          onSelect={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}
+        >
+          <span>Canvas size…</span>
+        </MenuItem>
+        <MenuItem
+          onSelect={() => {
+            // open a hidden file input for JSON import
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = 'application/json,.json'
+            input.onchange = async () => {
+              const f = input.files?.[0]
+              if (!f) return
+              try {
+                const text = await f.text()
+                const obj = JSON.parse(text)
+                importJSON(obj)
+              } catch (e) {
+                console.error('Import failed', e)
               }
-              input.click()
-              setMenuOpen(false)
-              setOpenSub(null)
+            }
+            input.click()
+            setMenuOpen(false)
+            setOpenSub(null)
+          }}
+        >
+          <span>Import JSON…</span>
+        </MenuItem>
+        <MenuDivider />
+        <MenuItem danger onSelect={() => { clear(); setMenuOpen(false); setOpenSub(null) }}>
+          <FaEraser aria-hidden />
+          <span>Clear</span>
+        </MenuItem>
+        <Menu open={!!modePos && openSub === 'mode'} x={modePos?.x ?? 0} y={modePos?.y ?? 0} menuRef={modeSubRef} minWidth={160}>
+          <MenuItem onSelect={() => { setMode('truecolor'); setMenuOpen(false); setOpenSub(null) }}>
+            {mode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+            <span>Truecolor</span>
+          </MenuItem>
+          <MenuItem onSelect={() => { setMode('indexed'); setMenuOpen(false); setOpenSub(null) }}>
+            {mode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+            <span>Indexed</span>
+          </MenuItem>
+        </Menu>
+
+        <Menu open={!!exportPos && openSub === 'export'} x={exportPos?.x ?? 0} y={exportPos?.y ?? 0} menuRef={exportSubRef} minWidth={160}>
+          <MenuItem onSelect={() => { exportPNG(); setMenuOpen(false); setOpenSub(null) }}>
+            <LuDownload aria-hidden />
+            <span>PNG</span>
+          </MenuItem>
+          <MenuItem onSelect={() => { exportJSON(); setMenuOpen(false); setOpenSub(null) }}>
+            <LuDownload aria-hidden />
+            <span>Project JSON</span>
+          </MenuItem>
+        </Menu>
+
+        <Menu open={!!drivePos && openSub === 'drive'} x={drivePos?.x ?? 0} y={drivePos?.y ?? 0} menuRef={driveSubRef} minWidth={224}>
+          <MenuItem
+            onSelect={async () => {
+              setDriveError(null)
+              try {
+                await GoogleDrive.signIn('consent')
+                setDriveOpen('menu')
+              } catch (e: any) {
+                setDriveError(e?.message || 'Sign-in failed')
+              }
             }}
           >
-            <span>Import JSON…</span>
-          </button>
-          <div className="my-1 h-px bg-border" />
-          <button
-            role="menuitem"
-            className="w-full text-left px-3 py-2 hover:bg-red-50/70 text-red-700 inline-flex items-center gap-2"
-            onClick={() => { clear(); setMenuOpen(false); setOpenSub(null) }}
+            {GoogleDrive.isSignedIn() ? 'Signed in' : 'Sign in'}
+          </MenuItem>
+          <MenuItem
+            onSelect={async () => {
+              setDriveOpen('open')
+              setDriveBusy(true)
+              setDriveError(null)
+              try {
+                const files = await GoogleDrive.listFiles('cpixel')
+                setDriveFiles(files)
+              } catch (e: any) {
+                setDriveError(e?.message || 'Failed to list files')
+              } finally {
+                setDriveBusy(false)
+              }
+            }}
           >
-            <FaEraser aria-hidden />
-            <span>Clear</span>
-          </button>
-
-          {openSub === 'mode' && modePos && createPortal(
-            <div
-              role="menu"
-              className="fixed z-[1001] min-w-40 rounded-md border border-border bg-elevated shadow-lg text-sm py-1"
-              style={{ left: modePos.x, top: modePos.y }}
-              ref={modeSubRef}
-            >
-              <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { setMode('truecolor'); setMenuOpen(false); setOpenSub(null) }}>
-                {mode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
-                <span>Truecolor</span>
-              </button>
-              <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { setMode('indexed'); setMenuOpen(false); setOpenSub(null) }}>
-                {mode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
-                <span>Indexed</span>
-              </button>
-            </div>,
-            document.body
+            Open from Drive…
+          </MenuItem>
+          <MenuItem
+            onSelect={async () => {
+              setDriveOpen('save')
+              setDriveFilename('cpixel.json')
+              setDriveFileId(undefined)
+            }}
+          >
+            Save to Drive…
+          </MenuItem>
+          {driveError && (
+            <div className="px-3 py-2 text-xs text-red-600">{driveError}</div>
           )}
-          {openSub === 'export' && exportPos && createPortal(
-            <div
-              role="menu"
-              className="fixed z-[1001] min-w-40 rounded-md border border-border bg-elevated shadow-lg text-sm py-1"
-              style={{ left: exportPos.x, top: exportPos.y }}
-              ref={exportSubRef}
-            >
-              <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { exportPNG(); setMenuOpen(false); setOpenSub(null) }}>
-                <LuDownload aria-hidden />
-                <span>PNG</span>
-              </button>
-              <button className="w-full text-left px-3 py-2 hover:bg-surface-muted inline-flex items-center gap-2" onClick={() => { exportJSON(); setMenuOpen(false); setOpenSub(null) }}>
-                <LuDownload aria-hidden />
-                <span>Project JSON</span>
-              </button>
-            </div>,
-            document.body
-          )}
-          {openSub === 'drive' && drivePos && createPortal(
-            <div
-              role="menu"
-              className="fixed z-[1001] min-w-56 rounded-md border border-border bg-elevated shadow-lg text-sm py-1"
-              style={{ left: drivePos.x, top: drivePos.y }}
-              ref={driveSubRef}
-            >
-              <button
-                className="w-full text-left px-3 py-2 hover:bg-surface-muted"
-                onClick={async () => {
-                  setDriveError(null)
-                  try {
-                    await GoogleDrive.signIn('consent')
-                    setDriveOpen('menu')
-                  } catch (e: any) {
-                    setDriveError(e?.message || 'Sign-in failed')
-                  }
-                }}
-              >
-                {GoogleDrive.isSignedIn() ? 'Signed in' : 'Sign in'}
-              </button>
-              <button
-                className="w-full text-left px-3 py-2 hover:bg-surface-muted"
-                onClick={async () => {
-                  setDriveOpen('open')
-                  setDriveBusy(true)
-                  setDriveError(null)
-                  try {
-                    const files = await GoogleDrive.listFiles('cpixel')
-                    setDriveFiles(files)
-                  } catch (e: any) {
-                    setDriveError(e?.message || 'Failed to list files')
-                  } finally {
-                    setDriveBusy(false)
-                  }
-                }}
-              >
-                Open from Drive…
-              </button>
-              <button
-                className="w-full text-left px-3 py-2 hover:bg-surface-muted"
-                onClick={async () => {
-                  setDriveOpen('save')
-                  setDriveFilename('cpixel.json')
-                  setDriveFileId(undefined)
-                }}
-              >
-                Save to Drive…
-              </button>
-              {driveError && (
-                <div className="px-3 py-2 text-xs text-red-600">{driveError}</div>
-              )}
-            </div>,
-            document.body
-          )}
-        </div>,
-        document.body
-      )}
+        </Menu>
+      </Menu>
       {recentOpen && createPortal(
         <div
           ref={recentRootRef}
