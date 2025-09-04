@@ -105,6 +105,7 @@ export type PixelState = {
   exportPNG: () => void
   exportJSON: () => void
   importJSON: (data: unknown) => void
+  importPNGFromImageData: (img: ImageData) => void
   resizeCanvas: (w: number, h: number) => void
 }
 
@@ -893,6 +894,32 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       transparentIndex,
       color,
       recentColors,
+      _undo: [],
+      _redo: [],
+      canUndo: false,
+      canRedo: false,
+    })
+  },
+  importPNGFromImageData: (img: ImageData) => {
+    const W = img.width | 0
+    const H = img.height | 0
+    if (W <= 0 || H <= 0) return
+    // Build a single truecolor layer from the pixels and switch to truecolor mode
+    const data = new Uint32Array(W * H)
+    const src = img.data
+    for (let i = 0, p = 0; i < src.length; i += 4, p++) {
+      const r = src[i + 0] | 0
+      const g = src[i + 1] | 0
+      const b = src[i + 2] | 0
+      const a = src[i + 3] | 0
+      data[p] = ((r & 0xff) << 24) | ((g & 0xff) << 16) | ((b & 0xff) << 8) | (a & 0xff)
+    }
+    set({
+      width: W,
+      height: H,
+      mode: 'truecolor',
+      layers: [{ id: 'L1', visible: true, locked: false, data }],
+      activeLayerId: 'L1',
       _undo: [],
       _redo: [],
       canUndo: false,

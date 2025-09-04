@@ -23,6 +23,7 @@ export function TopBar() {
   const exportPNG = usePixelStore(s => s.exportPNG)
   const exportJSON = usePixelStore(s => s.exportJSON)
   const importJSON = usePixelStore(s => s.importJSON)
+  const importPNGFromImageData = usePixelStore(s => s.importPNGFromImageData)
   const resizeCanvas = usePixelStore(s => s.resizeCanvas)
   const curW = usePixelStore(s => s.width)
   const curH = usePixelStore(s => s.height)
@@ -32,12 +33,14 @@ export function TopBar() {
   const menuRootRef = useRef<HTMLDivElement | null>(null)
   const modeSubRef = useRef<HTMLDivElement | null>(null)
   const exportSubRef = useRef<HTMLDivElement | null>(null)
+  const importSubRef = useRef<HTMLDivElement | null>(null)
   const driveSubRef = useRef<HTMLDivElement | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
-  const [openSub, setOpenSub] = useState<null | 'mode' | 'export' | 'drive'>(null)
+  const [openSub, setOpenSub] = useState<null | 'mode' | 'export' | 'import' | 'drive'>(null)
   const [modePos, setModePos] = useState<{ x: number, y: number } | null>(null)
   const [exportPos, setExportPos] = useState<{ x: number, y: number } | null>(null)
+  const [importPos, setImportPos] = useState<{ x: number, y: number } | null>(null)
   const [drivePos, setDrivePos] = useState<{ x: number, y: number } | null>(null)
   // Recent colors popover
   const recentBtnRef = useRef<HTMLButtonElement | null>(null)
@@ -67,8 +70,9 @@ export function TopBar() {
       const insideRoot = menuRootRef.current && t && menuRootRef.current.contains(t)
       const insideMode = modeSubRef.current && t && modeSubRef.current.contains(t)
       const insideExport = exportSubRef.current && t && exportSubRef.current.contains(t)
+      const insideImport = importSubRef.current && t && importSubRef.current.contains(t)
       const insideDrive = driveSubRef.current && t && driveSubRef.current.contains(t)
-      if (insideMore || insideRoot || insideMode || insideExport || insideDrive) return
+      if (insideMore || insideRoot || insideMode || insideExport || insideImport || insideDrive) return
       setMenuOpen(false); setOpenSub(null)
     }
     window.addEventListener('keydown', onKey, { capture: true })
@@ -109,6 +113,7 @@ export function TopBar() {
     setOpenSub(null)
     setModePos(null)
     setExportPos(null)
+    setImportPos(null)
     setDrivePos(null)
     setDriveOpen(null)
   }
@@ -280,12 +285,27 @@ export function TopBar() {
         </MenuItem>
         <MenuItem
           onSelect={() => {
+            if (openSub === 'import') { setOpenSub(null); return }
+            const MAIN_W = 208, SUB_W = 180, margin = 8
+            const rightX = menuPos.x + MAIN_W
+            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
+            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
+            const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 68)
+            setImportPos({ x, y })
+            setOpenSub('import')
+          }}
+        >
+          <span>Import</span>
+          <LuChevronRight className="ml-auto" aria-hidden />
+        </MenuItem>
+        <MenuItem
+          onSelect={() => {
             if (openSub === 'drive') { setOpenSub(null); return }
             const MAIN_W = 208, SUB_W = 220, margin = 8
             const rightX = menuPos.x + MAIN_W
             const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
             const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-            const y = Math.min(window.innerHeight - 140 - margin, menuPos.y + 68)
+            const y = Math.min(window.innerHeight - 140 - margin, menuPos.y + 100)
             setDrivePos({ x, y })
             setOpenSub('drive')
           }}
@@ -298,30 +318,7 @@ export function TopBar() {
         >
           <span>Canvas size…</span>
         </MenuItem>
-        <MenuItem
-          onSelect={() => {
-            // open a hidden file input for JSON import
-            const input = document.createElement('input')
-            input.type = 'file'
-            input.accept = 'application/json,.json'
-            input.onchange = async () => {
-              const f = input.files?.[0]
-              if (!f) return
-              try {
-                const text = await f.text()
-                const obj = JSON.parse(text)
-                importJSON(obj)
-              } catch (e) {
-                console.error('Import failed', e)
-              }
-            }
-            input.click()
-            setMenuOpen(false)
-            setOpenSub(null)
-          }}
-        >
-          <span>Import JSON…</span>
-        </MenuItem>
+
         <MenuDivider />
         <MenuItem danger onSelect={() => { clear(); setMenuOpen(false); setOpenSub(null) }}>
           <FaEraser aria-hidden />
@@ -346,6 +343,42 @@ export function TopBar() {
           <MenuItem onSelect={() => { exportJSON(); setMenuOpen(false); setOpenSub(null) }}>
             <LuDownload aria-hidden />
             <span>Project JSON</span>
+          </MenuItem>
+        </Menu>
+
+        <Menu open={!!importPos && openSub === 'import'} x={importPos?.x ?? 0} y={importPos?.y ?? 0} menuRef={importSubRef} minWidth={180}>
+          <MenuItem
+            onSelect={() => {
+              pickAndImportPNG(importPNGFromImageData)
+              setMenuOpen(false)
+              setOpenSub(null)
+            }}
+          >
+            <span>PNG…</span>
+          </MenuItem>
+          <MenuItem
+            onSelect={() => {
+              // Import Project JSON…
+              const input = document.createElement('input')
+              input.type = 'file'
+              input.accept = 'application/json,.json'
+              input.onchange = async () => {
+                const f = input.files?.[0]
+                if (!f) return
+                try {
+                  const text = await f.text()
+                  const obj = JSON.parse(text)
+                  importJSON(obj)
+                } catch (e) {
+                  console.error('Import JSON failed', e)
+                }
+              }
+              input.click()
+              setMenuOpen(false)
+              setOpenSub(null)
+            }}
+          >
+            <span>Project JSON…</span>
           </MenuItem>
         </Menu>
 
@@ -495,28 +528,7 @@ export function TopBar() {
                     setDriveBusy(true)
                     setDriveError(null)
                     try {
-                      const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors, width, height } = usePixelStore.getState()
-                      const payload = {
-                        app: 'cpixel' as const,
-                        version: 1 as const,
-                        width,
-                        height,
-                        mode,
-                        layers: layers.map(l => ({
-                          id: l.id,
-                          visible: l.visible,
-                          locked: l.locked,
-                          data: l.data ? Array.from(l.data) : undefined,
-                          indices: l.indices ? Array.from(l.indices) : undefined,
-                        })),
-                        activeLayerId,
-                        palette: Array.from(palette ?? new Uint32Array(0)),
-                        transparentIndex,
-                        color,
-                        recentColors: recentColors ?? [],
-                      }
-                      const name = driveFilename && /\.json$/i.test(driveFilename) ? driveFilename : `${driveFilename || 'cpixel'}.json`
-                      await GoogleDrive.saveJSON(name, payload, driveFileId)
+                      await saveProjectToGoogleDrive(driveFilename, driveFileId)
                       setDriveOpen(null)
                       setMenuOpen(false)
                       setOpenSub(null)
@@ -564,4 +576,67 @@ function ColorButton({ color, onLive, onDone }: { color: string; onLive: (c: str
       />
     </>
   )
+}
+
+function pickAndImportPNG(onComplete: (img: ImageData) => void) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/png,.png,image/*'
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (!f) return
+    try {
+      const url = URL.createObjectURL(f)
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        try {
+          const w = Math.max(1, img.naturalWidth | 0)
+          const h = Math.max(1, img.naturalHeight | 0)
+          const cvs = document.createElement('canvas')
+          cvs.width = w
+          cvs.height = h
+          const ctx = cvs.getContext('2d')!
+          ctx.drawImage(img, 0, 0)
+          const imageData = ctx.getImageData(0, 0, w, h)
+          onComplete(imageData)
+        } finally {
+          URL.revokeObjectURL(url)
+        }
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        console.error('Failed to load image')
+      }
+      img.src = url
+    } catch (e) {
+      console.error('Import PNG failed', e)
+    }
+  }
+  input.click()
+}
+
+async function saveProjectToGoogleDrive(filename: string, fileId?: string) {
+  const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors, width, height } = usePixelStore.getState()
+  const payload = {
+    app: 'cpixel' as const,
+    version: 1 as const,
+    width,
+    height,
+    mode,
+    layers: layers.map(l => ({
+      id: l.id,
+      visible: l.visible,
+      locked: l.locked,
+      data: l.data ? Array.from(l.data) : undefined,
+      indices: l.indices ? Array.from(l.indices) : undefined,
+    })),
+    activeLayerId,
+    palette: Array.from(palette ?? new Uint32Array(0)),
+    transparentIndex,
+    color,
+    recentColors: recentColors ?? [],
+  }
+  const name = filename && /\.json$/i.test(filename) ? filename : `${filename || 'cpixel'}.json`
+  await GoogleDrive.saveJSON(name, payload, fileId)
 }
