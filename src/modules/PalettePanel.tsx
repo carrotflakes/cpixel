@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { rgbaToCSSHex, parseCSSColor } from './utils/color'
 import { usePixelStore } from './store'
 import { LuPin, LuArrowUp, LuArrowDown, LuTrash2 } from 'react-icons/lu'
-import { PALETTE_PRESETS } from './presets/palettes'
 import { ColorPicker } from './ColorPicker'
 import { Menu, MenuItem, useContextMenu } from './ui/ContextMenu'
+import { PalettePresetsDialog } from './PalettePresetsDialog'
 
 export function PalettePanel() {
   const mode = usePixelStore(s => s.mode)
@@ -21,7 +21,6 @@ export function PalettePanel() {
   const panelRef = useRef<HTMLDivElement | null>(null)
   const { menu, openAt: openMenuAt, close: closeMenu, menuRef } = useContextMenu<{ index: number }>()
   const [presetsOpen, setPresetsOpen] = useState(false)
-  const presetsRef = useRef<HTMLDivElement | null>(null)
   const longPressRef = useRef<{ timer?: number; index?: number } | null>({})
   const suppressClickRef = useRef(false)
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
@@ -36,9 +35,7 @@ export function PalettePanel() {
       }
       const target = e.target as Node | null
       if (menuRef.current && target && menuRef.current.contains(target)) return
-      if (presetsRef.current && target && presetsRef.current.contains(target)) return
       closeMenu()
-      setPresetsOpen(false)
       suppressClickRef.current = false
     }
     window.addEventListener('pointerdown', close, { capture: true })
@@ -71,7 +68,7 @@ export function PalettePanel() {
         <span className="text-sm text-muted">Palette ({palette.length}/256)</span>
         <button
           className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted"
-          onClick={() => setPresetsOpen(v => !v)}
+          onClick={() => setPresetsOpen(true)}
           aria-expanded={presetsOpen}
         >Presets</button>
         <label className="text-sm ml-3 text-muted">Transparent</label>
@@ -86,38 +83,11 @@ export function PalettePanel() {
         </select>
       </div>
 
-      {presetsOpen && (
-        <div ref={presetsRef} className="mb-3 p-2 rounded border border-border bg-elevated shadow-sm">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {PALETTE_PRESETS.map(p => (
-              <button
-                key={p.id}
-                className="text-left p-2 rounded border border-border hover:bg-surface-muted"
-                onClick={() => { applyPalettePreset(p.colors, p.transparentIndex); setPresetsOpen(false) }}
-                title={`Apply ${p.name}`}
-              >
-                <div className="text-xs font-medium mb-2 text-content">{p.name}</div>
-                <div className="flex flex-wrap gap-1">
-                  {Array.from(p.colors.slice(0, 32)).map((c, i) => {
-                    const isTransparent = (p.transparentIndex ?? -1) === i || ((c >>> 0) & 0xff) === 0
-                    const style = isTransparent
-                      ? { backgroundImage: 'repeating-conic-gradient(#cccccc 0% 25%, transparent 0% 50%)', backgroundSize: '8px 8px', backgroundColor: '#ffffff' }
-                      : { background: rgbaToCSSHex(c) }
-                    return (
-                      <span
-                        key={i}
-                        className="w-4 h-4 inline-block rounded border border-border"
-                        style={style}
-                      />
-                    )
-                  })}
-                  {p.colors.length > 32 && <span className="text-[10px] text-muted ml-1">+{p.colors.length - 32}</span>}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <PalettePresetsDialog
+        open={presetsOpen}
+        onCancel={() => setPresetsOpen(false)}
+        onSelect={(p) => { applyPalettePreset(p.colors, p.transparentIndex); setPresetsOpen(false) }}
+      />
 
       <div className="flex flex-wrap gap-3">
         {Array.from(palette).map((rgba, i) => {
