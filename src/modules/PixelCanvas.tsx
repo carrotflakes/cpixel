@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { usePixelStore, MIN_SIZE, MAX_SIZE } from './store'
-import { compositeImageData } from './utils/composite'
-import { drawBorder, drawChecker, drawGrid, drawHoverCell, drawShapePreview, ensureHiDPICanvas, getCheckerPatternCanvas, drawSelectionOverlay } from './utils/canvasDraw'
 import { useCanvasInput } from './hooks/useCanvasInput'
+import { usePixelStore } from './store'
+import { drawBorder, drawChecker, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerPatternCanvas } from './utils/canvasDraw'
+import { compositeImageData } from './utils/composite'
 
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -40,22 +40,7 @@ export function PixelCanvas() {
     if (inited.current) return
     const cvs = canvasRef.current
     if (!cvs) return
-    // try restore from session
-    try {
-      const raw = sessionStorage.getItem('cpixel:view')
-      if (raw) {
-        const saved = JSON.parse(raw) as { size: number; viewX: number; viewY: number } | null
-        if (saved && isFinite(saved.size) && isFinite(saved.viewX) && isFinite(saved.viewY)) {
-          const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
-          const s = clamp(saved.size, MIN_SIZE, MAX_SIZE)
-          setPixelSizeRaw(s)
-          setView(Math.round(saved.viewX), Math.round(saved.viewY))
-          inited.current = true
-          return
-        }
-      }
-    } catch { }
-    // center if no saved state
+
     const rect = cvs.getBoundingClientRect()
     const vw = rect.width
     const vh = rect.height
@@ -66,13 +51,6 @@ export function PixelCanvas() {
     setView(cx, cy)
     inited.current = true
   }, [size, setPixelSizeRaw, setView])
-
-  // Persist view/zoom to sessionStorage
-  useEffect(() => {
-    try {
-      sessionStorage.setItem('cpixel:view', JSON.stringify({ size, viewX, viewY }))
-    } catch { }
-  }, [size, viewX, viewY])
 
   // Animate marching ants
   useEffect(() => {

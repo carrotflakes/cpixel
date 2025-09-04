@@ -115,7 +115,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   height: HEIGHT,
   layers: [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
   activeLayerId: 'L1',
-  pixelSize: 10,
+  pixelSize: 5,
   viewX: 0,
   viewY: 0,
   color: '#000000',
