@@ -828,12 +828,14 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       palette: current.palette,
       color: current.color,
       recentColors: current.recentColors,
-    }, current.width, current.height)
+    })
     if (!normalized) return
-    const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors } = normalized
+    const { width, height, mode, layers, activeLayerId, palette, transparentIndex, color, recentColors } = normalized
     set({
+      width,
+      height,
       mode,
-      layers: layers.length > 0 ? layers : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(current.width * current.height) }],
+      layers: layers.length > 0 ? layers : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(width * height) }],
       activeLayerId,
       palette,
       transparentIndex,

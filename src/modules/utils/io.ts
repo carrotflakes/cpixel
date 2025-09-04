@@ -9,6 +9,8 @@ export type NormalizedLayer = {
 }
 
 export type NormalizedImport = {
+  width: number
+  height: number
   mode: 'truecolor' | 'indexed'
   layers: NormalizedLayer[]
   activeLayerId: string
@@ -22,17 +24,15 @@ export type NormalizedImport = {
 export function normalizeImportedJSON(
   data: unknown,
   defaults: { palette: Uint32Array; color: string; recentColors: string[] },
-  targetWidth: number,
-  targetHeight: number,
 ): NormalizedImport | null {
   const isObj = (v: any) => v && typeof v === 'object'
   if (!isObj(data)) return null
   const obj: any = data
   if (obj.app !== 'cpixel') return null
   const impMode: 'truecolor' | 'indexed' = obj.mode === 'indexed' ? 'indexed' : 'truecolor'
-  const width = Math.max(1, obj.width | 0 || targetWidth)
-  const height = Math.max(1, obj.height | 0 || targetHeight)
-  const targetSize = targetWidth * targetHeight
+  const width = Math.max(1, (obj.width | 0))
+  const height = Math.max(1, (obj.height | 0))
+  const targetSize = width * height
   const clampSize = (arr: number[], fill = 0) => {
     const out = new Array<number>(targetSize)
     const n = Math.min(targetSize, arr.length)
@@ -56,11 +56,11 @@ export function normalizeImportedJSON(
     const locked = !!l?.locked
     if (impMode === 'truecolor') {
       if (Array.isArray(l?.data)) {
-        const dataArr: number[] = width === targetWidth && height === targetHeight ? l.data : clampSize(l.data, 0)
+        const dataArr: number[] = clampSize(l.data, 0)
         const data = new Uint32Array(dataArr.map(v => v >>> 0))
         return { id, visible, locked, data }
       } else if (Array.isArray(l?.indices)) {
-        const idxArr: number[] = width === targetWidth && height === targetHeight ? l.indices : clampSize(l.indices, ti)
+        const idxArr: number[] = clampSize(l.indices, ti)
         const data = new Uint32Array(targetSize)
         for (let i = 0; i < targetSize; i++) {
           const pi = (idxArr[i] | 0) & 0xff
@@ -73,11 +73,11 @@ export function normalizeImportedJSON(
       }
     } else {
       if (Array.isArray(l?.indices)) {
-        const idxArr: number[] = width === targetWidth && height === targetHeight ? l.indices : clampSize(l.indices, ti)
+        const idxArr: number[] = clampSize(l.indices, ti)
         const indices = new Uint8Array(idxArr.map(v => (v | 0) & 0xff))
         return { id, visible, locked, indices }
       } else if (Array.isArray(l?.data)) {
-        const srcArr: number[] = width === targetWidth && height === targetHeight ? l.data : clampSize(l.data, 0)
+        const srcArr: number[] = clampSize(l.data, 0)
         const indices = new Uint8Array(targetSize)
         for (let i = 0; i < targetSize; i++) {
           const rgba = (srcArr[i] >>> 0)
@@ -100,6 +100,8 @@ export function normalizeImportedJSON(
     : defaults.recentColors
 
   return {
+    width,
+    height,
     mode: impMode,
     layers: nextLayers,
     activeLayerId,
