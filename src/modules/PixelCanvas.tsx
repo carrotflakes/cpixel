@@ -23,6 +23,7 @@ export function PixelCanvas() {
   const selectionOffsetX = usePixelStore(s => s.selectionOffsetX)
   const selectionOffsetY = usePixelStore(s => s.selectionOffsetY)
   const selectionFloating = usePixelStore(s => s.selectionFloating)
+  const clearSelection = usePixelStore(s => s.clearSelection)
 
   const scaledW = W * size
   const scaledH = H * size
@@ -179,8 +180,25 @@ export function PixelCanvas() {
     }
   }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase])
 
+  const overlay = (() => {
+    if (!selectionMask || !selectionBounds) return null
+    return (
+      <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
+        <button
+          onClick={clearSelection}
+          className="pointer-events-auto absolute z-20 px-2 py-1 text-xs sm:text-sm bg-surface border border-border rounded shadow hover:bg-surface-muted"
+          style={{ left: '50%', top: 12, transform: 'translateX(-50%)' }}
+          title="Clear selection"
+          aria-label="Clear selection"
+        >
+          Clear selection
+        </button>
+      </div>
+    )
+  })()
+
   return (
-    <div className="w-full h-full bg-surface-muted touch-none">
+    <div className="relative w-full h-full bg-surface-muted touch-none">
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}
@@ -195,6 +213,7 @@ export function PixelCanvas() {
         tabIndex={0}
         aria-label="Pixel canvas"
       />
+      {overlay}
     </div>
   )
 }
