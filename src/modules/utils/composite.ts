@@ -1,5 +1,3 @@
-import { WIDTH, HEIGHT } from "../store"
-
 export type LayerLike = {
   visible: boolean
   data?: Uint32Array
@@ -32,8 +30,8 @@ export function compositePixel(
   mode: 'truecolor' | 'indexed',
   palette: Uint32Array,
   transparentIndex: number,
-  width = WIDTH,
-  height = HEIGHT,
+  width = 64,
+  height = 64,
 ): number {
   if (x < 0 || y < 0 || x >= width || y >= height) return 0x00000000
   let out = 0x00000000
@@ -61,8 +59,8 @@ export function compositeImageData(
   palette: Uint32Array,
   transparentIndex: number,
   ctx: CanvasRenderingContext2D,
-  width = WIDTH,
-  height = HEIGHT,
+  width = 64,
+  height = 64,
 ): ImageData {
   const img = ctx.createImageData(width, height)
   for (let y = 0; y < height; y++) {

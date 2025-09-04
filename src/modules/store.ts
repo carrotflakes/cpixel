@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { clamp } from './utils/view'
 import { nearestIndexInPalette, parseCSSColor, rgbaToCSSHex } from './utils/color'
+import { generatePaletteFromComposite } from './utils/palette'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 
@@ -523,20 +524,41 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   setMode: (m) => set((s) => {
     if (s.mode === m) return {}
     if (m === 'indexed') {
-      // convert all layers: truecolor -> indices
+      // Auto-generate a palette from current composited image (transparent at index 0)
+      const autoPalette = generatePaletteFromComposite(
+        s.layers.map(l => ({ visible: l.visible, data: l.data, indices: l.indices })),
+        s.width,
+        s.height,
+        s.mode,
+        s.palette,
+        s.transparentIndex,
+        256,
+      )
+      const transparentIndex = 0
+      // Convert all layers: truecolor -> indices using the generated palette
       const layers = s.layers.map(l => {
         const src = l.data ?? new Uint32Array(s.width * s.height)
         const idx = new Uint8Array(s.width * s.height)
         for (let i = 0; i < idx.length; i++) {
-          const rgba = src[i]
-          idx[i] = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+          const rgba = src[i] >>> 0
+          if (rgba === 0x00000000) { idx[i] = transparentIndex; continue }
+          let best = transparentIndex, bestD = Infinity
+          const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
+          for (let k = 0; k < autoPalette.length; k++) {
+            const c = autoPalette[k] >>> 0
+            if (c === 0x00000000 && k === transparentIndex) continue
+            const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
+            const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
+            if (d < bestD) { bestD = d; best = k }
+          }
+          idx[i] = best & 0xff
         }
         return { id: l.id, visible: l.visible, locked: l.locked, indices: idx } as Layer
       })
-      // Sync current palette index from current truecolor selection
+      // Sync current palette index nearest to current color
       const rgba = parseCSSColor(s.color)
-      const curIdx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
-      return { mode: 'indexed', layers, currentPaletteIndex: curIdx, color: rgbaToCSSHex(s.palette[curIdx] ?? 0) }
+      const curIdx = (rgba >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(autoPalette, rgba, transparentIndex)
+      return { mode: 'indexed', layers, currentPaletteIndex: curIdx, color: rgbaToCSSHex(autoPalette[curIdx] ?? 0), palette: autoPalette, transparentIndex }
     } else {
       // convert all layers: indices -> truecolor
       const layers = s.layers.map(l => {
