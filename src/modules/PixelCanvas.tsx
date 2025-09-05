@@ -7,7 +7,7 @@ import { compositeImageData } from './utils/composite'
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const { hoverCell, shapePreview, onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onTouchStart, onTouchMove, onTouchEnd } = useCanvasInput(canvasRef)
-  const size = usePixelStore(s => s.pixelSize)
+  const viewScale = usePixelStore(s => s.viewScale)
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
   const layers = usePixelStore(s => s.layers)
@@ -16,7 +16,6 @@ export function PixelCanvas() {
   const transparentIndex = usePixelStore(s => s.transparentIndex)
   const viewX = usePixelStore(s => s.viewX)
   const viewY = usePixelStore(s => s.viewY)
-  const setPixelSizeRaw = usePixelStore(s => s.setPixelSizeRaw)
   const setView = usePixelStore(s => s.setView)
   const selectionMask = usePixelStore(s => s.selectionMask)
   const selectionBounds = usePixelStore(s => s.selectionBounds)
@@ -25,8 +24,8 @@ export function PixelCanvas() {
   const selectionFloating = usePixelStore(s => s.selectionFloating)
   const clearSelection = usePixelStore(s => s.clearSelection)
 
-  const scaledW = W * size
-  const scaledH = H * size
+  const scaledW = W * viewScale
+  const scaledH = H * viewScale
   // cache small helper canvases
   const checkerTileRef = useRef<HTMLCanvasElement | null>(null)
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -44,13 +43,13 @@ export function PixelCanvas() {
     const rect = cvs.getBoundingClientRect()
     const vw = rect.width
     const vh = rect.height
-    const cw = W * size
-    const ch = H * size
+    const cw = W * viewScale
+    const ch = H * viewScale
     const cx = Math.round((vw - cw) / 2)
     const cy = Math.round((vh - ch) / 2)
-    setView(cx, cy)
+    setView(cx, cy, viewScale)
     inited.current = true
-  }, [size, setPixelSizeRaw, setView])
+  }, [viewScale, setView])
 
   // Animate marching ants
   useEffect(() => {
@@ -80,7 +79,7 @@ export function PixelCanvas() {
     // draw checkerboard in content space so it follows pan/zoom (cached tile)
     if (!checkerTileRef.current) checkerTileRef.current = getCheckerPatternCanvas(4)
     ctx.translate(vx, vy)
-    drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, size)
+    drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, viewScale)
     // draw bitmap on top (alpha respected)
     const img = compositeImageData(layers, mode, palette, transparentIndex, ctx, W, H)
     if (!tmpCanvasRef.current) {
@@ -97,10 +96,10 @@ export function PixelCanvas() {
 
     // border and grid
     drawBorder(ctx, scaledW, scaledH)
-    drawGrid(ctx, W, H, size)
+    drawGrid(ctx, W, H, viewScale)
   // hover highlight
     if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < W && hoverCell.y < H) {
-      drawHoverCell(ctx, hoverCell.x, hoverCell.y, size)
+      drawHoverCell(ctx, hoverCell.x, hoverCell.y, viewScale)
     }
     // shape preview overlay
     if (shapePreview.kind) {
@@ -111,18 +110,18 @@ export function PixelCanvas() {
         shapePreview.startY,
         shapePreview.curX,
         shapePreview.curY,
-        size,
+        viewScale,
       )
     }
 
     // selection overlay and floating
     if (selectionMask && selectionBounds) {
       // Optional: dim outside selection
-      drawSelectionOverlay(ctx, selectionMask, W, H, size)
+      drawSelectionOverlay(ctx, selectionMask, W, H, viewScale)
       // Draw marching ants rect at current offset
       const dx = (selectionOffsetX ?? 0)
       const dy = (selectionOffsetY ?? 0)
-      const s = size
+      const s = viewScale
       const left = (selectionBounds.left + dx) * s + 0.5
       const top = (selectionBounds.top + dy) * s + 0.5
       const width = (selectionBounds.right - selectionBounds.left + 1) * s - 1
@@ -157,7 +156,7 @@ export function PixelCanvas() {
         ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selectionBounds.left + dx) * s, (selectionBounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, size, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick])
+  }, [layers, palette, mode, transparentIndex, viewScale, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick])
 
   const overlay = (() => {
     if (!selectionMask || !selectionBounds) return null

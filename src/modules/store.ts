@@ -36,7 +36,7 @@ export type PixelState = {
   height: number
   layers: Layer[]
   activeLayerId: string
-  pixelSize: number
+  viewScale: number
   viewX: number
   viewY: number
   color: string
@@ -64,9 +64,7 @@ export type PixelState = {
   movePaletteIndex: (from: number, to: number) => void
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
   setTool: (t: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'lasso') => void
-  setPixelSize: (n: number) => void
-  setPixelSizeRaw: (n: number) => void
-  setView: (x: number, y: number) => void
+  setView: (x: number, y: number, scale: number) => void
   panBy: (dx: number, dy: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
   drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
@@ -115,7 +113,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   height: HEIGHT,
   layers: [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
   activeLayerId: 'L1',
-  pixelSize: 5,
+  viewScale: 5,
   viewX: 0,
   viewY: 0,
   color: '#000000',
@@ -374,10 +372,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const clamped = Math.max(0, Math.min(idx | 0, Math.max(0, s.palette.length - 1)))
     return { transparentIndex: clamped }
   }),
-  setPixelSize: (n) => set({ pixelSize: clamp(Math.round(n), MIN_SIZE, MAX_SIZE) }),
-  // Allows fractional pixel sizes (used for pinch-zoom). Still clamped to bounds.
-  setPixelSizeRaw: (n) => set({ pixelSize: clamp(n, MIN_SIZE, MAX_SIZE) }),
-  setView: (x, y) => set({ viewX: x, viewY: y }),
+  setView: (x, y, scale) => set({ viewX: x, viewY: y, viewScale: clamp(scale, MIN_SIZE, MAX_SIZE) }),
   panBy: (dx, dy) => set((s) => ({ viewX: s.viewX + dx, viewY: s.viewY + dy })),
   setAt: (x, y, rgbaOrIndex) => set((s) => {
     const W = s.width, H = s.height

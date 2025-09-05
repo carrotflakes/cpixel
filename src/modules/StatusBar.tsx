@@ -2,7 +2,7 @@ import { rgbaToCSSHex } from './utils/color'
 import { usePixelStore } from './store'
 
 export function StatusBar() {
-  const size = usePixelStore(s => s.pixelSize)
+  const size = usePixelStore(s => s.viewScale)
   const hx = usePixelStore(s => s.hoverX)
   const hy = usePixelStore(s => s.hoverY)
   const rgba = usePixelStore(s => s.hoverRGBA)

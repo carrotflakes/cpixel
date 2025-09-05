@@ -14,7 +14,7 @@ export type ShapePreview = {
 }
 
 export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
-  const size = usePixelStore(s => s.pixelSize)
+  const size = usePixelStore(s => s.viewScale)
   const color = usePixelStore(s => s.color)
   const setColor = usePixelStore(s => s.setColor)
   const setAt = usePixelStore(s => s.setAt)
@@ -31,8 +31,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const tool = usePixelStore(s => s.tool)
   const viewX = usePixelStore(s => s.viewX)
   const viewY = usePixelStore(s => s.viewY)
-  const setPixelSize = usePixelStore(s => s.setPixelSize)
-  const setPixelSizeRaw = usePixelStore(s => s.setPixelSizeRaw)
   const setView = usePixelStore(s => s.setView)
   const setHoverInfo = usePixelStore(s => s.setHoverInfo)
   const clearHoverInfo = usePixelStore(s => s.clearHoverInfo)
@@ -318,7 +316,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       let nvx = viewX + dx
       let nvy = viewY + dy
         ; ({ vx: nvx, vy: nvy } = clampViewToBounds(nvx, nvy, vw, vh, cw, ch))
-      setView(Math.round(nvx), Math.round(nvy))
+      setView(Math.round(nvx), Math.round(nvy), size)
       e.preventDefault()
       return
     }
@@ -374,8 +372,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const newVX = viewX - (Cx - viewX) * (ratio - 1)
     const newVY = viewY - (Cy - viewY) * (ratio - 1)
     const { vx: cvx2, vy: cvy2 } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
-    setPixelSize(nextSize)
-    setView(Math.round(cvx2), Math.round(cvy2))
+    setView(Math.round(cvx2), Math.round(cvy2), nextSize)
   }
 
   // Touch handlers
@@ -602,8 +599,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const newVX = v1x - (Cx - v1x) * (ratio - 1)
       const newVY = v1y - (Cy - v1y) * (ratio - 1)
       const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
-      setPixelSizeRaw(nextSize)
-      setView(Math.round(cvx), Math.round(cvy))
+      setView(Math.round(cvx), Math.round(cvy), nextSize)
       touches.current.lastDist = d
       touches.current.lastX = cx
       touches.current.lastY = cy
