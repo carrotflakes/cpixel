@@ -99,7 +99,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       : rgbaFor(erase)
   )
   const isShapeTool = () => tool === 'line' || tool === 'rect'
-  const isSelectionTool = () => tool === 'select-rect' || tool === 'lasso'
+  const isSelectionTool = () => tool === 'select-rect' || tool === 'select-lasso'
   const isBucketTool = () => tool === 'bucket'
   const updateHover = (x: number, y: number) => {
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
@@ -275,7 +275,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           setSelectionRect(x, y, x, y)
           e.preventDefault()
           return
-        } else if (tool === 'lasso') {
+        } else if (tool === 'select-lasso') {
           lassoPath.current = [{ x, y }]
           const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
           setSelectionMask(mask, bounds)
@@ -320,7 +320,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       e.preventDefault()
       return
     }
-    if (lassoPath.current && tool === 'lasso') {
+    if (lassoPath.current && tool === 'select-lasso') {
       const { x, y } = pickPoint(e.clientX, e.clientY)
       const last = lassoPath.current[lassoPath.current.length - 1]
       if (!last || last.x !== x || last.y !== y) {
@@ -440,7 +440,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             touches.current.selStartX = x
             touches.current.selStartY = y
             setSelectionRect(x, y, x, y)
-          } else if (tool === 'lasso') {
+          } else if (tool === 'select-lasso') {
             touches.current.lasso = true
             lassoPath.current = [{ x, y }]
             const { mask, bounds } = polygonToMask(W, H, lassoPath.current)

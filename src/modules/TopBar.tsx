@@ -248,7 +248,7 @@ export function TopBar() {
           </button>
           <button
             ref={selBtnRef}
-            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${(tool === 'select-rect' || tool === 'lasso') ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+            className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${(tool === 'select-rect' || tool === 'select-lasso') ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
             onClick={() => {
               if (!selBtnRef.current) return
               const r = selBtnRef.current.getBoundingClientRect()
@@ -258,30 +258,31 @@ export function TopBar() {
               const y = Math.min(window.innerHeight - 10 - margin, r.bottom + margin)
               setSelPos({ x, y })
               setSelOpen(v => !v)
+              setTool(selectTool)
             }}
-            aria-pressed={tool === 'select-rect' || tool === 'lasso'}
+            aria-pressed={tool === 'select-rect' || tool === 'select-lasso'}
             aria-haspopup="menu"
             aria-expanded={selOpen}
-            title={selectTool === 'lasso' ? 'Lasso' : 'Rect Select'}
+            title={selectTool === 'select-lasso' ? 'Lasso' : 'Rect Select'}
           >
-            {selectTool === 'lasso' ? (
+            {selectTool === 'select-lasso' ? (
               <span className="w-4 h-4 inline-block rounded-full border border-current" aria-hidden />
             ) : (
               <span className="w-4 h-4 inline-block border border-current" aria-hidden />
             )}
-            <span className="hidden sm:inline">{selectTool === 'lasso' ? 'Lasso' : 'Select'}</span>
+            <span className="hidden sm:inline">{selectTool === 'select-lasso' ? 'Lasso' : 'Select'}</span>
           </button>
         </div>
       </div>
       {/* Selection dropdown menu */}
       <Menu open={selOpen} x={selPos.x} y={selPos.y} menuRef={selMenuRef} minWidth={160}>
         <MenuItem onSelect={() => { setTool('select-rect'); setSelOpen(false) }}>
-          {selectTool === 'rect' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+          {selectTool === 'select-rect' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
           <span className="w-4 h-4 inline-block border border-current" aria-hidden />
           <span>Rect Select</span>
         </MenuItem>
-        <MenuItem onSelect={() => { setTool('lasso'); setSelOpen(false) }}>
-          {selectTool === 'lasso' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+        <MenuItem onSelect={() => { setTool('select-lasso'); setSelOpen(false) }}>
+          {selectTool === 'select-lasso' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
           <span className="w-4 h-4 inline-block rounded-full border border-current" aria-hidden />
           <span>Lasso</span>
         </MenuItem>
