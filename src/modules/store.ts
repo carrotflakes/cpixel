@@ -78,12 +78,19 @@ export type PixelState = {
   selectionOffsetX?: number
   selectionOffsetY?: number
   selectionFloating?: Uint32Array // RGBA buffer of width*height (bounds)
+  clipboard?:
+  | { kind: 'rgba'; width: number; height: number; pixels: Uint32Array }
+  | { kind: 'indexed'; width: number; height: number; indices: Uint8Array; palette: Uint32Array; transparentIndex: number }
   setSelectionRect: (x0: number, y0: number, x1: number, y1: number) => void
   setSelectionMask: (mask: Uint8Array, bounds: { left: number; top: number; right: number; bottom: number }) => void
   clearSelection: () => void
   beginSelectionDrag: () => void
   setSelectionOffset: (dx: number, dy: number) => void
   commitSelectionMove: () => void
+  // selection clipboard ops
+  copySelection: () => void
+  cutSelection: () => void
+  pasteClipboard: () => void
   // history
   beginStroke: () => void
   endStroke: () => void
@@ -140,6 +147,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   selectionOffsetX: 0,
   selectionOffsetY: 0,
   selectionFloating: undefined,
+  clipboard: undefined,
   addLayer: () => set((s) => {
     const id = 'L' + (s.layers.length + 1)
     const layer: Layer = s.mode === 'truecolor'
@@ -591,6 +599,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   beginSelectionDrag: () => set((s) => {
     const { selectionMask, selectionBounds } = s
     if (!selectionMask || !selectionBounds) return {}
+    // If already have floating pixels (e.g., after Paste), don't cut again
+    if (s.selectionFloating) return {}
     const W = s.width, H = s.height
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
@@ -697,6 +707,192 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       layers[li] = { ...layer, indices: out }
       return { layers, selectionFloating: undefined, selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0 }
     }
+  }),
+  // Clipboard operations
+  copySelection: () => set((s) => {
+    const { selectionMask, selectionBounds } = s
+    if (!selectionBounds) return {}
+    const bw = selectionBounds.right - selectionBounds.left + 1
+    const bh = selectionBounds.bottom - selectionBounds.top + 1
+    // If there's a floating buffer, copy it directly
+    if (s.selectionFloating) {
+      if (s.mode === 'truecolor') {
+        return { clipboard: { kind: 'rgba', pixels: s.selectionFloating.slice(0), width: bw, height: bh } }
+      } else {
+        // Convert floating RGBA back to indices using current palette
+        const idxOut = new Uint8Array(bw * bh)
+        for (let y = 0; y < bh; y++) {
+          for (let x = 0; x < bw; x++) {
+            const rgba = s.selectionFloating[y * bw + x] >>> 0
+            if ((rgba & 0xff) === 0) { idxOut[y * bw + x] = s.transparentIndex & 0xff; continue }
+            const pi = nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+            idxOut[y * bw + x] = pi & 0xff
+          }
+        }
+        return { clipboard: { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex } }
+      }
+    }
+    const W = s.width, H = s.height
+    const li = s.layers.findIndex(l => l.id === s.activeLayerId)
+    if (li < 0) return {}
+    const layer = s.layers[li]
+    const float = new Uint32Array(bw * bh)
+    if (s.mode === 'truecolor') {
+      const data = layer.data ?? new Uint32Array(W * H)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
+          if (!selectionMask || selectionMask[i]) float[fi] = data[i] >>> 0
+          else float[fi] = 0
+        }
+      }
+      return { clipboard: { kind: 'rgba', pixels: float, width: bw, height: bh } }
+    } else {
+      // Indexed: copy raw indices (masked), include palette snapshot
+      const idx = layer.indices ?? new Uint8Array(W * H)
+      const ti = s.transparentIndex
+      const outIdx = new Uint8Array(bw * bh)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
+          outIdx[fi] = (!selectionMask || selectionMask[i]) ? (idx[i] ?? ti) : (ti & 0xff)
+        }
+      }
+      return { clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
+    }
+  }),
+  cutSelection: () => set((s) => {
+    const { selectionMask, selectionBounds } = s
+    if (!selectionBounds) return {}
+    const bw = selectionBounds.right - selectionBounds.left + 1
+    const bh = selectionBounds.bottom - selectionBounds.top + 1
+    if (s.selectionFloating) {
+      if (s.mode === 'truecolor') {
+        return { clipboard: { kind: 'rgba', pixels: s.selectionFloating.slice(0), width: bw, height: bh }, selectionFloating: undefined, selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0 }
+      } else {
+        const idxOut = new Uint8Array(bw * bh)
+        for (let y = 0; y < bh; y++) {
+          for (let x = 0; x < bw; x++) {
+            const rgba = s.selectionFloating[y * bw + x] >>> 0
+            if ((rgba & 0xff) === 0) { idxOut[y * bw + x] = s.transparentIndex & 0xff; continue }
+            const pi = nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+            idxOut[y * bw + x] = pi & 0xff
+          }
+        }
+        return { clipboard: { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }, selectionFloating: undefined, selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0 }
+      }
+    }
+    const W = s.width, H = s.height
+    const li = s.layers.findIndex(l => l.id === s.activeLayerId)
+    if (li < 0) return {}
+    const layer = s.layers[li]
+    if (layer.locked) return {}
+    const float = new Uint32Array(bw * bh)
+    if (s.mode === 'truecolor') {
+      const data = layer.data ?? new Uint32Array(W * H)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
+          if (!selectionMask || selectionMask[i]) float[fi] = data[i] >>> 0
+          else float[fi] = 0
+        }
+      }
+      const out = new Uint32Array(data)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          if (!selectionMask || selectionMask[i]) out[i] = 0
+        }
+      }
+      const layers = s.layers.slice()
+      layers[li] = { ...layer, data: out }
+      return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers, clipboard: { kind: 'rgba', pixels: float.slice(0), width: bw, height: bh } }
+    } else {
+      const idx = layer.indices ?? new Uint8Array(W * H)
+      const pal = s.palette
+      const ti = s.transparentIndex
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
+          if (!selectionMask || selectionMask[i]) float[fi] = pal[idx[i] ?? ti] >>> 0
+          else float[fi] = 0
+        }
+      }
+      const out = new Uint8Array(idx)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          if (!selectionMask || selectionMask[i]) out[i] = ti & 0xff
+        }
+      }
+      const layers = s.layers.slice()
+      layers[li] = { ...layer, indices: out }
+      // Clipboard keeps indexed data
+      const outIdx = new Uint8Array(bw * bh)
+      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
+        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
+          const i = y * W + x
+          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
+          outIdx[fi] = (!selectionMask || selectionMask[i]) ? (idx[i] ?? ti) : (ti & 0xff)
+        }
+      }
+      return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
+    }
+  }),
+  pasteClipboard: () => set((s) => {
+    const clip = s.clipboard
+    if (!clip) return {}
+    const W = s.width, H = s.height
+    const bw = Math.min(clip.width, W)
+    const bh = Math.min(clip.height, H)
+    const left = Math.max(0, Math.min(W - bw, ((W - bw) / 2) | 0))
+    const top = Math.max(0, Math.min(H - bh, ((H - bh) / 2) | 0))
+    const right = left + bw - 1
+    const bottom = top + bh - 1
+    const mask = new Uint8Array(W * H)
+    for (let y = top; y <= bottom; y++) {
+      const row = y * W
+      mask.fill(1, row + left, row + right + 1)
+    }
+    let float: Uint32Array
+    if (clip.kind === 'rgba') {
+      if (bw !== clip.width || bh !== clip.height) {
+        const cropped = new Uint32Array(bw * bh)
+        for (let y = 0; y < bh; y++) {
+          const srcRow = y * clip.width
+          cropped.set(clip.pixels.subarray(srcRow, srcRow + bw), y * bw)
+        }
+        float = cropped
+      } else {
+        float = clip.pixels.slice(0)
+      }
+    } else {
+      // Build RGBA from indices using clipboard palette snapshot, then crop if needed
+      const srcW = clip.width, srcH = clip.height
+      // optional crop first: but converting then cropping is fine
+      const full = new Uint32Array(srcW * srcH)
+      for (let y = 0; y < srcH; y++) {
+        for (let x = 0; x < srcW; x++) {
+          const pi = clip.indices[y * srcW + x] ?? clip.transparentIndex
+          full[y * srcW + x] = clip.palette[pi] ?? 0x00000000
+        }
+      }
+      if (bw !== srcW || bh !== srcH) {
+        const cropped = new Uint32Array(bw * bh)
+        for (let y = 0; y < bh; y++) {
+          const srcRow = y * srcW
+          cropped.set(full.subarray(srcRow, srcRow + bw), y * bw)
+        }
+        float = cropped
+      } else {
+        float = full
+      }
+    }
+    return { selectionMask: mask, selectionBounds: { left, top, right, bottom }, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: float, tool: 'select-rect' }
   }),
   setHoverInfo: (x, y, rgba) => set({ hoverX: x, hoverY: y, hoverRGBA: rgba }),
   clearHoverInfo: () => set({ hoverX: undefined, hoverY: undefined, hoverRGBA: undefined }),

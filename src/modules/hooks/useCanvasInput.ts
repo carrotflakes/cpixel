@@ -41,6 +41,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const beginSelectionDrag = usePixelStore(s => s.beginSelectionDrag)
   const setSelectionOffset = usePixelStore(s => s.setSelectionOffset)
   const commitSelectionMove = usePixelStore(s => s.commitSelectionMove)
+  const copySelection = usePixelStore(s => s.copySelection)
+  const cutSelection = usePixelStore(s => s.cutSelection)
+  const pasteClipboard = usePixelStore(s => s.pasteClipboard)
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
 
@@ -169,14 +172,39 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
       const mod = isMac ? e.metaKey : e.ctrlKey
       if (!mod) return
-      if (e.key.toLowerCase() === 'z') {
+      const k = e.key.toLowerCase()
+      if (k === 'z') {
         if (e.shiftKey) { redo(); e.preventDefault() }
         else { undo(); e.preventDefault() }
+        return
+      }
+      // Copy / Cut / Paste for selections
+      if (k === 'c') {
+        // Only act if there's an active selection
+        if (usePixelStore.getState().selectionBounds) {
+          copySelection();
+          e.preventDefault()
+        }
+        return
+      }
+      if (k === 'x') {
+        if (usePixelStore.getState().selectionBounds) {
+          usePixelStore.getState().beginStroke()
+          cutSelection();
+          usePixelStore.getState().endStroke()
+          e.preventDefault()
+        }
+        return
+      }
+      if (k === 'v') {
+        pasteClipboard();
+        e.preventDefault()
+        return
       }
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey as any, { capture: true } as any)
-  }, [undo, redo])
+  }, [undo, redo, copySelection, cutSelection, pasteClipboard])
 
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') return
