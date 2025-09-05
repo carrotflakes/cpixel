@@ -4,19 +4,7 @@ import { nearestIndexInPalette, parseCSSColor, rgbaToCSSHex } from './utils/colo
 import { generatePaletteFromComposite } from './utils/palette'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
-
-function equalU32(a: Uint32Array, b: Uint32Array) {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
-  return true
-}
-function equalU8(a: Uint8Array, b: Uint8Array) {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
-  return true
-}
+import { equalU32, equalU8 } from './utils/arrays'
 
 export const WIDTH = 64
 export const HEIGHT = 64
