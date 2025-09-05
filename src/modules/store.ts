@@ -351,9 +351,6 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   }),
   addPaletteColor: (rgba) => {
     const s = get()
-    // if exists, return its index
-    const existingIdx = s.palette.findIndex((p) => p === (rgba >>> 0))
-    if (existingIdx >= 0) return existingIdx
     if (s.palette.length >= 256) return s.palette.length - 1
     const next = new Uint32Array(s.palette.length + 1)
     next.set(s.palette)
