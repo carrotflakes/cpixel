@@ -186,7 +186,13 @@ export function extractFloatingSelectionIndices(
   return floatIdx
 }
 
-export function buildFloatingFromClipboard(clip: any, bw: number, bh: number) {
+export function buildFloatingFromClipboard(
+  clip:
+    | { kind: 'rgba'; width: number; height: number; pixels: Uint32Array }
+    | { kind: 'indexed'; width: number; height: number; indices: Uint8Array; palette: Uint32Array; transparentIndex: number },
+  bw: number,
+  bh: number
+): Uint32Array {
   // Returns a cropped/cropped-or-copied Uint32Array of size bw*bh from clipboard
   if (clip.kind === 'rgba') {
     if (bw !== clip.width || bh !== clip.height) {
