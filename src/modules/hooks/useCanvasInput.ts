@@ -366,7 +366,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const Cy = e.clientY - rect.top
     const delta = e.deltaY
     const k = delta > 0 ? 0.9 : 1.1
-    const nextSize = clamp(Math.round(size * k), MIN_SIZE, MAX_SIZE)
+    const nextSize = clamp(size * k, MIN_SIZE, MAX_SIZE)
     if (nextSize === size) return
     const ratio = nextSize / size
     const newVX = viewX - (Cx - viewX) * (ratio - 1)

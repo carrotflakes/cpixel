@@ -20,7 +20,7 @@ function equalU8(a: Uint8Array, b: Uint8Array) {
 
 export const WIDTH = 64
 export const HEIGHT = 64
-export const MIN_SIZE = 4
+export const MIN_SIZE = 1
 export const MAX_SIZE = 40
 
 type Layer = {
