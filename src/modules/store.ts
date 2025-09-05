@@ -94,12 +94,8 @@ export type PixelState = {
   _undo?: any[]
   _redo?: any[]
   _stroking?: boolean
-  // hover info for status bar
-  hoverX?: number
-  hoverY?: number
-  hoverRGBA?: number
-  setHoverInfo: (x: number, y: number, rgba: number) => void
-  clearHoverInfo: () => void
+  hover?: { x: number; y: number; rgba?: number; index?: number }
+  setHoverInfo: (h?: { x: number; y: number; rgba?: number; index?: number }) => void
   clear: () => void
   exportPNG: () => void
   exportJSON: () => void
@@ -813,8 +809,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     }
     return { selectionMask: mask, selectionBounds: { left, top, right, bottom }, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: float, selectionFloatingIndices: floatIdx, tool: 'select-rect' }
   }),
-  setHoverInfo: (x, y, rgba) => set({ hoverX: x, hoverY: y, hoverRGBA: rgba }),
-  clearHoverInfo: () => set({ hoverX: undefined, hoverY: undefined, hoverRGBA: undefined }),
+  setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
   beginStroke: () => set((s: any) => {
     if (s._stroking) return {}
     // snapshot full state as JSON-serializable object of typed array buffers

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePixelStore, MIN_SIZE, MAX_SIZE } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
-import { compositePixel } from '../utils/composite'
+import { compositePixel, findTopPaletteIndex } from '../utils/composite'
 import { isPointInMask, polygonToMask } from '../utils/selection'
 
 export type ShapePreview = {
@@ -33,7 +33,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const viewY = usePixelStore(s => s.viewY)
   const setView = usePixelStore(s => s.setView)
   const setHoverInfo = usePixelStore(s => s.setHoverInfo)
-  const clearHoverInfo = usePixelStore(s => s.clearHoverInfo)
   const selectionMask = usePixelStore(s => s.selectionMask)
   const setSelectionRect = usePixelStore(s => s.setSelectionRect)
   const setSelectionMask = usePixelStore(s => s.setSelectionMask)
@@ -103,7 +102,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const isBucketTool = () => tool === 'bucket'
   const updateHover = (x: number, y: number) => {
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
-    setHoverInfo(x, y, hov)
+    const idx = mode === 'indexed' ? findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
+    setHoverInfo({ x, y, rgba: hov, index: idx })
   }
   const pointInSelection = (x: number, y: number) => isPointInMask(selectionMask, W, H, x, y)
   const startShapeAt = (x: number, y: number) => {
@@ -211,13 +211,16 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     // If this were a touch-derived PointerEvent with multiple contacts, bail
     if ((e as any).isPrimary === false) return
     const { x, y } = pickPoint(e.clientX, e.clientY)
-    if (!inBounds(x, y)) { setHoverCell(null); clearHoverInfo(); return }
+    if (!inBounds(x, y)) { setHoverCell(null); setHoverInfo(undefined); return }
     setHoverCell({ x, y })
     updateHover(x, y)
     // Selection tools: only hover/update, do not paint via move
     if (isSelectionTool()) return
     if (e.altKey) {
       const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
+      // also set hover info with index when picking via Alt
+      const idx = mode === 'indexed' ? findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) : undefined
+      setHoverInfo({ x, y, rgba, index: idx })
       setColor(rgbaToCSSHex(rgba))
       e.preventDefault();
       return
@@ -385,7 +388,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     endBrush()
   }
 
-  const onPointerLeave = () => { setHoverCell(null); clearHoverInfo() }
+  const onPointerLeave = () => { setHoverCell(null); setHoverInfo(undefined) }
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault()

@@ -40,9 +40,9 @@ export function compositePixel(
     if (!L.visible) continue
     let rgba = 0x00000000
     if (mode === 'truecolor') {
-      rgba = (L.data ?? new Uint32Array(width * height))[y * width + x] >>> 0
+      rgba = (L.data?.[y * width + x] ?? 0) >>> 0
     } else {
-      const pi = (L.indices ?? new Uint8Array(width * height))[y * width + x] ?? transparentIndex
+      const pi = L.indices?.[y * width + x] ?? transparentIndex
       if (pi === transparentIndex) continue
       rgba = palette[pi] ?? 0x00000000
     }
@@ -50,6 +50,26 @@ export function compositePixel(
     if ((out & 0xff) === 255) break
   }
   return out >>> 0
+}
+
+// Find the top-most visible palette index at a pixel (returns undefined if none)
+export function findTopPaletteIndex(
+  layers: LayerLike[],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  transparentIndex: number,
+): number | undefined {
+  if (x < 0 || y < 0 || x >= width || y >= height) return undefined
+  for (let li = 0; li < layers.length; li++) {
+    const L = layers[li]
+    if (!L.visible) continue
+    const pi = L.indices?.[y * width + x]
+    if (pi === undefined || pi === transparentIndex) continue
+    return pi
+  }
+  return undefined
 }
 
 // Composite all pixels into an ImageData
