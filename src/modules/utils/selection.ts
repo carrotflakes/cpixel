@@ -136,6 +136,56 @@ export function applyFloatingToIndexedLayer(dst: Uint8Array, floating: Uint32Arr
   return out
 }
 
+// apply floating indices directly (indexed mode) without color round-trip.
+// Behavior: transparentIndex pixels in floating are skipped (do not overwrite),
+// other indices copied verbatim (clipped to canvas bounds).
+export function applyFloatingIndicesToIndexedLayer(
+  dst: Uint8Array,
+  floating: Uint8Array,
+  transparentIndex: number,
+  dstLeft: number,
+  dstTop: number,
+  bw: number,
+  bh: number,
+  W: number,
+  H: number,
+) {
+  const out = new Uint8Array(dst)
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const pi = floating[y * bw + x] & 0xff
+      if (pi === (transparentIndex & 0xff)) continue
+      const X = dstLeft + x
+      const Y = dstTop + y
+      if (X < 0 || Y < 0 || X >= W || Y >= H) continue
+      out[Y * W + X] = pi
+    }
+  }
+  return out
+}
+
+// extract floating indices sub-rectangle (masked) directly for indexed mode.
+export function extractFloatingSelectionIndices(
+  indices: Uint8Array,
+  mask: Uint8Array | undefined,
+  bounds: { left: number; top: number; right: number; bottom: number },
+  W: number,
+  transparentIndex: number,
+) {
+  const bw = bounds.right - bounds.left + 1
+  const bh = bounds.bottom - bounds.top + 1
+  const floatIdx = new Uint8Array(bw * bh)
+  for (let y = bounds.top; y <= bounds.bottom; y++) {
+    for (let x = bounds.left; x <= bounds.right; x++) {
+      const i = y * W + x
+      const fi = (y - bounds.top) * bw + (x - bounds.left)
+      if (mask && !mask[i]) { floatIdx[fi] = transparentIndex & 0xff; continue }
+      floatIdx[fi] = indices[i] ?? (transparentIndex & 0xff)
+    }
+  }
+  return floatIdx
+}
+
 export function buildFloatingFromClipboard(clip: any, bw: number, bh: number) {
   // Returns a cropped/cropped-or-copied Uint32Array of size bw*bh from clipboard
   if (clip.kind === 'rgba') {
