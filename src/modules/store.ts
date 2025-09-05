@@ -5,6 +5,7 @@ import { generatePaletteFromComposite } from './utils/palette'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 import { equalU32, equalU8 } from './utils/arrays'
+import { rasterizeLine } from './utils/lines'
 import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard } from './utils/selection'
 
 export const WIDTH = 64
@@ -412,18 +413,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const layers = s.layers.slice()
     if (s.mode === 'truecolor') {
       const out = new Uint32Array(layer.data ?? new Uint32Array(W * H))
-      // Bresenham
-      let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1
-      let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1
-      let err = dx + dy
-      let x = x0, y = y0
-      while (true) {
+      // Rasterize line using shared Bresenham helper
+      rasterizeLine(x0, y0, x1, y1, (x, y) => {
         if (inBounds(x, y)) out[y * W + x] = rgbaOrIndex >>> 0
-        if (x === x1 && y === y1) break
-        const e2 = 2 * err
-        if (e2 >= dy) { err += dy; x += sx }
-        if (e2 <= dx) { err += dx; y += sy }
-      }
+      })
       if (layer.data && equalU32(out, layer.data)) return {}
       layers[li] = { ...layer, data: out }
       return { layers }
@@ -431,17 +424,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const idxArr = layer.indices ?? new Uint8Array(W * H)
       const writeIndex = rgbaOrIndex
       const out = new Uint8Array(idxArr)
-      let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1
-      let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1
-      let err = dx + dy
-      let x = x0, y = y0
-      while (true) {
-        if (x >= 0 && y >= 0 && x < W && y < H) out[y * W + x] = writeIndex & 0xff
-        if (x === x1 && y === y1) break
-        const e2 = 2 * err
-        if (e2 >= dy) { err += dy; x += sx }
-        if (e2 <= dx) { err += dx; y += sy }
-      }
+      rasterizeLine(x0, y0, x1, y1, (x, y) => {
+        if (inBounds(x, y)) out[y * W + x] = writeIndex & 0xff
+      })
       if (equalU8(out, idxArr)) return {}
       layers[li] = { ...layer, indices: out }
       return { layers }
