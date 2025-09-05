@@ -17,6 +17,7 @@ export function PalettePanel() {
   const applyPalettePreset = usePixelStore(s => s.applyPalettePreset)
   const setPaletteColor = usePixelStore(s => s.setPaletteColor)
   const setColorIndex = usePixelStore(s => s.setColorIndex)
+  const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
 
   const panelRef = useRef<HTMLDivElement | null>(null)
   const { menu, openAt: openMenuAt, close: closeMenu, menuRef } = useContextMenu<{ index: number }>()
@@ -116,6 +117,7 @@ export function PalettePanel() {
         <div className="mt-2 flex flex-wrap gap-3">
           {Array.from(palette).map((rgba, i) => {
             const isTransparent = i === transparentIndex
+            const isSelected = currentPaletteIndex === i
             const style = isTransparent
               ? { backgroundImage: 'repeating-conic-gradient(#cccccc 0% 25%, transparent 0% 50%)', backgroundSize: '8px 8px', backgroundColor: '#ffffff' }
               : { background: rgbaToCSSHex(rgba) }
@@ -123,7 +125,8 @@ export function PalettePanel() {
               <button
                 key={i}
                 title={`#${i}`}
-                className={`w-7 h-7 rounded border border-border relative flex items-center justify-center`}
+                aria-pressed={isSelected}
+                className={`w-7 h-7 rounded border border-border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-accent' : ''}`}
                 style={style}
                 onClick={(e) => {
                   if (suppressClickRef.current) {
