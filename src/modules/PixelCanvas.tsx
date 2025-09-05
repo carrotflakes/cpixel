@@ -4,6 +4,8 @@ import { usePixelStore } from './store'
 import { drawBorder, drawChecker, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerPatternCanvas } from './utils/canvasDraw'
 import { compositeImageData } from './utils/composite'
 
+const GRID_THRESHOLD = 8
+
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const { hoverCell, shapePreview, onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onTouchStart, onTouchMove, onTouchEnd } = useCanvasInput(canvasRef)
@@ -96,8 +98,10 @@ export function PixelCanvas() {
 
     // border and grid
     drawBorder(ctx, scaledW, scaledH)
-    drawGrid(ctx, W, H, viewScale)
-  // hover highlight
+    if (viewScale > GRID_THRESHOLD) {
+      drawGrid(ctx, W, H, viewScale)
+    }
+    // hover highlight
     if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < W && hoverCell.y < H) {
       drawHoverCell(ctx, hoverCell.x, hoverCell.y, viewScale)
     }

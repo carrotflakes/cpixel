@@ -55,7 +55,7 @@ export function drawChecker(
 }
 
 export function drawBorder(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  ctx.strokeStyle = 'rgba(0,0,0,0.3)'
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)'
   ctx.lineWidth = 1
   ctx.strokeRect(0.5, 0.5, w - 1, h - 1)
 }
