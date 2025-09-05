@@ -82,7 +82,7 @@ export function PalettePanel() {
         >
           {collapsed ? <LuChevronUp /> : <LuChevronDown />}
         </button>
-        <span className="text-sm text-muted">Palette ({palette.length}/256)</span>
+        <span className="text-sm text-muted">Palette ({palette.length})</span>
         {!collapsed && (
           <>
             <button
