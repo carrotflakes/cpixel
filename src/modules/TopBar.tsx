@@ -300,6 +300,11 @@ export function TopBar() {
       </button>
       <Menu open={menuOpen} x={menuPos.x} y={menuPos.y} menuRef={menuRootRef} minWidth={208}>
         <MenuItem
+          onSelect={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}
+        >
+          <span>Canvas size…</span>
+        </MenuItem>
+        <MenuItem
           onSelect={() => {
             if (openSub === 'mode') { setOpenSub(null); return }
             const MAIN_W = 208, SUB_W = 180, margin = 8
@@ -312,21 +317,6 @@ export function TopBar() {
           }}
         >
           <span>Mode</span>
-          <LuChevronRight className="ml-auto" aria-hidden />
-        </MenuItem>
-        <MenuItem
-          onSelect={() => {
-            if (openSub === 'export') { setOpenSub(null); return }
-            const MAIN_W = 208, SUB_W = 180, margin = 8
-            const rightX = menuPos.x + MAIN_W
-            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
-            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-            const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 36)
-            setExportPos({ x, y })
-            setOpenSub('export')
-          }}
-        >
-          <span>Export</span>
           <LuChevronRight className="ml-auto" aria-hidden />
         </MenuItem>
         <MenuItem
@@ -346,6 +336,21 @@ export function TopBar() {
         </MenuItem>
         <MenuItem
           onSelect={() => {
+            if (openSub === 'export') { setOpenSub(null); return }
+            const MAIN_W = 208, SUB_W = 180, margin = 8
+            const rightX = menuPos.x + MAIN_W
+            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
+            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
+            const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 36)
+            setExportPos({ x, y })
+            setOpenSub('export')
+          }}
+        >
+          <span>Export</span>
+          <LuChevronRight className="ml-auto" aria-hidden />
+        </MenuItem>
+        <MenuItem
+          onSelect={() => {
             if (openSub === 'drive') { setOpenSub(null); return }
             const MAIN_W = 208, SUB_W = 220, margin = 8
             const rightX = menuPos.x + MAIN_W
@@ -358,11 +363,6 @@ export function TopBar() {
         >
           <span>Google Drive</span>
           <LuChevronRight className="ml-auto" aria-hidden />
-        </MenuItem>
-        <MenuItem
-          onSelect={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}
-        >
-          <span>Canvas size…</span>
         </MenuItem>
 
         <MenuDivider />
