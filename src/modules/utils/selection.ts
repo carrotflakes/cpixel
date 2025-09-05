@@ -1,3 +1,5 @@
+import { nearestIndexInPalette } from './color'
+
 export type Point = { x: number; y: number }
 
 export function rectToMask(W: number, H: number, x0: number, y0: number, x1: number, y1: number) {
@@ -48,4 +50,123 @@ export function isPointInMask(mask: Uint8Array | undefined, W: number, H: number
   if (!mask) return false
   if (x < 0 || y < 0 || x >= W || y >= H) return false
   return mask[y * W + x] !== 0
+}
+
+export function extractFloatingTruecolor(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number) {
+  const bw = bounds.right - bounds.left + 1
+  const bh = bounds.bottom - bounds.top + 1
+  const float = new Uint32Array(bw * bh)
+  for (let y = bounds.top; y <= bounds.bottom; y++) {
+    for (let x = bounds.left; x <= bounds.right; x++) {
+      const i = y * W + x
+      const fi = (y - bounds.top) * bw + (x - bounds.left)
+      if (!mask || mask[i]) float[fi] = data[i] >>> 0
+      else float[fi] = 0
+    }
+  }
+  return float
+}
+
+export function clearSelectedTruecolor(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number) {
+  const out = new Uint32Array(data)
+  for (let y = bounds.top; y <= bounds.bottom; y++) {
+    for (let x = bounds.left; x <= bounds.right; x++) {
+      const i = y * W + x
+      if (!mask || mask[i]) out[i] = 0
+    }
+  }
+  return out
+}
+
+export function extractFloatingIndexed(indices: Uint8Array, palette: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
+  const bw = bounds.right - bounds.left + 1
+  const bh = bounds.bottom - bounds.top + 1
+  const float = new Uint32Array(bw * bh)
+  for (let y = bounds.top; y <= bounds.bottom; y++) {
+    for (let x = bounds.left; x <= bounds.right; x++) {
+      const i = y * W + x
+      const fi = (y - bounds.top) * bw + (x - bounds.left)
+      if (mask && !mask[i]) { float[fi] = 0; continue }
+      const pi = indices[i] ?? transparentIndex
+      float[fi] = palette[pi] >>> 0
+    }
+  }
+  return float
+}
+
+export function clearSelectedIndexed(indices: Uint8Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
+  const out = new Uint8Array(indices)
+  for (let y = bounds.top; y <= bounds.bottom; y++) {
+    for (let x = bounds.left; x <= bounds.right; x++) {
+      const i = y * W + x
+      if (!mask || mask[i]) out[i] = transparentIndex & 0xff
+    }
+  }
+  return out
+}
+
+export function applyFloatingToTruecolorLayer(dst: Uint32Array, floating: Uint32Array, dstLeft: number, dstTop: number, bw: number, bh: number, W: number, H: number) {
+  const out = new Uint32Array(dst)
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const pix = floating[y * bw + x] >>> 0
+      if ((pix & 0xff) === 0) continue
+      const X = dstLeft + x
+      const Y = dstTop + y
+      if (X < 0 || Y < 0 || X >= W || Y >= H) continue
+      out[Y * W + X] = pix
+    }
+  }
+  return out
+}
+
+export function applyFloatingToIndexedLayer(dst: Uint8Array, floating: Uint32Array, palette: Uint32Array, transparentIndex: number, dstLeft: number, dstTop: number, bw: number, bh: number, W: number, H: number) {
+  const out = new Uint8Array(dst)
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const pix = floating[y * bw + x] >>> 0
+      if ((pix & 0xff) === 0) continue
+      const X = dstLeft + x
+      const Y = dstTop + y
+      if (X < 0 || Y < 0 || X >= W || Y >= H) continue
+      const pi = nearestIndexInPalette(palette, pix, transparentIndex)
+      out[Y * W + X] = pi & 0xff
+    }
+  }
+  return out
+}
+
+export function buildFloatingFromClipboard(clip: any, bw: number, bh: number) {
+  // Returns a cropped/cropped-or-copied Uint32Array of size bw*bh from clipboard
+  if (clip.kind === 'rgba') {
+    if (bw !== clip.width || bh !== clip.height) {
+      const cropped = new Uint32Array(bw * bh)
+      for (let y = 0; y < bh; y++) {
+        const srcRow = y * clip.width
+        cropped.set(clip.pixels.subarray(srcRow, srcRow + bw), y * bw)
+      }
+      return cropped
+    } else {
+      return clip.pixels.slice(0)
+    }
+  } else {
+    const srcW = clip.width, srcH = clip.height
+    const full = new Uint32Array(srcW * srcH)
+    for (let y = 0; y < srcH; y++) {
+      for (let x = 0; x < srcW; x++) {
+        const pi = clip.indices[y * srcW + x] ?? clip.transparentIndex
+        full[y * srcW + x] = clip.palette[pi] ?? 0x00000000
+      }
+    }
+    if (bw !== srcW || bh !== srcH) {
+      const cropped = new Uint32Array(bw * bh)
+      for (let y = 0; y < bh; y++) {
+        const srcRow = y * srcW
+        cropped.set(full.subarray(srcRow, srcRow + bw), y * bw)
+      }
+      return cropped
+    } else {
+      return full
+    }
+  }
 }

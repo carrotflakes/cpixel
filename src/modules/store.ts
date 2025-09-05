@@ -5,6 +5,7 @@ import { generatePaletteFromComposite } from './utils/palette'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 import { equalU32, equalU8 } from './utils/arrays'
+import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard } from './utils/selection'
 
 export const WIDTH = 64
 export const HEIGHT = 64
@@ -571,76 +572,46 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   // Selection APIs
   setSelectionRect: (x0, y0, x1, y1) => set((s) => {
     const W = s.width, H = s.height
-    const left = Math.max(0, Math.min(x0 | 0, x1 | 0))
-    const right = Math.min(W - 1, Math.max(x0 | 0, x1 | 0))
-    const top = Math.max(0, Math.min(y0 | 0, y1 | 0))
-    const bottom = Math.min(H - 1, Math.max(y0 | 0, y1 | 0))
-    const mask = new Uint8Array(W * H)
-    for (let y = top; y <= bottom; y++) {
-      const row = y * W
-      mask.fill(1, row + left, row + right + 1)
-    }
-    return { selectionMask: mask, selectionBounds: { left, top, right, bottom }, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: undefined }
+    // reuse selection util to build mask and bounds
+    const { mask, bounds } = (() => {
+      const left = Math.max(0, Math.min(x0 | 0, x1 | 0))
+      const right = Math.min(W - 1, Math.max(x0 | 0, x1 | 0))
+      const top = Math.max(0, Math.min(y0 | 0, y1 | 0))
+      const bottom = Math.min(H - 1, Math.max(y0 | 0, y1 | 0))
+      const m = new Uint8Array(W * H)
+      for (let y = top; y <= bottom; y++) {
+        const row = y * W
+        m.fill(1, row + left, row + right + 1)
+      }
+      return { mask: m, bounds: { left, top, right, bottom } }
+    })()
+    return { selectionMask: mask, selectionBounds: bounds, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: undefined }
   }),
   setSelectionMask: (mask, bounds) => set(() => ({ selectionMask: mask, selectionBounds: bounds, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: undefined })),
   clearSelection: () => set({ selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: undefined }),
   beginSelectionDrag: () => set((s) => {
     const { selectionMask, selectionBounds } = s
     if (!selectionMask || !selectionBounds) return {}
-    // If already have floating pixels (e.g., after Paste), don't cut again
     if (s.selectionFloating) return {}
-    const W = s.width, H = s.height
+    const W = s.width
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
-    const bw = selectionBounds.right - selectionBounds.left + 1
-    const bh = selectionBounds.bottom - selectionBounds.top + 1
-    const float = new Uint32Array(bw * bh)
+    // bounds width/height available via selectionBounds when needed
     if (s.mode === 'truecolor') {
-      const data = layer.data ?? new Uint32Array(W * H)
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
-          if (selectionMask[i]) {
-            float[fi] = data[i] >>> 0
-          } else {
-            float[fi] = 0
-          }
-        }
-      }
-      // clear selected pixels in layer (cut)
-      const out = new Uint32Array(data)
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          if (selectionMask[i]) out[i] = 0
-        }
-      }
+      const data = layer.data ?? new Uint32Array(W * (s.height))
+      const float = extractFloatingTruecolor(data, selectionMask, selectionBounds, W)
+      const out = clearSelectedTruecolor(data, selectionMask, selectionBounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers }
     } else {
-      // indexed -> convert to RGBA float; clear indices to transparentIndex
-      const idx = layer.indices ?? new Uint8Array(W * H)
+      const idx = layer.indices ?? new Uint8Array(W * (s.height))
       const pal = s.palette
       const ti = s.transparentIndex
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
-          if (selectionMask[i]) float[fi] = pal[idx[i] ?? ti] >>> 0
-          else float[fi] = 0
-        }
-      }
-      const out = new Uint8Array(idx)
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          if (selectionMask[i]) out[i] = ti & 0xff
-        }
-      }
+      const float = extractFloatingIndexed(idx, pal, selectionMask, selectionBounds, W, ti)
+      const out = clearSelectedIndexed(idx, selectionMask, selectionBounds, W, ti)
       const layers = s.layers.slice()
       layers[li] = { ...layer, indices: out }
       return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers }
@@ -663,34 +634,13 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const dstTop = selectionBounds.top + dy
     if (s.mode === 'truecolor') {
       const src = layer.data ?? new Uint32Array(W * H)
-      const out = new Uint32Array(src)
-      for (let y = 0; y < bh; y++) {
-        for (let x = 0; x < bw; x++) {
-          const pix = selectionFloating[y * bw + x] >>> 0
-          if ((pix & 0xff) === 0) continue
-          const X = dstLeft + x
-          const Y = dstTop + y
-          if (X < 0 || Y < 0 || X >= W || Y >= H) continue
-          out[Y * W + X] = pix
-        }
-      }
+      const out = applyFloatingToTruecolorLayer(src, selectionFloating, dstLeft, dstTop, bw, bh, W, H)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       return { layers, selectionFloating: undefined, selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0 }
     } else {
       const idx = layer.indices ?? new Uint8Array(W * H)
-      const out = new Uint8Array(idx)
-      for (let y = 0; y < bh; y++) {
-        for (let x = 0; x < bw; x++) {
-          const pix = selectionFloating[y * bw + x] >>> 0
-          if ((pix & 0xff) === 0) continue
-          const X = dstLeft + x
-          const Y = dstTop + y
-          if (X < 0 || Y < 0 || X >= W || Y >= H) continue
-          const pi = nearestIndexInPalette(s.palette, pix, s.transparentIndex)
-          out[Y * W + X] = pi & 0xff
-        }
-      }
+      const out = applyFloatingToIndexedLayer(idx, selectionFloating, s.palette, s.transparentIndex, dstLeft, dstTop, bw, bh, W, H)
       const layers = s.layers.slice()
       layers[li] = { ...layer, indices: out }
       return { layers, selectionFloating: undefined, selectionMask: undefined, selectionBounds: undefined, selectionOffsetX: 0, selectionOffsetY: 0 }
@@ -724,23 +674,15 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
-    const float = new Uint32Array(bw * bh)
     if (s.mode === 'truecolor') {
       const data = layer.data ?? new Uint32Array(W * H)
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
-          if (!selectionMask || selectionMask[i]) float[fi] = data[i] >>> 0
-          else float[fi] = 0
-        }
-      }
+      const float = extractFloatingTruecolor(data, selectionMask, selectionBounds, W)
       return { clipboard: { kind: 'rgba', pixels: float, width: bw, height: bh } }
     } else {
-      // Indexed: copy raw indices (masked), include palette snapshot
       const idx = layer.indices ?? new Uint8Array(W * H)
       const ti = s.transparentIndex
       const outIdx = new Uint8Array(bw * bh)
+      // build masked indices copy
       for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
         for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
           const i = y * W + x
@@ -777,24 +719,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
-    const float = new Uint32Array(bw * bh)
     if (s.mode === 'truecolor') {
       const data = layer.data ?? new Uint32Array(W * H)
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
-          if (!selectionMask || selectionMask[i]) float[fi] = data[i] >>> 0
-          else float[fi] = 0
-        }
-      }
-      const out = new Uint32Array(data)
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          if (!selectionMask || selectionMask[i]) out[i] = 0
-        }
-      }
+      const float = extractFloatingTruecolor(data, selectionMask, selectionBounds, W)
+      const out = clearSelectedTruecolor(data, selectionMask, selectionBounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers, clipboard: { kind: 'rgba', pixels: float.slice(0), width: bw, height: bh } }
@@ -802,21 +730,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const idx = layer.indices ?? new Uint8Array(W * H)
       const pal = s.palette
       const ti = s.transparentIndex
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
-          if (!selectionMask || selectionMask[i]) float[fi] = pal[idx[i] ?? ti] >>> 0
-          else float[fi] = 0
-        }
-      }
-      const out = new Uint8Array(idx)
-      for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
-        for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
-          const i = y * W + x
-          if (!selectionMask || selectionMask[i]) out[i] = ti & 0xff
-        }
-      }
+      const float = extractFloatingIndexed(idx, pal, selectionMask, selectionBounds, W, ti)
+      const out = clearSelectedIndexed(idx, selectionMask, selectionBounds, W, ti)
       const layers = s.layers.slice()
       layers[li] = { ...layer, indices: out }
       // Clipboard keeps indexed data
@@ -846,40 +761,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const row = y * W
       mask.fill(1, row + left, row + right + 1)
     }
-    let float: Uint32Array
-    if (clip.kind === 'rgba') {
-      if (bw !== clip.width || bh !== clip.height) {
-        const cropped = new Uint32Array(bw * bh)
-        for (let y = 0; y < bh; y++) {
-          const srcRow = y * clip.width
-          cropped.set(clip.pixels.subarray(srcRow, srcRow + bw), y * bw)
-        }
-        float = cropped
-      } else {
-        float = clip.pixels.slice(0)
-      }
-    } else {
-      // Build RGBA from indices using clipboard palette snapshot, then crop if needed
-      const srcW = clip.width, srcH = clip.height
-      // optional crop first: but converting then cropping is fine
-      const full = new Uint32Array(srcW * srcH)
-      for (let y = 0; y < srcH; y++) {
-        for (let x = 0; x < srcW; x++) {
-          const pi = clip.indices[y * srcW + x] ?? clip.transparentIndex
-          full[y * srcW + x] = clip.palette[pi] ?? 0x00000000
-        }
-      }
-      if (bw !== srcW || bh !== srcH) {
-        const cropped = new Uint32Array(bw * bh)
-        for (let y = 0; y < bh; y++) {
-          const srcRow = y * srcW
-          cropped.set(full.subarray(srcRow, srcRow + bw), y * bw)
-        }
-        float = cropped
-      } else {
-        float = full
-      }
-    }
+    const float = buildFloatingFromClipboard(clip, bw, bh)
     return { selectionMask: mask, selectionBounds: { left, top, right, bottom }, selectionOffsetX: 0, selectionOffsetY: 0, selectionFloating: float, tool: 'select-rect' }
   }),
   setHoverInfo: (x, y, rgba) => set({ hoverX: x, hoverY: y, hoverRGBA: rgba }),
