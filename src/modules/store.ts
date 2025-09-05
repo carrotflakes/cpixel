@@ -7,6 +7,7 @@ import { normalizeImportedJSON } from './utils/io'
 import { equalU32, equalU8 } from './utils/arrays'
 import { rasterizeLine } from './utils/lines'
 import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard } from './utils/selection'
+import { compositeImageData } from './utils/composite'
 
 export const WIDTH = 64
 export const HEIGHT = 64
@@ -873,46 +874,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     cvs.width = W
     cvs.height = H
     const ctx = cvs.getContext('2d')!
-    const img = ctx.createImageData(W, H)
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const i = (y * W + x) * 4
-        // composite visible layers bottom->top (Normal)
-        let out = 0x00000000
-        for (let li = 0; li < layers.length; li++) {
-          const L = layers[li]
-          if (!L.visible) continue
-          let rgba = 0x00000000
-          if (mode === 'truecolor') {
-            rgba = (L.data ?? new Uint32Array(W * H))[y * W + x] >>> 0
-          } else {
-            const pi = (L.indices ?? new Uint8Array(W * H))[y * W + x] ?? transparentIndex
-            rgba = palette[pi] ?? 0x00000000
-          }
-          // alpha over
-          const aS = rgba & 0xff
-          if (aS === 0) continue
-          if ((out & 0xff) === 255) continue
-          const rS = (rgba >>> 24) & 0xff
-          const gS = (rgba >>> 16) & 0xff
-          const bS = (rgba >>> 8) & 0xff
-          const rD = (out >>> 24) & 0xff
-          const gD = (out >>> 16) & 0xff
-          const bD = (out >>> 8) & 0xff
-          const aD = out & 0xff
-          const aO = aS + ((aD * (255 - aS) + 127) / 255 | 0)
-          const rO = ((rS * aS + rD * aD * (255 - aS) / 255 + 127) / 255) | 0
-          const gO = ((gS * aS + gD * aD * (255 - aS) / 255 + 127) / 255) | 0
-          const bO = ((bS * aS + bD * aD * (255 - aS) / 255 + 127) / 255) | 0
-          out = (rO << 24) | (gO << 16) | (bO << 8) | (aO & 0xff)
-          if ((out & 0xff) === 255) break
-        }
-        img.data[i + 0] = (out >>> 24) & 0xff
-        img.data[i + 1] = (out >>> 16) & 0xff
-        img.data[i + 2] = (out >>> 8) & 0xff
-        img.data[i + 3] = (out >>> 0) & 0xff
-      }
-    }
+    const img = compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data, indices: l.indices })), mode, palette, transparentIndex, ctx, W, H)
     ctx.putImageData(img, 0, 0)
     const a = document.createElement('a')
     a.href = cvs.toDataURL('image/png')
