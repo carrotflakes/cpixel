@@ -39,10 +39,12 @@ export function TopBar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
   const [openSub, setOpenSub] = useState<null | 'mode' | 'export' | 'import' | 'drive'>(null)
-  const [modePos, setModePos] = useState<{ x: number, y: number } | null>(null)
-  const [exportPos, setExportPos] = useState<{ x: number, y: number } | null>(null)
-  const [importPos, setImportPos] = useState<{ x: number, y: number } | null>(null)
-  const [drivePos, setDrivePos] = useState<{ x: number, y: number } | null>(null)
+  const [subPos, setSubPos] = useState<{ x: number, y: number } | null>(null)
+  // Refs for root menu items to measure dynamic Y offsets
+  const modeItemRef = useRef<HTMLButtonElement | null>(null)
+  const importItemRef = useRef<HTMLButtonElement | null>(null)
+  const exportItemRef = useRef<HTMLButtonElement | null>(null)
+  const driveItemRef = useRef<HTMLButtonElement | null>(null)
   // Selection tool dropdown state
   const selBtnRef = useRef<HTMLButtonElement | null>(null)
   const selMenuRef = useRef<HTMLDivElement | null>(null)
@@ -136,11 +138,38 @@ export function TopBar() {
     setMenuPos({ x, y })
     setMenuOpen(v => !v)
     setOpenSub(null)
-    setModePos(null)
-    setExportPos(null)
-    setImportPos(null)
-    setDrivePos(null)
+    setSubPos(null)
     setDriveOpen(null)
+  }
+
+  // Centralized submenu layout config & calculator
+  const MAIN_MENU_WIDTH = 208
+  const SUB_MENU_META: Record<'mode' | 'export' | 'import' | 'drive', { width: number; approxHeight: number; ref: React.RefObject<HTMLButtonElement | null> }> = {
+    mode: { width: 160, approxHeight: 100, ref: modeItemRef },
+    export: { width: 160, approxHeight: 100, ref: exportItemRef },
+    import: { width: 180, approxHeight: 100, ref: importItemRef },
+    drive: { width: 224, approxHeight: 140, ref: driveItemRef },
+  }
+  function computeSubmenuPos(kind: keyof typeof SUB_MENU_META) {
+    const meta = SUB_MENU_META[kind]
+    const margin = 8
+    const rightX = menuPos.x + MAIN_MENU_WIDTH
+    const fitsRight = rightX + meta.width + margin <= window.innerWidth
+    const x = fitsRight ? rightX : Math.max(margin, menuPos.x - meta.width)
+    // Dynamic Y: align top to the corresponding root item
+    let y = menuPos.y
+    const el = meta.ref.current
+    const rootMenuEl = menuRootRef.current
+    if (el && rootMenuEl) {
+      const itemRect = el.getBoundingClientRect()
+      y = itemRect.top // align directly with item
+      // If aligning causes overflow bottom, shift upward
+      const maxY = window.innerHeight - meta.approxHeight - margin
+      if (y > maxY) y = maxY
+      // Ensure not above global margin
+      if (y < margin) y = margin
+    }
+    return { x, y }
   }
 
   return (
@@ -305,14 +334,10 @@ export function TopBar() {
           <span>Canvas size…</span>
         </MenuItem>
         <MenuItem
+          ref={modeItemRef}
           onSelect={() => {
-            if (openSub === 'mode') { setOpenSub(null); return }
-            const MAIN_W = 208, SUB_W = 180, margin = 8
-            const rightX = menuPos.x + MAIN_W
-            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
-            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-            const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 4)
-            setModePos({ x, y })
+            if (openSub === 'mode') { setOpenSub(null); setSubPos(null); return }
+            setSubPos(computeSubmenuPos('mode'))
             setOpenSub('mode')
           }}
         >
@@ -320,14 +345,10 @@ export function TopBar() {
           <LuChevronRight className="ml-auto" aria-hidden />
         </MenuItem>
         <MenuItem
+          ref={importItemRef}
           onSelect={() => {
-            if (openSub === 'import') { setOpenSub(null); return }
-            const MAIN_W = 208, SUB_W = 180, margin = 8
-            const rightX = menuPos.x + MAIN_W
-            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
-            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-            const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 68)
-            setImportPos({ x, y })
+            if (openSub === 'import') { setOpenSub(null); setSubPos(null); return }
+            setSubPos(computeSubmenuPos('import'))
             setOpenSub('import')
           }}
         >
@@ -335,14 +356,10 @@ export function TopBar() {
           <LuChevronRight className="ml-auto" aria-hidden />
         </MenuItem>
         <MenuItem
+          ref={exportItemRef}
           onSelect={() => {
-            if (openSub === 'export') { setOpenSub(null); return }
-            const MAIN_W = 208, SUB_W = 180, margin = 8
-            const rightX = menuPos.x + MAIN_W
-            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
-            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-            const y = Math.min(window.innerHeight - 100 - margin, menuPos.y + 36)
-            setExportPos({ x, y })
+            if (openSub === 'export') { setOpenSub(null); setSubPos(null); return }
+            setSubPos(computeSubmenuPos('export'))
             setOpenSub('export')
           }}
         >
@@ -350,14 +367,10 @@ export function TopBar() {
           <LuChevronRight className="ml-auto" aria-hidden />
         </MenuItem>
         <MenuItem
+          ref={driveItemRef}
           onSelect={() => {
-            if (openSub === 'drive') { setOpenSub(null); return }
-            const MAIN_W = 208, SUB_W = 220, margin = 8
-            const rightX = menuPos.x + MAIN_W
-            const leftIfOverflow = Math.max(margin, menuPos.x - SUB_W)
-            const x = rightX + SUB_W + margin > window.innerWidth ? leftIfOverflow : rightX
-            const y = Math.min(window.innerHeight - 140 - margin, menuPos.y + 100)
-            setDrivePos({ x, y })
+            if (openSub === 'drive') { setOpenSub(null); setSubPos(null); return }
+            setSubPos(computeSubmenuPos('drive'))
             setOpenSub('drive')
           }}
         >
@@ -366,11 +379,11 @@ export function TopBar() {
         </MenuItem>
 
         <MenuDivider />
-        <MenuItem danger onSelect={() => { clear(); setMenuOpen(false); setOpenSub(null) }}>
+        <MenuItem danger onSelect={() => { clear(); setMenuOpen(false); setOpenSub(null); setSubPos(null) }}>
           <FaEraser aria-hidden />
           <span>Clear</span>
         </MenuItem>
-        <Menu open={!!modePos && openSub === 'mode'} x={modePos?.x ?? 0} y={modePos?.y ?? 0} menuRef={modeSubRef} minWidth={160}>
+        <Menu open={openSub === 'mode'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={modeSubRef} minWidth={SUB_MENU_META.mode.width}>
           <MenuItem onSelect={() => { setMode('truecolor'); setMenuOpen(false); setOpenSub(null) }}>
             {mode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
             <span>Truecolor</span>
@@ -380,8 +393,7 @@ export function TopBar() {
             <span>Indexed</span>
           </MenuItem>
         </Menu>
-
-        <Menu open={!!exportPos && openSub === 'export'} x={exportPos?.x ?? 0} y={exportPos?.y ?? 0} menuRef={exportSubRef} minWidth={160}>
+        <Menu open={openSub === 'export'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={exportSubRef} minWidth={SUB_MENU_META.export.width}>
           <MenuItem onSelect={() => { exportPNG(); setMenuOpen(false); setOpenSub(null) }}>
             <LuDownload aria-hidden />
             <span>PNG</span>
@@ -391,8 +403,7 @@ export function TopBar() {
             <span>Project JSON</span>
           </MenuItem>
         </Menu>
-
-        <Menu open={!!importPos && openSub === 'import'} x={importPos?.x ?? 0} y={importPos?.y ?? 0} menuRef={importSubRef} minWidth={180}>
+        <Menu open={openSub === 'import'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={importSubRef} minWidth={SUB_MENU_META.import.width}>
           <MenuItem
             onSelect={() => {
               pickAndImportPNG(importPNGFromImageData)
@@ -427,8 +438,7 @@ export function TopBar() {
             <span>Project JSON…</span>
           </MenuItem>
         </Menu>
-
-        <Menu open={!!drivePos && openSub === 'drive'} x={drivePos?.x ?? 0} y={drivePos?.y ?? 0} menuRef={driveSubRef} minWidth={224}>
+        <Menu open={openSub === 'drive'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={driveSubRef} minWidth={SUB_MENU_META.drive.width}>
           <MenuItem
             onSelect={async () => {
               setDriveError(null)

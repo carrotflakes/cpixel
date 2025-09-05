@@ -99,22 +99,18 @@ export function Menu(props: {
   )
 }
 
-export function MenuItem({
-  onSelect,
-  disabled,
-  danger,
-  children,
-}: {
+export const MenuItem = React.forwardRef<HTMLButtonElement, {
   onSelect: () => void
   disabled?: boolean
   danger?: boolean
   children: React.ReactNode
-}) {
+}>(({ onSelect, disabled, danger, children }, ref) => {
   const base = 'w-full text-left px-3 py-2 inline-flex items-center gap-2 '
   const color = danger ? 'hover:bg-red-50/70 text-red-700 ' : 'hover:bg-surface-muted '
   const dis = disabled ? 'disabled:opacity-50 ' : ''
   return (
     <button
+      ref={ref}
       role="menuitem"
       className={base + color + dis}
       onClick={() => { if (!disabled) onSelect() }}
@@ -123,7 +119,8 @@ export function MenuItem({
       {children}
     </button>
   )
-}
+})
+MenuItem.displayName = 'MenuItem'
 
 export function MenuDivider() {
   return <div className="my-1 h-px bg-border" />
