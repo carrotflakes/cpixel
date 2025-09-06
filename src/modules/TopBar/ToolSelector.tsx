@@ -35,7 +35,7 @@ export function ToolSelector() {
 
   return (
     <div className="flex items-center gap-2 ml-auto">
-      <label className="text-sm text-muted">Tool</label>
+      <label className="hidden sm:inline text-sm text-muted">Tool</label>
       <div className="inline-flex rounded border border-border overflow-hidden">
         <button
           className={`px-2 py-1 text-sm inline-flex items-center gap-1 ${tool === 'brush' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}

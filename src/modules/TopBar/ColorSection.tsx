@@ -19,7 +19,7 @@ export function ColorSection() {
   return (
     <div className="flex items-center gap-3">
       <div className="flex items-center gap-2">
-        <label className="text-sm text-muted">Color</label>
+        <label className="hidden sm:inline text-sm text-muted">Color</label>
         <ColorButton
           color={color}
           onLive={(hex) => {
