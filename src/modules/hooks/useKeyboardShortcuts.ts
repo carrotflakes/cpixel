@@ -3,7 +3,6 @@ import { usePixelStore } from '../store'
 
 export function useKeyboardShortcuts(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  panModRef: React.RefObject<boolean>,
   clearSelection: () => void,
 ) {
   const undo = usePixelStore(s => s.undo)
@@ -15,31 +14,16 @@ export function useKeyboardShortcuts(
   // beginStroke/endStroke and selectionBounds are referenced via getState when needed
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        if (!panModRef.current) {
-          panModRef.current = true
-          if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
-        }
-        e.preventDefault()
-      } else if (e.key === 'Escape') {
+      if (e.key === 'Escape') {
         clearSelection()
         e.preventDefault()
       }
     }
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        panModRef.current = false
-        if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
-        e.preventDefault()
-      }
-    }
     window.addEventListener('keydown', onKeyDown, { capture: true })
-    window.addEventListener('keyup', onKeyUp, { capture: true })
     return () => {
-      window.removeEventListener('keydown', onKeyDown as any, { capture: true } as any)
-      window.removeEventListener('keyup', onKeyUp as any, { capture: true } as any)
+      window.removeEventListener('keydown', onKeyDown)
     }
-  }, [canvasRef, panModRef, clearSelection])
+  }, [canvasRef, clearSelection])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

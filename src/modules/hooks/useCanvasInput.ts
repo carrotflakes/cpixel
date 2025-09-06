@@ -23,8 +23,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const fillBucket = usePixelStore(s => s.fillBucket)
   const beginStroke = usePixelStore(s => s.beginStroke)
   const endStroke = usePixelStore(s => s.endStroke)
-  const undo = usePixelStore(s => s.undo)
-  const redo = usePixelStore(s => s.redo)
   const layers = usePixelStore(s => s.layers)
   const mode = usePixelStore(s => s.mode)
   const palette = usePixelStore(s => s.palette)
@@ -46,41 +44,28 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null)
   const [shapePreview, setShapePreview] = useState<ShapePreview>({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
 
-  const panModRef = useRef(false)
   const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
+  const touchState = useRef<{
+    pointers: { id: number; startX: number; startY: number }[]
+    lastDist?: number
+    lastCenter?: { x: number; y: number }
+    // when true we are in a multi-touch gesture and should suppress drawing
+    multiGesture: boolean
+    _pts: { [id: number]: { x: number; y: number } }
+    // multi-finger tap detection
+    gestureStartTime: number
+    gestureMoved: boolean
+    maxPointers: number
+  }>({ pointers: [], multiGesture: false, _pts: {}, maxPointers: 0, gestureStartTime: 0, gestureMoved: false })
   const mouseStroke = useRef<{ lastX?: number; lastY?: number; active: boolean; erase: boolean }>({ active: false, erase: false })
   const selectionDrag = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
   const rectSelecting = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
   const lassoPath = useRef<{ x: number; y: number }[] | null>(null)
-  const touches = useRef<{
-    id1?: number
-    id2?: number
-    lastDist?: number
-    lastX?: number
-    lastY?: number
-    isDrawing?: boolean
-    startX?: number
-    startY?: number
-    startTime?: number
-    timer?: number
-    lastPixX?: number
-    lastPixY?: number
-    multi?: boolean
-    // multi-tap detection (2 or 3 finger quick tap)
-    multiCount?: number
-    multiTapStart?: number
-    multiTapMoved?: boolean
-    multiStartCenterX?: number
-    multiStartCenterY?: number
-    multiStartDist?: number // for 2-finger tap movement/scale tolerance
-    selDragging?: boolean
-    selStartX?: number
-    selStartY?: number
-    selRect?: boolean
-    lasso?: boolean
-  }>({})
+  const state = useRef<null | "firstTouch" | "pinch" | "tool">(null)
+  const firstTouch = useRef<{ x: number; y: number; clientX: number; clientY: number; button: number; shiftKey: boolean; ctrlKey: boolean } | null>(null)
+  const toolPointerId = useRef<number | null>(null)
 
-  useKeyboardShortcuts(canvasRef, panModRef, clearSelection)
+  useKeyboardShortcuts(canvasRef, clearSelection)
   useCanvasPanZoom(canvasRef, view, setView, W, H)
 
   // Helpers
@@ -91,16 +76,19 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     return { x, y }
   }
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
-  const rgbaFor = (erase: boolean) => (erase ? 0x00000000 : parseCSSColor(color))
   const paintFor = (erase: boolean) => (
     mode === 'indexed'
       ? (erase ? transparentIndex : currentPaletteIndex) ?? 0
-      : rgbaFor(erase)
+      : erase ? 0x00000000 : parseCSSColor(color)
   )
   const isShapeTool = () => tool === 'line' || tool === 'rect'
   const isSelectionTool = () => tool === 'select-rect' || tool === 'select-lasso'
+  const isBrushishTool = () => tool === 'brush' || tool === 'eraser'
   const isBucketTool = () => tool === 'bucket'
   const updateHover = (x: number, y: number) => {
+    if (touchState.current.multiGesture) return
+    if (!inBounds(x, y)) { setHoverCell(null); setHoverInfo(undefined); return }
+    setHoverCell({ x, y })
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
     const idx = mode === 'indexed' ? findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
     setHoverInfo({ x, y, rgba: hov, index: idx })
@@ -125,512 +113,376 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     endStroke()
   }
   const startBrushAt = (x: number, y: number, erase: boolean) => {
-    mouseStroke.current.active = true
-    mouseStroke.current.erase = erase
-    mouseStroke.current.lastX = x
-    mouseStroke.current.lastY = y
+    mouseStroke.current = { active: true, erase, lastX: x, lastY: y }
     setAt(x, y, paintFor(erase))
   }
   const endBrush = () => {
-    mouseStroke.current.active = false
-    mouseStroke.current.lastX = undefined
-    mouseStroke.current.lastY = undefined
+    mouseStroke.current = { active: false, erase: false }
+  }
+  const addPointer = (id: number, x: number, y: number) => {
+    if (!touchState.current.pointers.some(p => p.id === id))
+      touchState.current.pointers.push({ id, startX: x, startY: y })
+  }
+
+  const startTool = (x: number, y: number, e: { button: number, shiftKey: boolean }) => {
+    if (!inBounds(x, y)) return false
+    if (isSelectionTool()) {
+      // drag move if inside selection, else start creating
+      if (selectionMask && pointInSelection(x, y)) {
+        beginStroke()
+        beginSelectionDrag()
+        selectionDrag.current = { active: true, startX: x, startY: y }
+        return true
+      }
+      if (tool === 'select-rect') {
+        rectSelecting.current = { active: true, startX: x, startY: y }
+        setSelectionRect(x, y, x, y)
+        return true
+      } else if (tool === 'select-lasso') {
+        lassoPath.current = [{ x, y }]
+        const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
+        setSelectionMask(mask, bounds)
+        return true
+      }
+    }
+    if (isShapeTool()) {
+      startShapeAt(x, y)
+      return true
+    }
+
+    if (e.button === -1 || e.button === 0 || e.button === 2) {
+      beginStroke()
+      const erase = e.button === -1 || e.button === 0 ? tool === 'eraser' : true
+      const contiguous = !e.shiftKey
+      if (isBucketTool()) {
+        fillBucket(x, y, paintFor(erase), contiguous)
+      } else if (isBrushishTool()) {
+        startBrushAt(x, y, erase)
+      }
+    }
   }
 
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.pointerType === 'touch') return
-    // If this were a touch-derived PointerEvent with multiple contacts, bail
-    if ((e as any).isPrimary === false) return
+    if (touchState.current.multiGesture) return
+
     const { x, y } = pickPoint(e.clientX, e.clientY)
-    if (!inBounds(x, y)) { setHoverCell(null); setHoverInfo(undefined); return }
-    setHoverCell({ x, y })
-    updateHover(x, y)
+
     // Selection tools: only hover/update, do not paint via move
     if (isSelectionTool()) return
     if (e.altKey) {
+      // Pick color from canvas
       const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
-      // also set hover info with index when picking via Alt
       const idx = mode === 'indexed' ? findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) : undefined
       setHoverInfo({ x, y, rgba, index: idx })
       setColor(rgbaToCSSHex(rgba))
       e.preventDefault();
       return
     }
-    if (!isBucketTool()) {
-      const left = (e.buttons & 1) !== 0
-      const right = (e.buttons & 2) !== 0
-      const pressed = left || right
-      if (pressed) {
-        const erase = tool === 'eraser' ? left || right : right
+    if (isBucketTool()) return
+
+    if (mouseStroke.current.active) {
+      const erase = mouseStroke.current.erase
+      if (mouseStroke.current.erase !== erase) {
+        startBrushAt(x, y, erase)
+      } else if (mouseStroke.current.lastX !== undefined && mouseStroke.current.lastY !== undefined) {
         const rgba = paintFor(erase)
-        if (!mouseStroke.current.active) {
-          // seed first pixel
-          startBrushAt(x, y, erase)
-        } else {
-          // if erase mode changed mid-stroke, reset seed
-          if (mouseStroke.current.erase !== erase) {
-            startBrushAt(x, y, erase)
-          } else if (mouseStroke.current.lastX !== undefined && mouseStroke.current.lastY !== undefined) {
-            usePixelStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, rgba)
-            mouseStroke.current.lastX = x
-            mouseStroke.current.lastY = y
-          }
-        }
-      } else {
-        // button released
-        endBrush()
+        usePixelStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, rgba)
+        mouseStroke.current.lastX = x
+        mouseStroke.current.lastY = y
       }
     }
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.pointerType === 'touch') return
-    const wantPan = e.button === 1 || (e.button === 0 && (panModRef.current || e.ctrlKey))
-    if (wantPan) {
-      dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
-        ; (e.target as HTMLElement).setPointerCapture(e.pointerId)
-      if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
-      e.preventDefault()
-      return
-    }
+    if (e.target instanceof HTMLElement) e.target.setPointerCapture(e.pointerId)
+
     const { x, y } = pickPoint(e.clientX, e.clientY)
-    if (inBounds(x, y)) {
-      if (isSelectionTool()) {
-        // drag move if inside selection, else start creating
-        if (selectionMask && pointInSelection(x, y)) {
-          beginStroke()
-          beginSelectionDrag()
-          selectionDrag.current = { active: true, startX: x, startY: y }
-          e.preventDefault()
-          return
-        }
-        if (tool === 'select-rect') {
-          rectSelecting.current = { active: true, startX: x, startY: y }
-          setSelectionRect(x, y, x, y)
-          e.preventDefault()
-          return
-        } else if (tool === 'select-lasso') {
-          lassoPath.current = [{ x, y }]
-          const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
-          setSelectionMask(mask, bounds)
-          e.preventDefault()
-          return
-        }
-      }
-      if (isShapeTool()) {
-        startShapeAt(x, y)
-      } else {
-        if (e.button === 0 || e.button === 2) beginStroke()
-        const contiguous = !e.shiftKey
-        if (e.button === 0) {
-          if (isBucketTool()) { fillBucket(x, y, paintFor(tool === 'eraser'), contiguous) }
-          else {
-            // start mouse stroke drawing
-            startBrushAt(x, y, tool === 'eraser')
+
+    if (touchState.current.pointers.length === 0)
+      updateHover(x, y)
+
+    switch (state.current) {
+      case null:
+        if (e.pointerType === 'touch') {
+          state.current = 'firstTouch'
+
+          addPointer(e.pointerId, x, y)
+
+          firstTouch.current = { x, y, clientX: e.clientX, clientY: e.clientY, button: e.button, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey }
+        } else {
+          state.current = 'tool'
+          toolPointerId.current = e.pointerId
+
+          const wantPan = e.button === 1 || (e.button === 0 && e.ctrlKey)
+          if (wantPan) {
+            dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
+            if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
+            e.preventDefault()
+            return
           }
-        } else if (e.button === 2) {
-          if (isBucketTool()) { fillBucket(x, y, paintFor(true), contiguous) }
-          else {
-            startBrushAt(x, y, true)
+
+          if (startTool(x, y, e)) {
+            e.preventDefault()
+            return
+          }
+          onPointer(e)
+        }
+        return
+      case "pinch":
+        if (e.pointerType === 'touch') {
+          addPointer(e.pointerId, x, y)
+          touchState.current.maxPointers = Math.max(touchState.current.maxPointers, touchState.current.pointers.length)
+        }
+        return
+      case "firstTouch":
+        if (e.pointerType === 'touch') {
+          addPointer(e.pointerId, x, y)
+          if (touchState.current.pointers.length === 2) {
+            state.current = "pinch"
+
+            // initialize pinch
+            touchState.current.multiGesture = true
+            touchState.current.lastDist = undefined
+            touchState.current.lastCenter = undefined
+            // initialize potential multi-finger tap
+            touchState.current.gestureStartTime = performance.now()
+            touchState.current.gestureMoved = false
+            touchState.current.maxPointers = 2
           }
         }
-      }
+        return
+      case "tool":
+        // Noop
+        return
     }
-    onPointer(e)
   }
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.pointerType === 'touch') return
-    // Selection drag/create
-    if (selectionDrag.current.active) {
-      const { x, y } = pickPoint(e.clientX, e.clientY)
-      setSelectionOffset(x - selectionDrag.current.startX, y - selectionDrag.current.startY)
-      e.preventDefault()
-      return
-    }
-    if (rectSelecting.current.active && tool === 'select-rect') {
-      const { x, y } = pickPoint(e.clientX, e.clientY)
-      setSelectionRect(rectSelecting.current.startX, rectSelecting.current.startY, x, y)
-      e.preventDefault()
-      return
-    }
-    if (lassoPath.current && tool === 'select-lasso') {
-      const { x, y } = pickPoint(e.clientX, e.clientY)
-      const last = lassoPath.current[lassoPath.current.length - 1]
-      if (!last || last.x !== x || last.y !== y) {
-        lassoPath.current.push({ x, y })
-        const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
-        setSelectionMask(mask, bounds)
-      }
-      e.preventDefault()
-      return
-    }
-    if (dragState.current.panning) {
-      const dx = e.clientX - dragState.current.lastX
-      const dy = e.clientY - dragState.current.lastY
-      dragState.current.lastX = e.clientX
-      dragState.current.lastY = e.clientY
-      const rect = canvasRef.current!.getBoundingClientRect()
-      const vw = rect.width
-      const vh = rect.height
-      const cw = W * view.scale
-      const ch = H * view.scale
-      let nvx = view.x + dx
-      let nvy = view.y + dy
-        ; ({ vx: nvx, vy: nvy } = clampViewToBounds(nvx, nvy, vw, vh, cw, ch))
-      setView(Math.round(nvx), Math.round(nvy), view.scale)
-      e.preventDefault()
-      return
-    }
-    if (shapePreview.kind) {
-      const { x, y } = pickPoint(e.clientX, e.clientY)
-      updateShapeTo(x, y)
-      return
-    }
-    onPointer(e)
-  }
+    const { x, y } = pickPoint(e.clientX, e.clientY)
 
-  const onPointerUp = (e?: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e && e.pointerType === 'touch') return
-    dragState.current.panning = false
-    if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
-    if (selectionDrag.current.active) {
-      commitSelectionMove()
-      endStroke()
-      selectionDrag.current.active = false
-      return
-    }
-    if (rectSelecting.current.active) {
-      rectSelecting.current.active = false
-      return
-    }
-    if (lassoPath.current) {
-      const pts = lassoPath.current
-      const { mask, bounds } = polygonToMask(W, H, pts)
-      setSelectionMask(mask, bounds)
-      lassoPath.current = null
-      return
-    }
-    if (shapePreview.kind) {
-      commitShape(tool === 'eraser')
-      return
-    }
-    endStroke()
-    endBrush()
-  }
+    if (touchState.current.pointers.length <= 1)
+      updateHover(x, y)
 
-  const onPointerLeave = () => { setHoverCell(null); setHoverInfo(undefined) }
+    switch (state.current) {
+      case null:
+        return
+      case "firstTouch":
+        const f = firstTouch.current
+        if (f) {
+          firstTouch.current = null
+          state.current = 'tool'
+          toolPointerId.current = e.pointerId
 
-  // Touch handlers
-  const TOUCH_HOLD_MS = 150
-  const TOUCH_MOVE_PX = 8
-  const MULTI_TAP_MS = 250 // max duration for multi-finger tap
-  const MULTI_TAP_MOVE_PX = 10 // movement tolerance (in CSS px)
-  const getTouchById = (e: React.TouchEvent, id?: number) => Array.from(e.touches).find(t => t.identifier === id)
-  const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by)
+          const wantPan = f.button === 1 || (f.button === 0 && f.ctrlKey)
+          if (wantPan) {
+            dragState.current = { lastX: f.clientX, lastY: f.clientY, panning: true }
+            if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
+            e.preventDefault()
+            return
+          }
 
-  const onTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (e.touches.length === 1) {
-      // ignore if already in multi-touch gesture
-      if (touches.current.multi) return
-      const t = e.touches[0]
-      if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
-      touches.current.isDrawing = false
-      touches.current.multi = false
-      touches.current.startX = t.clientX
-      touches.current.startY = t.clientY
-      touches.current.startTime = performance.now()
-      touches.current.lastPixX = undefined
-      touches.current.lastPixY = undefined
+          if (startTool(f.x, f.y, e)) {
+            e.preventDefault()
+            return
+          }
+          onPointer(e)
+        }
+        return
+      case "pinch":
+        // Handle pinch zoom (two touch pointers) or single finger pan when in multiGesture
+        if (e.pointerType === 'touch' && touchState.current.multiGesture) {
+          const canvas = canvasRef.current
+          if (!canvas) return
+          touchState.current._pts[e.pointerId] = { x: e.clientX, y: e.clientY }
 
-      // Selection tools (touch): start drag or creation immediately
-      if (isSelectionTool()) {
-        const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (inBounds(x, y)) {
-          if (selectionMask && pointInSelection(x, y)) {
-            beginStroke()
-            beginSelectionDrag()
-            touches.current.selDragging = true
-            touches.current.selStartX = x
-            touches.current.selStartY = y
-          } else if (tool === 'select-rect') {
-            touches.current.selRect = true
-            touches.current.selStartX = x
-            touches.current.selStartY = y
-            setSelectionRect(x, y, x, y)
-          } else if (tool === 'select-lasso') {
-            touches.current.lasso = true
-            lassoPath.current = [{ x, y }]
+          const pointers = touchState.current.pointers
+          if (pointers.length >= 2) {
+            const p1 = touchState.current._pts[pointers[0].id]
+            const p2 = touchState.current._pts[pointers[1].id]
+            if (p1 && p2) {
+              const cx = (p1.x + p2.x) / 2
+              const cy = (p1.y + p2.y) / 2
+              const dx = p1.x - p2.x
+              const dy = p1.y - p2.y
+              const dist = Math.hypot(dx, dy)
+              const rect = canvas.getBoundingClientRect()
+              if (touchState.current.lastDist === undefined) {
+                touchState.current.lastDist = dist
+                touchState.current.lastCenter = { x: cx, y: cy }
+              } else {
+                const k = dist / (touchState.current.lastDist ?? dist)
+                const nextSize = clamp(view.scale * k, MIN_SIZE, MAX_SIZE)
+                const ratio = nextSize / view.scale
+                const lastC = touchState.current.lastCenter ?? { x: cx, y: cy }
+                const moveCx = cx - lastC.x
+                const moveCy = cy - lastC.y
+                const Cx = cx - rect.left
+                const Cy = cy - rect.top
+                const nvx = view.x + moveCx
+                const nvy = view.y + moveCy
+                const newVX = nvx - (Cx - nvx) * (ratio - 1)
+                const newVY = nvy - (Cy - nvy) * (ratio - 1)
+                const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
+                setView(Math.round(cvx), Math.round(cvy), nextSize)
+                touchState.current.lastDist = dist
+                touchState.current.lastCenter = { x: cx, y: cy }
+              }
+            }
+          }
+          e.preventDefault()
+        }
+        return
+      case "tool":
+        if (e.pointerId !== toolPointerId.current) return
+
+        // Selection drag/create
+        if (selectionDrag.current.active) {
+          setSelectionOffset(x - selectionDrag.current.startX, y - selectionDrag.current.startY)
+          e.preventDefault()
+          return
+        }
+        if (rectSelecting.current.active) {
+          setSelectionRect(rectSelecting.current.startX, rectSelecting.current.startY, x, y)
+          e.preventDefault()
+          return
+        }
+        if (lassoPath.current) {
+          const last = lassoPath.current[lassoPath.current.length - 1]
+          if (!last || last.x !== x || last.y !== y) {
+            lassoPath.current.push({ x, y })
             const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
             setSelectionMask(mask, bounds)
           }
           e.preventDefault()
           return
         }
-      }
-
-      // Touch: begin shape drawing immediately for line/rect
-      if (isShapeTool()) {
-        const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (inBounds(x, y)) {
-          startShapeAt(x, y)
+        if (dragState.current.panning) {
+          const dx = e.clientX - dragState.current.lastX
+          const dy = e.clientY - dragState.current.lastY
+          dragState.current.lastX = e.clientX
+          dragState.current.lastY = e.clientY
+          const rect = canvasRef.current!.getBoundingClientRect()
+          const vw = rect.width
+          const vh = rect.height
+          const cw = W * view.scale
+          const ch = H * view.scale
+          const nvx = view.x + dx
+          const nvy = view.y + dy
+          const clamped = clampViewToBounds(nvx, nvy, vw, vh, cw, ch)
+          setView(Math.round(clamped.vx), Math.round(clamped.vy), view.scale)
+          e.preventDefault()
+          return
         }
-        e.preventDefault()
+        if (shapePreview.kind) {
+          updateShapeTo(x, y)
+          return
+        }
+        onPointer(e)
         return
-      }
-      touches.current.timer = window.setTimeout(() => {
-        if (touches.current.isDrawing) return
-        if (touches.current.multi) return
-        const { x, y } = pickPoint(touches.current.startX!, touches.current.startY!)
-        if (inBounds(x, y)) {
-          beginStroke()
-          if (isBucketTool()) {
-            fillBucket(x, y, paintFor(tool === 'eraser'), true)
-            endStroke()
-          } else {
-            touches.current.isDrawing = true
-            setAt(x, y, paintFor(tool === 'eraser'))
-            touches.current.lastPixX = x
-            touches.current.lastPixY = y
-          }
-        }
-      }, TOUCH_HOLD_MS)
-    } else if (e.touches.length === 2) {
-      if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
-      // if a single-finger stroke was active, end it before switching to gesture
-      if (touches.current.isDrawing) {
-        endStroke()
-      }
-      touches.current.isDrawing = false
-      touches.current.multi = true
-      // mark as potential 2-finger tap
-      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
-      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2
-      touches.current.multiCount = 2
-      touches.current.multiTapStart = performance.now()
-      touches.current.multiTapMoved = false
-      touches.current.multiStartCenterX = cx
-      touches.current.multiStartCenterY = cy
-      touches.current = { ...touches.current, id1: e.touches[0].identifier, id2: e.touches[1].identifier }
-      touches.current.lastDist = dist(e.touches[0].clientX, e.touches[0].clientY, e.touches[1].clientX, e.touches[1].clientY)
-      touches.current.lastX = (e.touches[0].clientX + e.touches[1].clientX) / 2
-      touches.current.lastY = (e.touches[0].clientY + e.touches[1].clientY) / 2
-      e.preventDefault()
-    } else if (e.touches.length === 3) {
-      // Potential 3-finger tap for redo. We don't support 3-finger gestures otherwise.
-      if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
-      if (touches.current.isDrawing) endStroke()
-      touches.current.isDrawing = false
-      touches.current.multi = true
-      touches.current.multiCount = 3
-      touches.current.multiTapStart = performance.now()
-      touches.current.multiTapMoved = false
-      // store center to check movement
-      const t0 = e.touches[0], t1 = e.touches[1], t2 = e.touches[2]
-      const cx = (t0.clientX + t1.clientX + t2.clientX) / 3
-      const cy = (t0.clientY + t1.clientY + t2.clientY) / 3
-      touches.current.multiStartCenterX = cx
-      touches.current.multiStartCenterY = cy
-      e.preventDefault()
     }
   }
 
-  const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    // Selection interactions on touch
-    if (isSelectionTool() && e.touches.length === 1) {
-      const t = e.touches[0]
-      const { x, y } = pickPoint(t.clientX, t.clientY)
-      if (touches.current.selDragging && touches.current.selStartX !== undefined && touches.current.selStartY !== undefined) {
-        setSelectionOffset(x - touches.current.selStartX, y - touches.current.selStartY)
-        e.preventDefault()
-        return
-      }
-      if (touches.current.selRect && touches.current.selStartX !== undefined && touches.current.selStartY !== undefined) {
-        setSelectionRect(touches.current.selStartX, touches.current.selStartY, x, y)
-        e.preventDefault()
-        return
-      }
-      if (touches.current.lasso && lassoPath.current) {
-        const last = lassoPath.current[lassoPath.current.length - 1]
-        if (!last || last.x !== x || last.y !== y) {
-          lassoPath.current.push({ x, y })
-          const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
-          setSelectionMask(mask, bounds)
-        }
-        e.preventDefault()
-        return
-      }
-    }
-    // If shaping (line/rect), update preview and skip brush logic
-    if (shapePreview.kind && e.touches.length === 1) {
-      const t = e.touches[0]
-      const { x, y } = pickPoint(t.clientX, t.clientY)
-      updateShapeTo(x, y)
-      e.preventDefault()
-      return
-    }
-    if (e.touches.length === 1 && touches.current.id1 === undefined) {
-      // For bucket tool, do not start brush strokes on move; also cancel any hold timer
-      if (isBucketTool()) {
-        if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
-        return
-      }
-      if (touches.current.multi) return
-      const t = e.touches[0]
-      const dx0 = (touches.current.startX ?? t.clientX) - t.clientX
-      const dy0 = (touches.current.startY ?? t.clientY) - t.clientY
-      const moved = Math.hypot(dx0, dy0)
-      if (!touches.current.isDrawing && moved >= TOUCH_MOVE_PX) {
-        touches.current.isDrawing = true
-        beginStroke()
-        if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
-      }
-      if (touches.current.isDrawing) {
-        const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (inBounds(x, y)) {
-          const rgba = paintFor(tool === 'eraser')
-          const lx = touches.current.lastPixX
-          const ly = touches.current.lastPixY
-          if (lx === undefined || ly === undefined) {
-            setAt(x, y, paintFor(tool === 'eraser'))
-          } else if (lx !== x || ly !== y) {
-            usePixelStore.getState().drawLine(lx, ly, x, y, rgba)
-          }
-          touches.current.lastPixX = x
-          touches.current.lastPixY = y
-        }
-        e.preventDefault()
-      }
-      return
-    }
-    // 3-finger movement: if moved too much, cancel multi-tap candidate
-    if (e.touches.length === 3 && touches.current.multiCount === 3 && touches.current.multiStartCenterX !== undefined && touches.current.multiStartCenterY !== undefined) {
-      const t0 = e.touches[0], t1m = e.touches[1], t2m = e.touches[2]
-      const cx = (t0.clientX + t1m.clientX + t2m.clientX) / 3
-      const cy = (t0.clientY + t1m.clientY + t2m.clientY) / 3
-      const move = Math.hypot(cx - touches.current.multiStartCenterX, cy - touches.current.multiStartCenterY)
-      if (move > MULTI_TAP_MOVE_PX) touches.current.multiTapMoved = true
-      // Do not apply any action on move for 3 fingers; just prevent default to avoid browser gestures
-      e.preventDefault()
-      return
-    }
-    const t1 = getTouchById(e, touches.current.id1)
-    const t2 = getTouchById(e, touches.current.id2)
-    if (t1 && t2 && touches.current.lastDist && touches.current.lastX !== undefined && touches.current.lastY !== undefined) {
-      touches.current.multi = true
-      const cx = (t1.clientX + t2.clientX) / 2
-      const cy = (t1.clientY + t2.clientY) / 2
-      const d = dist(t1.clientX, t1.clientY, t2.clientX, t2.clientY)
-      const rect = canvasRef.current!.getBoundingClientRect()
-      const Cx = cx - rect.left
-      const Cy = cy - rect.top
-      const dx = cx - touches.current.lastX
-      const dy = cy - touches.current.lastY
-      const k = d / touches.current.lastDist
-      // If this was a potential 2-finger tap, cancel it on movement/scale over tolerance
-      if (touches.current.multiCount === 2 && touches.current.multiTapStart !== undefined) {
-        const movedCenter = Math.hypot(
-          (cx - (touches.current.multiStartCenterX ?? cx)),
-          (cy - (touches.current.multiStartCenterY ?? cy))
-        )
-        if (movedCenter > MULTI_TAP_MOVE_PX || Math.abs(k - 1) > 0.05) {
-          touches.current.multiTapMoved = true
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === 'touch') {
+      const pointer = touchState.current.pointers.find(p => p.id === e.pointerId)
+      if (pointer) {
+        const { x, y } = pickPoint(e.clientX, e.clientY)
+        if (Math.hypot(pointer.startX - x, pointer.startY - y) > 10) {
+          touchState.current.gestureMoved = true
         }
       }
-      const nextSize = clamp(view.scale * k, MIN_SIZE, MAX_SIZE)
-      const ratio = nextSize / view.scale
+      touchState.current.pointers = touchState.current.pointers.filter(p => p.id !== e.pointerId)
+      if (touchState.current.pointers.length < 2) {
+        touchState.current.multiGesture = false
+        touchState.current.lastDist = undefined
+        touchState.current.lastCenter = undefined
+      }
+    }
 
-      const v1x = view.x + dx
-      const v1y = view.y + dy
-      const newVX = v1x - (Cx - v1x) * (ratio - 1)
-      const newVY = v1y - (Cy - v1y) * (ratio - 1)
-      const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
-      setView(Math.round(cvx), Math.round(cvy), nextSize)
-      touches.current.lastDist = d
-      touches.current.lastX = cx
-      touches.current.lastY = cy
-      e.preventDefault()
-    }
-  }
-
-  const onTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    // Selection end handling
-    if (isSelectionTool()) {
-      let handledSelection = false
-      if (touches.current.selDragging) {
+    const endTool = () => {
+      dragState.current.panning = false
+      if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
+      if (selectionDrag.current.active) {
         commitSelectionMove()
         endStroke()
-        handledSelection = true
-      }
-      if (touches.current.lasso && lassoPath.current) {
-        const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
-        setSelectionMask(mask, bounds)
-        handledSelection = true
-      }
-      if (handledSelection) {
-        touches.current.selDragging = false
-        touches.current.selRect = false
-        touches.current.lasso = false
-        lassoPath.current = null
-        touches.current = {}
+        selectionDrag.current.active = false
         return
       }
-      // If no active selection gesture, fall through to allow multi-tap (undo/redo)
+      if (rectSelecting.current.active) {
+        rectSelecting.current.active = false
+        return
+      }
+      if (lassoPath.current) {
+        const pts = lassoPath.current
+        const { mask, bounds } = polygonToMask(W, H, pts)
+        setSelectionMask(mask, bounds)
+        lassoPath.current = null
+        return
+      }
+      if (shapePreview.kind) {
+        commitShape()
+        return
+      }
+      endStroke()
+      endBrush()
     }
-    // If a shape is active, commit it first and exit to avoid brush single-tap
-    if (shapePreview.kind) {
-      commitShape(false)
-      touches.current = {}
-      return
-    }
-    if (e.touches.length === 0) {
-      // Multi-finger tap gestures (undo/redo) when nothing else consumed the gesture
-      if (touches.current.multi && (touches.current.multiCount === 2 || touches.current.multiCount === 3)) {
-        const dur = touches.current.multiTapStart ? (performance.now() - touches.current.multiTapStart) : Infinity
-        const valid = dur <= MULTI_TAP_MS && !touches.current.multiTapMoved
-        if (valid) {
-          if (touches.current.multiCount === 2) {
-            undo()
-            touches.current = {}
-            return
-          } else if (touches.current.multiCount === 3) {
-            redo()
-            touches.current = {}
+
+    switch (state.current) {
+      case null:
+        console.warn("PointerUp in null state")
+        return
+      case "firstTouch":
+        state.current = null
+
+        const f = firstTouch.current
+        if (f) {
+          firstTouch.current = null
+
+          const wantPan = f.button === 1 || (f.button === 0 && f.ctrlKey)
+          if (wantPan) {
+            dragState.current = { lastX: f.clientX, lastY: f.clientY, panning: true }
+            if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
+            e.preventDefault()
             return
           }
-        }
-      }
-      if (touches.current.timer) { clearTimeout(touches.current.timer); touches.current.timer = undefined }
-      if (!touches.current.multi && !touches.current.isDrawing) {
-        const t = e.changedTouches[0]
-        const { x, y } = pickPoint(t.clientX, t.clientY)
-        if (inBounds(x, y)) {
-          beginStroke()
-          if (isBucketTool()) {
-            fillBucket(x, y, paintFor(tool === 'eraser'), true)
-          } else {
-            setAt(x, y, paintFor(tool === 'eraser'))
+
+          if (startTool(f.x, f.y, e)) {
+            e.preventDefault()
+            return
           }
-          endStroke()
+          onPointer(e)
+
+          endTool()
         }
-      }
-      if (touches.current.isDrawing) endStroke()
-      touches.current = {}
+        return
+      case "pinch":
+        if (touchState.current.pointers.length === 0) {
+          // evaluate multi-finger tap (undo/redo) if gesture ended quickly & without movement
+          const duration = (performance.now() - (touchState.current.gestureStartTime))
+          if (!touchState.current.gestureMoved && duration < 200) {
+            const fingers = touchState.current.maxPointers
+            if (fingers === 2) {
+              usePixelStore.getState().undo()
+            } else if (fingers === 3) {
+              usePixelStore.getState().redo()
+            }
+          }
+          state.current = null
+        }
+        return
+      case "tool":
+        if (e.pointerId !== toolPointerId.current) return
+
+        state.current = null
+
+        endTool()
+        return
     }
   }
 
-  const interactionActive =
-    mouseStroke.current.active ||
-    dragState.current.panning ||
-    selectionDrag.current.active ||
-    rectSelecting.current.active ||
-    lassoPath.current ||
-    shapePreview.kind !== null ||
-    touches.current.isDrawing ||
-    touches.current.multi ||
-    touches.current.selDragging ||
-    touches.current.selRect ||
-    touches.current.lasso;
+  const onPointerLeave = () => { setHoverCell(null); setHoverInfo(undefined) }
+
+  const interactionActive = state.current !== null;
 
   return {
     hoverCell,
@@ -639,9 +491,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     onPointerMove,
     onPointerUp,
     onPointerLeave,
-    onTouchStart,
-    onTouchMove,
-    onTouchEnd,
     interactionActive,
   }
 }
