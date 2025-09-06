@@ -10,7 +10,7 @@ export function App() {
       <div className="bg-surface border-b border-border">
         <TopBar />
       </div>
-      <div className="grow min-h-0 bg-surface-muted">
+      <div className="grow relative min-h-0 bg-surface-muted">
         <PixelCanvas />
         <LayersPanel />
       </div>

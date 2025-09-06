@@ -18,7 +18,7 @@ export function LayersPanel() {
 
   if (collapsed) {
     return (
-    <div className="absolute right-2 top-14 z-[500] rounded-md border border-border bg-elevated/90 backdrop-blur shadow">
+    <div className="absolute right-2 top-2 z-[500] rounded-md border border-border bg-elevated/90 backdrop-blur shadow">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border" onClick={() => setCollapsed(!collapsed)}>
         <div className="text-xs font-medium text-muted">Layers</div>
       </div>
@@ -27,7 +27,7 @@ export function LayersPanel() {
   }
 
   return (
-    <div className="absolute right-2 top-14 z-[500] w-56 rounded-md border border-border bg-elevated/90 backdrop-blur shadow">
+    <div className="absolute right-2 top-2 z-[500] w-56 rounded-md border border-border bg-elevated/90 backdrop-blur shadow">
       <div className="flex items-center justify-between px-2 py-1 border-b border-border">
         <div className="text-xs font-medium text-muted" onClick={() => setCollapsed(!collapsed)}>Layers</div>
         <div className="flex items-center gap-1">

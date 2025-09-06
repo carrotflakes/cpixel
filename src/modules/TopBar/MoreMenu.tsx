@@ -3,7 +3,7 @@ import { usePixelStore } from '../store'
 import { Menu, MenuItem, MenuDivider } from '../ui/ContextMenu'
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
 import { SettingsDialog } from '../SettingsDialog'
-import { FaEraser } from 'react-icons/fa'
+import { FaEllipsisV, FaEraser } from 'react-icons/fa'
 import { LuDownload, LuChevronRight, LuCheck } from 'react-icons/lu'
 import { GoogleDrive } from '../utils/googleDrive'
 
@@ -119,6 +119,7 @@ export function MoreMenu() {
         aria-expanded={menuOpen}
         title="More"
       >
+        <FaEllipsisV aria-hidden />
         <span className="hidden sm:inline">More</span>
       </button>
       <Menu open={menuOpen} x={menuPos.x} y={menuPos.y} menuRef={menuRootRef} minWidth={208}>
