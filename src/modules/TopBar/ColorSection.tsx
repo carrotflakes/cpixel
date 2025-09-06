@@ -1,15 +1,20 @@
 import { usePixelStore } from '../store'
 import { ColorPicker, useColorPopover } from '../ColorPicker'
-import { parseCSSColor } from '../utils/color'
+import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 
 export function ColorSection() {
   const color = usePixelStore(s => s.color)
   const setColor = usePixelStore(s => s.setColor)
-  const pushRecentColor = usePixelStore(s => s.pushRecentColor)
+  const setColorIndex = usePixelStore(s => s.setColorIndex)
   const setPaletteColor = usePixelStore(s => s.setPaletteColor)
   const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
   const mode = usePixelStore(s => s.mode)
-  const recentColors = usePixelStore(s => s.recentColors)
+  const recentIndexed = usePixelStore(s => s.recentColorsIndexed)
+  const recentTrue = usePixelStore(s => s.recentColorsTruecolor)
+  const palette = usePixelStore(s => s.palette)
+  const recentColors = mode === 'indexed'
+    ? recentIndexed.map(i => rgbaToCSSHex((palette[i] ?? 0x00000000)))
+    : recentTrue
 
   return (
     <div className="flex items-center gap-3">
@@ -29,26 +34,23 @@ export function ColorSection() {
               setPaletteColor(currentPaletteIndex, parseCSSColor(hex))
             } else {
               setColor(hex)
-              pushRecentColor()
             }
           }}
         />
       </div>
       {recentColors?.length > 0 && (
         <div className="flex items-center gap-1" aria-label="Recent colors">
-          {recentColors.slice(0, 8).map((c) => (
+          {recentColors.slice(0, 8).map((c, idx) => (
             <button
-              key={c}
+              key={mode === 'indexed' ? `${recentIndexed[idx]}` : c}
               className="h-5 w-5 rounded border border-border/60 hover:border-border focus:outline-none"
               style={{ background: c }}
-              title={c}
+              title={mode === 'indexed' ? `Palette index ${recentIndexed[idx]}` : c}
               onClick={() => {
                 if (mode === 'indexed' && currentPaletteIndex !== undefined) {
-                  // In indexed mode, picking a recent color attempts to map to nearest palette index via setColor
-                  setColor(c)
+                  setColorIndex(recentIndexed[idx])
                 } else {
                   setColor(c)
-                  pushRecentColor()
                 }
               }}
             />

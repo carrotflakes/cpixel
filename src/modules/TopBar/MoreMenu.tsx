@@ -45,7 +45,7 @@ export function MoreMenu() {
   const [driveFileId, setDriveFileId] = useState<string | undefined>(undefined)
   const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (window as any).VITE_GOOGLE_CLIENT_ID
 
-  useEffect(() => { GoogleDrive.init(clientId).catch(() => {}) }, [clientId])
+  useEffect(() => { GoogleDrive.init(clientId).catch(() => { }) }, [clientId])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -246,7 +246,7 @@ export function MoreMenu() {
         <DriveSaveDialog
           busy={driveBusy}
           filename={driveFilename}
-            setFilename={setDriveFilename}
+          setFilename={setDriveFilename}
           error={driveError}
           onClose={() => setDriveOpen(null)}
           onSave={async () => {
@@ -308,7 +308,7 @@ function pickAndImportPNG(onComplete: (img: ImageData) => void) {
 }
 
 async function saveProjectToGoogleDrive(filename: string, fileId?: string) {
-  const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColors, width, height } = usePixelStore.getState()
+  const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = usePixelStore.getState()
   const payload = {
     app: 'cpixel' as const,
     version: 1 as const,
@@ -320,7 +320,8 @@ async function saveProjectToGoogleDrive(filename: string, fileId?: string) {
     palette: Array.from(palette ?? new Uint32Array(0)),
     transparentIndex,
     color,
-    recentColors: recentColors ?? [],
+    recentColorsTruecolor: recentColorsTruecolor ?? [],
+    recentColorsIndexed: recentColorsIndexed ?? [],
   }
   const name = filename && /\.json$/i.test(filename) ? filename : `${filename || 'cpixel'}.json`
   await GoogleDrive.saveJSON(name, payload, fileId)

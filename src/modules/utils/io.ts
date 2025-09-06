@@ -17,13 +17,14 @@ export type NormalizedImport = {
   palette: Uint32Array
   transparentIndex: number
   color: string
-  recentColors: string[]
+  recentColorsTruecolor: string[]
+  recentColorsIndexed: number[]
 }
 
 // Normalize a cpixel JSON payload into state-like fields. Returns null if invalid.
 export function normalizeImportedJSON(
   data: unknown,
-  defaults: { palette: Uint32Array; color: string; recentColors: string[] },
+  defaults: { palette: Uint32Array; color: string; recentColorsTruecolor: string[]; recentColorsIndexed: number[] },
 ): NormalizedImport | null {
   const isObj = (v: any) => v && typeof v === 'object'
   if (!isObj(data)) return null
@@ -95,9 +96,16 @@ export function normalizeImportedJSON(
     ? obj.activeLayerId
     : (nextLayers[0]?.id || 'L1')
   const nextColor = typeof obj.color === 'string' ? obj.color : defaults.color
-  const nextRecent = Array.isArray(obj.recentColors)
+  // Backward compatibility: if flat recentColors provided, apply to truecolor list
+  const flatRecent = Array.isArray(obj.recentColors)
     ? obj.recentColors.filter((x: any) => typeof x === 'string').slice(0, 10)
-    : defaults.recentColors
+    : undefined
+  const rcTrue = Array.isArray(obj.recentColorsTruecolor)
+    ? obj.recentColorsTruecolor.filter((x: any) => typeof x === 'string').slice(0, 10)
+    : (flatRecent ?? defaults.recentColorsTruecolor)
+  const rcIndexed = Array.isArray(obj.recentColorsIndexed)
+    ? obj.recentColorsIndexed.filter((x: any) => Number.isFinite(x)).map((x: any) => x | 0).slice(0, 10)
+    : defaults.recentColorsIndexed
 
   return {
     width,
@@ -108,6 +116,7 @@ export function normalizeImportedJSON(
     palette: nextPalette,
     transparentIndex: Math.max(0, Math.min(ti, Math.max(0, nextPalette.length - 1))),
     color: nextColor,
-    recentColors: nextRecent,
+    recentColorsTruecolor: rcTrue,
+    recentColorsIndexed: rcIndexed,
   }
 }
