@@ -713,6 +713,19 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
   }, [onWheel])
 
+  const interactionActive =
+    mouseStroke.current.active ||
+    dragState.current.panning ||
+    selectionDrag.current.active ||
+    rectSelecting.current.active ||
+    lassoPath.current ||
+    shapePreview.kind !== null ||
+    touches.current.isDrawing ||
+    touches.current.multi ||
+    touches.current.selDragging ||
+    touches.current.selRect ||
+    touches.current.lasso;
+
   return {
     hoverCell,
     shapePreview,
@@ -723,5 +736,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     onTouchStart,
     onTouchMove,
     onTouchEnd,
+    interactionActive,
   }
 }
