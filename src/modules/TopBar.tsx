@@ -9,6 +9,7 @@ import { GoogleDrive } from './utils/googleDrive'
 import { ColorPicker, useColorPopover } from './ColorPicker'
 import { Menu, MenuItem, MenuDivider } from './ui/ContextMenu'
 import { parseCSSColor } from './utils/color'
+import { PiLasso, PiRectangleDashed } from 'react-icons/pi'
 
 export function TopBar() {
   const color = usePixelStore(s => s.color)
@@ -295,9 +296,9 @@ export function TopBar() {
             title={selectTool === 'select-lasso' ? 'Lasso' : 'Rect Select'}
           >
             {selectTool === 'select-lasso' ? (
-              <span className="w-4 h-4 inline-block rounded-full border border-current" aria-hidden />
+              <PiLasso />
             ) : (
-              <span className="w-4 h-4 inline-block border border-current" aria-hidden />
+              <PiRectangleDashed />
             )}
             <span className="hidden sm:inline">{selectTool === 'select-lasso' ? 'Lasso' : 'Select'}</span>
           </button>
@@ -307,12 +308,12 @@ export function TopBar() {
       <Menu open={selOpen} x={selPos.x} y={selPos.y} menuRef={selMenuRef} minWidth={160}>
         <MenuItem onSelect={() => { setTool('select-rect'); setSelOpen(false) }}>
           {selectTool === 'select-rect' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
-          <span className="w-4 h-4 inline-block border border-current" aria-hidden />
+          <PiRectangleDashed />
           <span>Rect Select</span>
         </MenuItem>
         <MenuItem onSelect={() => { setTool('select-lasso'); setSelOpen(false) }}>
           {selectTool === 'select-lasso' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
-          <span className="w-4 h-4 inline-block rounded-full border border-current" aria-hidden />
+          <PiLasso />
           <span>Lasso</span>
         </MenuItem>
       </Menu>
