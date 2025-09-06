@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { usePixelStore, MIN_SIZE, MAX_SIZE } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel, findTopPaletteIndex } from '../utils/composite'
 import { isPointInMask, polygonToMask } from '../utils/selection'
+import { useKeyboardShortcuts } from './useKeyboardShortcuts'
+import { useCanvasPanZoom } from './useCanvasPanZoom'
 
 export type ShapePreview = {
   kind: 'line' | 'rect' | null
@@ -38,9 +40,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const beginSelectionDrag = usePixelStore(s => s.beginSelectionDrag)
   const setSelectionOffset = usePixelStore(s => s.setSelectionOffset)
   const commitSelectionMove = usePixelStore(s => s.commitSelectionMove)
-  const copySelection = usePixelStore(s => s.copySelection)
-  const cutSelection = usePixelStore(s => s.cutSelection)
-  const pasteClipboard = usePixelStore(s => s.pasteClipboard)
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
 
@@ -80,6 +79,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     selRect?: boolean
     lasso?: boolean
   }>({})
+
+  useKeyboardShortcuts(canvasRef, panModRef, clearSelection)
+  useCanvasPanZoom(canvasRef, view, setView, W, H)
 
   // Helpers
   const pickPoint = (clientX: number, clientY: number) => {
@@ -134,75 +136,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     mouseStroke.current.lastX = undefined
     mouseStroke.current.lastY = undefined
   }
-
-  // Pan mode while Space key is held
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        if (!panModRef.current) {
-          panModRef.current = true
-          if (canvasRef.current && !dragState.current.panning) canvasRef.current.style.cursor = 'grab'
-        }
-        e.preventDefault()
-      } else if (e.key === 'Escape') {
-        clearSelection()
-        e.preventDefault()
-      }
-    }
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        panModRef.current = false
-        if (canvasRef.current && !dragState.current.panning) canvasRef.current.style.cursor = 'crosshair'
-        e.preventDefault()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown, { capture: true })
-    window.addEventListener('keyup', onKeyUp, { capture: true })
-    return () => {
-      window.removeEventListener('keydown', onKeyDown as any, { capture: true } as any)
-      window.removeEventListener('keyup', onKeyUp as any, { capture: true } as any)
-    }
-  }, [canvasRef, clearSelection])
-
-  // Undo/Redo keyboard shortcuts
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
-      const mod = isMac ? e.metaKey : e.ctrlKey
-      if (!mod) return
-      const k = e.key.toLowerCase()
-      if (k === 'z') {
-        if (e.shiftKey) { redo(); e.preventDefault() }
-        else { undo(); e.preventDefault() }
-        return
-      }
-      // Copy / Cut / Paste for selections
-      if (k === 'c') {
-        // Only act if there's an active selection
-        if (usePixelStore.getState().selectionBounds) {
-          copySelection();
-          e.preventDefault()
-        }
-        return
-      }
-      if (k === 'x') {
-        if (usePixelStore.getState().selectionBounds) {
-          usePixelStore.getState().beginStroke()
-          cutSelection();
-          usePixelStore.getState().endStroke()
-          e.preventDefault()
-        }
-        return
-      }
-      if (k === 'v') {
-        pasteClipboard();
-        e.preventDefault()
-        return
-      }
-    }
-    window.addEventListener('keydown', onKey, { capture: true })
-    return () => window.removeEventListener('keydown', onKey as any, { capture: true } as any)
-  }, [undo, redo, copySelection, cutSelection, pasteClipboard])
 
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') return
@@ -387,22 +320,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
 
   const onPointerLeave = () => { setHoverCell(null); setHoverInfo(undefined) }
-
-  const onWheel = (e: WheelEvent) => {
-    e.preventDefault()
-    const rect = canvasRef.current!.getBoundingClientRect()
-    const Cx = e.clientX - rect.left
-    const Cy = e.clientY - rect.top
-    const delta = e.deltaY
-    const k = delta > 0 ? 0.9 : 1.1
-    const nextSize = clamp(view.scale * k, MIN_SIZE, MAX_SIZE)
-    if (nextSize === view.scale) return
-    const ratio = nextSize / view.scale
-    const newVX = view.x - (Cx - view.x) * (ratio - 1)
-    const newVY = view.y - (Cy - view.y) * (ratio - 1)
-    const { vx: cvx2, vy: cvy2 } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
-    setView(Math.round(cvx2), Math.round(cvy2), nextSize)
-  }
 
   // Touch handlers
   const TOUCH_HOLD_MS = 150
@@ -701,17 +618,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       touches.current = {}
     }
   }
-
-  // We must set the passive to false.
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return
-
-    canvas.addEventListener('wheel', onWheel, { passive: false });
-    return () => {
-      canvas.removeEventListener('wheel', onWheel);
-    }
-  }, [onWheel])
 
   const interactionActive =
     mouseStroke.current.active ||
