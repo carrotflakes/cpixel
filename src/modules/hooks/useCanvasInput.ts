@@ -14,7 +14,7 @@ export type ShapePreview = {
 }
 
 export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
-  const size = usePixelStore(s => s.viewScale)
+  const view = usePixelStore(s => s.view)
   const color = usePixelStore(s => s.color)
   const setColor = usePixelStore(s => s.setColor)
   const setAt = usePixelStore(s => s.setAt)
@@ -29,8 +29,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const transparentIndex = usePixelStore(s => s.transparentIndex)
   const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
   const tool = usePixelStore(s => s.tool)
-  const viewX = usePixelStore(s => s.viewX)
-  const viewY = usePixelStore(s => s.viewY)
   const setView = usePixelStore(s => s.setView)
   const setHoverInfo = usePixelStore(s => s.setHoverInfo)
   const selectionMask = usePixelStore(s => s.selectionMask)
@@ -86,8 +84,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   // Helpers
   const pickPoint = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect()
-    const x = Math.floor((clientX - rect.left - viewX) / size)
-    const y = Math.floor((clientY - rect.top - viewY) / size)
+    const x = Math.floor((clientX - rect.left - view.x) / view.scale)
+    const y = Math.floor((clientY - rect.top - view.y) / view.scale)
     return { x, y }
   }
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
@@ -342,12 +340,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const rect = canvasRef.current!.getBoundingClientRect()
       const vw = rect.width
       const vh = rect.height
-      const cw = W * size
-      const ch = H * size
-      let nvx = viewX + dx
-      let nvy = viewY + dy
+      const cw = W * view.scale
+      const ch = H * view.scale
+      let nvx = view.x + dx
+      let nvy = view.y + dy
         ; ({ vx: nvx, vy: nvy } = clampViewToBounds(nvx, nvy, vw, vh, cw, ch))
-      setView(Math.round(nvx), Math.round(nvy), size)
+      setView(Math.round(nvx), Math.round(nvy), view.scale)
       e.preventDefault()
       return
     }
@@ -397,11 +395,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const Cy = e.clientY - rect.top
     const delta = e.deltaY
     const k = delta > 0 ? 0.9 : 1.1
-    const nextSize = clamp(size * k, MIN_SIZE, MAX_SIZE)
-    if (nextSize === size) return
-    const ratio = nextSize / size
-    const newVX = viewX - (Cx - viewX) * (ratio - 1)
-    const newVY = viewY - (Cy - viewY) * (ratio - 1)
+    const nextSize = clamp(view.scale * k, MIN_SIZE, MAX_SIZE)
+    if (nextSize === view.scale) return
+    const ratio = nextSize / view.scale
+    const newVX = view.x - (Cx - view.x) * (ratio - 1)
+    const newVY = view.y - (Cy - view.y) * (ratio - 1)
     const { vx: cvx2, vy: cvy2 } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
     setView(Math.round(cvx2), Math.round(cvy2), nextSize)
   }
@@ -622,11 +620,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           touches.current.multiTapMoved = true
         }
       }
-      const nextSize = clamp(size * k, MIN_SIZE, MAX_SIZE)
-      const ratio = nextSize / size
+      const nextSize = clamp(view.scale * k, MIN_SIZE, MAX_SIZE)
+      const ratio = nextSize / view.scale
 
-      const v1x = viewX + dx
-      const v1y = viewY + dy
+      const v1x = view.x + dx
+      const v1y = view.y + dy
       const newVX = v1x - (Cx - v1x) * (ratio - 1)
       const newVY = v1y - (Cy - v1y) * (ratio - 1)
       const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)

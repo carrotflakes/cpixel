@@ -9,15 +9,13 @@ const GRID_THRESHOLD = 8
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const { hoverCell, shapePreview, onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onTouchStart, onTouchMove, onTouchEnd } = useCanvasInput(canvasRef)
-  const viewScale = usePixelStore(s => s.viewScale)
+  const view = usePixelStore(s => s.view)
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
   const layers = usePixelStore(s => s.layers)
   const mode = usePixelStore(s => s.mode)
   const palette = usePixelStore(s => s.palette)
   const transparentIndex = usePixelStore(s => s.transparentIndex)
-  const viewX = usePixelStore(s => s.viewX)
-  const viewY = usePixelStore(s => s.viewY)
   const setView = usePixelStore(s => s.setView)
   const selectionMask = usePixelStore(s => s.selectionMask)
   const selectionBounds = usePixelStore(s => s.selectionBounds)
@@ -26,8 +24,8 @@ export function PixelCanvas() {
   const selectionFloating = usePixelStore(s => s.selectionFloating)
   const clearSelection = usePixelStore(s => s.clearSelection)
 
-  const scaledW = W * viewScale
-  const scaledH = H * viewScale
+  const scaledW = W * view.scale
+  const scaledH = H * view.scale
   // cache small helper canvases
   const checkerTileRef = useRef<HTMLCanvasElement | null>(null)
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -45,13 +43,13 @@ export function PixelCanvas() {
     const rect = cvs.getBoundingClientRect()
     const vw = rect.width
     const vh = rect.height
-    const cw = W * viewScale
-    const ch = H * viewScale
+    const cw = W * view.scale
+    const ch = H * view.scale
     const cx = Math.round((vw - cw) / 2)
     const cy = Math.round((vh - ch) / 2)
-    setView(cx, cy, viewScale)
+    setView(cx, cy, view.scale)
     inited.current = true
-  }, [viewScale, setView])
+  }, [view.scale, setView])
 
   // Animate marching ants
   useEffect(() => {
@@ -76,12 +74,12 @@ export function PixelCanvas() {
     const ctx = cvs.getContext('2d', { willReadFrequently: true })!
     ensureHiDPICanvas(cvs, ctx)
     // translate to current view (rounded for crisper grid in CSS px space)
-    const vx = Math.round(viewX)
-    const vy = Math.round(viewY)
+    const vx = Math.round(view.x)
+    const vy = Math.round(view.y)
     // draw checkerboard in content space so it follows pan/zoom (cached tile)
     if (!checkerTileRef.current) checkerTileRef.current = getCheckerPatternCanvas(4)
     ctx.translate(vx, vy)
-    drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, viewScale)
+    drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, view.scale)
     // draw bitmap on top (alpha respected)
     const img = compositeImageData(layers, mode, palette, transparentIndex, ctx, W, H)
     if (!tmpCanvasRef.current) {
@@ -98,12 +96,12 @@ export function PixelCanvas() {
 
     // border and grid
     drawBorder(ctx, scaledW, scaledH)
-    if (viewScale > GRID_THRESHOLD) {
-      drawGrid(ctx, W, H, viewScale)
+    if (view.scale > GRID_THRESHOLD) {
+      drawGrid(ctx, W, H, view.scale)
     }
     // hover highlight
     if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < W && hoverCell.y < H) {
-      drawHoverCell(ctx, hoverCell.x, hoverCell.y, viewScale)
+      drawHoverCell(ctx, hoverCell.x, hoverCell.y, view.scale)
     }
     // shape preview overlay
     if (shapePreview.kind) {
@@ -114,18 +112,18 @@ export function PixelCanvas() {
         shapePreview.startY,
         shapePreview.curX,
         shapePreview.curY,
-        viewScale,
+        view.scale,
       )
     }
 
     // selection overlay and floating
     if (selectionMask && selectionBounds) {
       // Optional: dim outside selection
-      drawSelectionOverlay(ctx, selectionMask, W, H, viewScale)
+      drawSelectionOverlay(ctx, selectionMask, W, H, view.scale)
       // Draw marching ants rect at current offset
       const dx = (selectionOffsetX ?? 0)
       const dy = (selectionOffsetY ?? 0)
-      const s = viewScale
+      const s = view.scale
       const left = (selectionBounds.left + dx) * s + 0.5
       const top = (selectionBounds.top + dy) * s + 0.5
       const width = (selectionBounds.right - selectionBounds.left + 1) * s - 1
@@ -160,7 +158,7 @@ export function PixelCanvas() {
         ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selectionBounds.left + dx) * s, (selectionBounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, viewScale, viewX, viewY, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick])
+  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick])
 
   const overlay = (() => {
     if (!selectionMask || !selectionBounds) return null

@@ -27,9 +27,7 @@ export type PixelState = {
   height: number
   layers: Layer[]
   activeLayerId: string
-  viewScale: number
-  viewX: number
-  viewY: number
+  view: { x: number; y: number; scale: number }
   color: string
   currentPaletteIndex?: number
   recentColorsTruecolor: string[]
@@ -58,7 +56,6 @@ export type PixelState = {
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
   setTool: (t: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'select-lasso') => void
   setView: (x: number, y: number, scale: number) => void
-  panBy: (dx: number, dy: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
   drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   drawRect: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
@@ -110,9 +107,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   height: HEIGHT,
   layers: [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
   activeLayerId: 'L1',
-  viewScale: 5,
-  viewX: 0,
-  viewY: 0,
+  view: { x: 0, y: 0, scale: 5 },
   color: '#000000',
   currentPaletteIndex: 1,
   recentColorsTruecolor: ['#000000', '#ffffff'],
@@ -386,8 +381,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const clamped = Math.max(0, Math.min(idx | 0, Math.max(0, s.palette.length - 1)))
     return { transparentIndex: clamped }
   }),
-  setView: (x, y, scale) => set({ viewX: x, viewY: y, viewScale: clamp(scale, MIN_SIZE, MAX_SIZE) }),
-  panBy: (dx, dy) => set((s) => ({ viewX: s.viewX + dx, viewY: s.viewY + dy })),
+  setView: (x, y, scale) => set(() => ({ view: { x, y, scale: clamp(scale, MIN_SIZE, MAX_SIZE) } })),
   setAt: (x, y, rgbaOrIndex) => {
     set((s) => {
       const W = s.width, H = s.height
