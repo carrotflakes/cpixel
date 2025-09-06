@@ -1,5 +1,5 @@
 import { PixelCanvas } from "./PixelCanvas";
-import { TopBar } from "./TopBar";
+import { TopBar } from "./TopBar/index";
 import { StatusBar } from "./StatusBar";
 import { PalettePanel } from "./PalettePanel";
 import { LayersPanel } from "./LayersPanel";
