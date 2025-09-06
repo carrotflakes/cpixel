@@ -21,6 +21,7 @@ export function PixelCanvas() {
   const checkerSize = useSettingsStore(s => s.checkerSize)
   const tiltEnabled = useSettingsStore(s => s.tiltParallaxEnabled)
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
+  const tiltAmount = useSettingsStore(s => s.tiltParallaxAmount)
   const setView = usePixelStore(s => s.setView)
   const selectionMask = usePixelStore(s => s.selectionMask)
   const selectionBounds = usePixelStore(s => s.selectionBounds)
@@ -30,7 +31,7 @@ export function PixelCanvas() {
   const clearSelection = usePixelStore(s => s.clearSelection)
 
   const { rotationRate, rotationRateRef, motionPermission, requestMotionPermission } = useTilt({enabled: tiltEnabled})
-  const { shiftActive, shiftOffsetRef, shiftTick } = useLayerShift(rotationRate, rotationRateRef, { trigger: tiltTrigger, enabled: tiltEnabled && !interactionActive })
+  const { active: parallaxActive, shiftOffsetRef, shiftTick } = useTiltParallax(rotationRate, rotationRateRef, { trigger: tiltTrigger, amount: tiltAmount, enabled: tiltEnabled && !interactionActive })
 
   const scaledW = W * view.scale
   const scaledH = H * view.scale
@@ -91,7 +92,7 @@ export function PixelCanvas() {
     ctx.translate(vx, vy)
 
     // If in shift mode, render each layer with offset, suppress overlays
-    if (shiftActive) {
+    if (parallaxActive) {
       drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, view.scale)
       if (!tmpCanvasRef.current) {
         const t = document.createElement('canvas')
@@ -195,10 +196,10 @@ export function PixelCanvas() {
         ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selectionBounds.left + dx) * s, (selectionBounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick, checkerSize, shiftActive, shiftTick])
+  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick])
 
   const overlay = (() => {
-    if (shiftActive) return null // hide selection UI in shift mode
+    if (parallaxActive) return null // hide selection UI in parallax mode
     if (!selectionMask || !selectionBounds) return null
     return (
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
@@ -219,23 +220,20 @@ export function PixelCanvas() {
     <div className="relative w-full h-full bg-surface-muted touch-none">
       <canvas
         ref={canvasRef}
-        onPointerDown={shiftActive ? undefined : onPointerDown}
-        onPointerMove={shiftActive ? undefined : onPointerMove}
-        onPointerUp={shiftActive ? undefined : onPointerUp}
-        onPointerLeave={shiftActive ? undefined : onPointerLeave}
+        onPointerDown={parallaxActive ? undefined : onPointerDown}
+        onPointerMove={parallaxActive ? undefined : onPointerMove}
+        onPointerUp={parallaxActive ? undefined : onPointerUp}
+        onPointerLeave={parallaxActive ? undefined : onPointerLeave}
         onContextMenu={(e) => e.preventDefault()}
-        onTouchStart={shiftActive ? undefined : onTouchStart}
-        onTouchMove={shiftActive ? undefined : onTouchMove}
-        onTouchEnd={shiftActive ? undefined : onTouchEnd}
+        onTouchStart={parallaxActive ? undefined : onTouchStart}
+        onTouchMove={parallaxActive ? undefined : onTouchMove}
+        onTouchEnd={parallaxActive ? undefined : onTouchEnd}
         className="w-full h-full block shadow cursor-crosshair focus:outline-2 focus:outline-blue-500"
         tabIndex={0}
         aria-label="Pixel canvas"
       />
       {overlay}
 
-      {shiftActive && (
-        <div className="absolute left-1/2 top-2 -translate-x-1/2 px-2 py-1 text-xs bg-surface border border-border rounded shadow pointer-events-none select-none opacity-80">Layer shift</div>
-      )}
       {/* Motion permission / enable button (iOS) */}
       {tiltEnabled && motionPermission === 'prompt' && (
         <button
@@ -253,7 +251,7 @@ export function PixelCanvas() {
         <div>rot β: {rotationRate.beta !== undefined ? rotationRate.beta.toFixed(1) : '-'} deg/s</div>
         <div>rot γ: {rotationRate.gamma !== undefined ? rotationRate.gamma.toFixed(1) : '-'} deg/s</div>
         {/* orientation velocity removed */}
-        <div>shift: {shiftActive ? 'ON' : 'off'}</div>
+        <div>parallax: {parallaxActive ? 'ON' : 'off'}</div>
         <div>layers: {layers.length}</div>
         <div>perm: {motionPermission}</div>
         <div>off: {shiftOffsetRef.current.dx.toFixed(2)},{shiftOffsetRef.current.dy.toFixed(2)}</div>
@@ -280,7 +278,7 @@ function useWindowResizeRedraw() {
   return tick
 }
 
-function useLayerShift(
+function useTiltParallax(
   rotationRate: { alpha: number; beta: number; gamma: number },
   rotationRateRef: React.RefObject<{ alpha: number; beta: number; gamma: number }>,
   options?: {
@@ -297,7 +295,7 @@ function useLayerShift(
   const MIN_MAG = 1.0
   const AMOUNT = options?.amount ?? 0.5
 
-  const [shiftActive, setShiftActive] = useState(false)
+  const [active, setActive] = useState(false)
   const shiftOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
   const [shiftTick, setShiftTick] = useState(0)
   const rafShift = useRef<number>(0)
@@ -323,7 +321,7 @@ function useLayerShift(
       // Stop
       if (Math.abs(dx) + Math.abs(dy) < MIN_MAG && Math.abs(beta) + Math.abs(alpha) < STOP_ROTATION) {
         shiftOffsetRef.current = { dx: 0, dy: 0 }
-        setShiftActive(false)
+        setActive(false)
         rafShift.current = 0
         return
       }
@@ -336,16 +334,16 @@ function useLayerShift(
   // Trigger on threshold crossing when inactive
   useEffect(() => {
     if (!ENABLED) return
-    if (shiftActive) return
+    if (active) return
     const { alpha = 0, beta = 0 } = rotationRate
     if (Math.abs(alpha) + Math.abs(beta) < SHIFT_TRIGGER) return
 
-    setShiftActive(true)
+    setActive(true)
     if (!rafShift.current) dampLoop.current()
     setShiftTick(0)
-  }, [rotationRate.alpha, rotationRate.beta, shiftActive, SHIFT_TRIGGER, ENABLED])
+  }, [rotationRate.alpha, rotationRate.beta, active, SHIFT_TRIGGER, ENABLED])
 
   useEffect(() => () => { if (rafShift.current) cancelAnimationFrame(rafShift.current) }, [])
 
-  return { shiftActive, shiftOffsetRef, shiftTick }
+  return { active, shiftOffsetRef, shiftTick }
 }

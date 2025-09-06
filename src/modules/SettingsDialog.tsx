@@ -10,8 +10,11 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const setTiltEnabled = useSettingsStore(s => s.setTiltParallaxEnabled)
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
   const setTiltTrigger = useSettingsStore(s => s.setTiltParallaxTrigger)
+  const tiltAmount = useSettingsStore(s => s.tiltParallaxAmount)
+  const setTiltAmount = useSettingsStore(s => s.setTiltParallaxAmount)
   const [checkerStr, setCheckerStr] = useState(String(checkerSize))
   const [tiltTriggerStr, setTiltTriggerStr] = useState(String(tiltTrigger))
+  const [tiltAmountStr, setTiltAmountStr] = useState(String(tiltAmount))
   const [tiltEnabledLocal, setTiltEnabledLocal] = useState<boolean>(tiltEnabled)
   const firstRef = useRef<HTMLInputElement | null>(null)
 
@@ -19,10 +22,11 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     if (!open) return
     setCheckerStr(String(checkerSize))
     setTiltTriggerStr(String(tiltTrigger))
-    setTiltEnabledLocal(tiltEnabled)
+  setTiltEnabledLocal(tiltEnabled)
+  setTiltAmountStr(String(tiltAmount))
     const t = setTimeout(() => firstRef.current?.focus(), 0)
     return () => clearTimeout(t)
-  }, [open, checkerSize, tiltTrigger, tiltEnabled])
+  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount])
 
   useEffect(() => {
     if (!open) return
@@ -44,6 +48,11 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     if (Number.isFinite(t)) {
       const normT = Math.max(20, Math.min(720, Math.round(t)))
       setTiltTrigger(normT)
+    }
+    const a = Number(tiltAmountStr)
+    if (Number.isFinite(a)) {
+      const normA = Math.max(0.05, Math.min(5, a))
+      setTiltAmount(normA)
     }
     setTiltEnabled(tiltEnabledLocal)
     onClose()
@@ -93,6 +102,20 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
                 className="w-full rounded border border-border bg-surface p-1"
                 value={tiltTriggerStr}
                 onChange={(e) => setTiltTriggerStr(e.target.value)}
+                disabled={!tiltEnabledLocal}
+              />
+            </label>
+            <label className="flex flex-col gap-1 max-w-40">
+              <span className="text-sm text-muted">Parallax amount</span>
+              <input
+                type="number"
+                step={0.05}
+                min={0.05}
+                max={5}
+                inputMode="decimal"
+                className="w-full rounded border border-border bg-surface p-1"
+                value={tiltAmountStr}
+                onChange={(e) => setTiltAmountStr(e.target.value)}
                 disabled={!tiltEnabledLocal}
               />
             </label>
