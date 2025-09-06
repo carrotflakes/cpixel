@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCanvasInput } from './hooks/useCanvasInput'
 import { usePixelStore } from './store'
+import { useSettingsStore } from './settingsStore'
 import { drawBorder, drawChecker, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerPatternCanvas } from './utils/canvasDraw'
 import { compositeImageData } from './utils/composite'
 
@@ -16,6 +17,7 @@ export function PixelCanvas() {
   const mode = usePixelStore(s => s.mode)
   const palette = usePixelStore(s => s.palette)
   const transparentIndex = usePixelStore(s => s.transparentIndex)
+  const checkerSize = useSettingsStore(s => s.checkerSize)
   const setView = usePixelStore(s => s.setView)
   const selectionMask = usePixelStore(s => s.selectionMask)
   const selectionBounds = usePixelStore(s => s.selectionBounds)
@@ -77,7 +79,9 @@ export function PixelCanvas() {
     const vx = Math.round(view.x)
     const vy = Math.round(view.y)
     // draw checkerboard in content space so it follows pan/zoom (cached tile)
-    if (!checkerTileRef.current) checkerTileRef.current = getCheckerPatternCanvas(4)
+    if (!checkerTileRef.current || checkerTileRef.current.width !== checkerSize * 2) {
+      checkerTileRef.current = getCheckerPatternCanvas(checkerSize)
+    }
     ctx.translate(vx, vy)
     drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, view.scale)
     // draw bitmap on top (alpha respected)
@@ -158,7 +162,7 @@ export function PixelCanvas() {
         ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selectionBounds.left + dx) * s, (selectionBounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick])
+  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds?.left, selectionBounds?.top, selectionBounds?.right, selectionBounds?.bottom, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick, checkerSize])
 
   const overlay = (() => {
     if (!selectionMask || !selectionBounds) return null

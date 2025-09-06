@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePixelStore } from '../store'
 import { Menu, MenuItem, MenuDivider } from '../ui/ContextMenu'
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
+import { SettingsDialog } from '../SettingsDialog'
 import { FaEraser } from 'react-icons/fa'
 import { LuDownload, LuChevronRight, LuCheck } from 'react-icons/lu'
 import { GoogleDrive } from '../utils/googleDrive'
@@ -35,6 +36,7 @@ export function MoreMenu() {
   const exportItemRef = useRef<HTMLButtonElement | null>(null)
   const driveItemRef = useRef<HTMLButtonElement | null>(null)
   const [sizeOpen, setSizeOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Drive state
   const [driveOpen, setDriveOpen] = useState<null | 'open' | 'save'>(null)
@@ -167,6 +169,9 @@ export function MoreMenu() {
           <span>Google Drive</span>
           <LuChevronRight className="ml-auto" aria-hidden />
         </MenuItem>
+        <MenuItem onSelect={() => { setSettingsOpen(true); setMenuOpen(false); setOpenSub(null) }}>
+          <span>Settings…</span>
+        </MenuItem>
         <MenuDivider />
         <MenuItem danger onSelect={() => { clear(); setMenuOpen(false); setOpenSub(null); setSubPos(null) }}>
           <FaEraser aria-hidden />
@@ -218,6 +223,7 @@ export function MoreMenu() {
         onCancel={() => setSizeOpen(false)}
         onSubmit={(w, h) => { resizeCanvas(w, h); setSizeOpen(false) }}
       />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Drive open dialog */}
       {driveOpen === 'open' && (
