@@ -40,16 +40,16 @@ export function LayersPanel() {
         {layers.map((l, i) => {
           return (
             <div key={l.id} className={`flex items-center gap-2 px-2 py-1 text-sm cursor-pointer ${l.id === active ? 'bg-accent/10' : ''}`} onClick={() => setActive(l.id)}>
-              <button className="p-1 hover:bg-surface-muted rounded" title={l.visible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); toggleVisible(l.id) }}>
+              <button className="p-1 rounded" title={l.visible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); toggleVisible(l.id) }}>
                 {l.visible ? <LuEye /> : <LuEyeOff />}
               </button>
-              <button className={`p-1 rounded ${l.locked ? 'text-muted' : ''}`} title={l.locked ? 'Unlock' : 'Lock'} onClick={(e) => { e.stopPropagation(); toggleLocked(l.id) }}>
+              <button className="p-1 rounded" title={l.locked ? 'Unlock' : 'Lock'} onClick={(e) => { e.stopPropagation(); toggleLocked(l.id) }}>
                 {l.locked ? <FaLock /> : <FaLockOpen />}
               </button>
               <div className="flex-1 truncate">{l.id}</div>
               <div className="flex flex-col">
-                <button className="p-1 hover:bg-surface-muted rounded disabled:opacity-50" title="Down" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.max(0, i - 1)) }}><LuArrowUp /></button>
-                <button className="p-1 hover:bg-surface-muted rounded disabled:opacity-50" title="Up" disabled={i === layers.length - 1} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.min(layers.length - 1, i + 1)) }}><LuArrowDown /></button>
+                <button className="p-1 rounded disabled:opacity-50" title="Down" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.max(0, i - 1)) }}><LuArrowUp /></button>
+                <button className="p-1 rounded disabled:opacity-50" title="Up" disabled={i === layers.length - 1} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.min(layers.length - 1, i + 1)) }}><LuArrowDown /></button>
               </div>
             </div>
           )
