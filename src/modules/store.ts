@@ -777,7 +777,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const out = clearSelectedTruecolor(data, selectionMask, selectionBounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
-      return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers, clipboard: { kind: 'rgba', pixels: float.slice(0), width: bw, height: bh } }
+      return { selectionFloating: float, selectionFloatingIndices: undefined, selectionOffsetX: 0, selectionOffsetY: 0, layers, clipboard: { kind: 'rgba', pixels: float.slice(0), width: bw, height: bh }, selectionMask: undefined, selectionBounds: undefined }
     } else {
       const idx = layer.indices ?? new Uint8Array(W * H)
       const pal = s.palette
@@ -786,16 +786,18 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const out = clearSelectedIndexed(idx, selectionMask, selectionBounds, W, ti)
       const layers = s.layers.slice()
       layers[li] = { ...layer, indices: out }
-      // Clipboard keeps indexed data
       const outIdx = new Uint8Array(bw * bh)
+      const floatIdx = new Uint8Array(bw * bh)
       for (let y = selectionBounds.top; y <= selectionBounds.bottom; y++) {
         for (let x = selectionBounds.left; x <= selectionBounds.right; x++) {
           const i = y * W + x
           const fi = (y - selectionBounds.top) * bw + (x - selectionBounds.left)
-          outIdx[fi] = (!selectionMask || selectionMask[i]) ? (idx[i] ?? ti) : (ti & 0xff)
+          const v = (!selectionMask || selectionMask[i]) ? (idx[i] ?? ti) : (ti & 0xff)
+          outIdx[fi] = v
+          floatIdx[fi] = v
         }
       }
-      return { selectionFloating: float, selectionOffsetX: 0, selectionOffsetY: 0, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
+      return { selectionFloating: float, selectionFloatingIndices: floatIdx, selectionOffsetX: 0, selectionOffsetY: 0, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }, selectionMask: undefined, selectionBounds: undefined }
     }
   }),
   pasteClipboard: () => set((s) => {
