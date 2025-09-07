@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { usePixelStore } from '../store'
-import { Menu, MenuItem, MenuDivider } from '../ui/ContextMenu'
+import { FaEllipsisV, FaEraser } from 'react-icons/fa'
+import { LuCheck, LuChevronRight, LuDownload, LuMaximize } from 'react-icons/lu'
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
 import { SettingsDialog } from '../SettingsDialog'
-import { FaEllipsisV, FaEraser } from 'react-icons/fa'
-import { LuDownload, LuChevronRight, LuCheck } from 'react-icons/lu'
+import { usePixelStore } from '../store'
+import { Menu, MenuDivider, MenuItem } from '../ui/ContextMenu'
 import { GoogleDrive } from '../utils/googleDrive'
 
 export function MoreMenu() {
@@ -42,6 +42,8 @@ export function MoreMenu() {
 
   // Drive state
   const [driveOpen, setDriveOpen] = useState<null | 'open' | 'save'>(null)
+  // fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const [driveFiles, setDriveFiles] = useState<{ id: string; name: string; modifiedTime?: string }[]>([])
   const [driveBusy, setDriveBusy] = useState(false)
   const [driveError, setDriveError] = useState<string | null>(null)
@@ -50,6 +52,25 @@ export function MoreMenu() {
   const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (window as any).VITE_GOOGLE_CLIENT_ID
 
   useEffect(() => { GoogleDrive.init(clientId).catch(() => { }) }, [clientId])
+
+  useEffect(() => {
+    const onChange = () => {
+      const fsEl = document.fullscreenElement || (document as any).webkitFullscreenElement || (document as any).mozFullScreenElement || (document as any).msFullscreenElement
+      setIsFullscreen(!!fsEl)
+    }
+    document.addEventListener('fullscreenchange', onChange)
+    document.addEventListener('webkitfullscreenchange', onChange as any)
+    document.addEventListener('mozfullscreenchange', onChange as any)
+    document.addEventListener('MSFullscreenChange', onChange as any)
+    // initialize
+    onChange()
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange)
+      document.removeEventListener('webkitfullscreenchange', onChange as any)
+      document.removeEventListener('mozfullscreenchange', onChange as any)
+      document.removeEventListener('MSFullscreenChange', onChange as any)
+    }
+  }, [])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -196,6 +217,28 @@ export function MoreMenu() {
         </MenuItem>
         <MenuItem onSelect={() => { setSettingsOpen(true); setMenuOpen(false); setOpenSub(null) }}>
           <span>Settings…</span>
+        </MenuItem>
+        <MenuDivider />
+        <MenuItem onSelect={async () => {
+          try {
+            if (!isFullscreen) {
+              const el = document.documentElement
+              if (el.requestFullscreen) await el.requestFullscreen()
+              else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen()
+              else if ((el as any).msRequestFullscreen) await (el as any).msRequestFullscreen()
+            } else {
+              if (document.exitFullscreen) await document.exitFullscreen()
+              else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen()
+              else if ((document as any).msExitFullscreen) await (document as any).msExitFullscreen()
+            }
+          } catch (e) {
+            console.error('Fullscreen toggle failed', e)
+          } finally {
+            setMenuOpen(false); setOpenSub(null)
+          }
+        }}>
+          <LuMaximize aria-hidden />
+          <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
         </MenuItem>
 
         {/* Edit submenu */}
