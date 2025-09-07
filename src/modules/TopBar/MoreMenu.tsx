@@ -59,16 +59,16 @@ export function MoreMenu() {
       setIsFullscreen(!!fsEl)
     }
     document.addEventListener('fullscreenchange', onChange)
-    document.addEventListener('webkitfullscreenchange', onChange as any)
-    document.addEventListener('mozfullscreenchange', onChange as any)
-    document.addEventListener('MSFullscreenChange', onChange as any)
+    document.addEventListener('webkitfullscreenchange', onChange)
+    document.addEventListener('mozfullscreenchange', onChange)
+    document.addEventListener('MSFullscreenChange', onChange)
     // initialize
     onChange()
     return () => {
       document.removeEventListener('fullscreenchange', onChange)
-      document.removeEventListener('webkitfullscreenchange', onChange as any)
-      document.removeEventListener('mozfullscreenchange', onChange as any)
-      document.removeEventListener('MSFullscreenChange', onChange as any)
+      document.removeEventListener('webkitfullscreenchange', onChange)
+      document.removeEventListener('mozfullscreenchange', onChange)
+      document.removeEventListener('MSFullscreenChange', onChange)
     }
   }, [])
 
@@ -90,8 +90,8 @@ export function MoreMenu() {
     window.addEventListener('keydown', onKey, { capture: true })
     window.addEventListener('pointerdown', onDown, { capture: true })
     return () => {
-      window.removeEventListener('keydown', onKey, { capture: true } as any)
-      window.removeEventListener('pointerdown', onDown, { capture: true } as any)
+      window.removeEventListener('keydown', onKey, { capture: true })
+      window.removeEventListener('pointerdown', onDown, { capture: true })
     }
   }, [menuOpen])
 

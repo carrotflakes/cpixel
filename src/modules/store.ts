@@ -93,8 +93,8 @@ export type PixelState = {
   canUndo?: boolean
   canRedo?: boolean
   // private/internal fields (optional to satisfy TS when mutating with set)
-  _undo?: any[]
-  _redo?: any[]
+  _undo?: Snapshot[]
+  _redo?: Snapshot[]
   _stroking?: boolean
   hover?: { x: number; y: number; rgba?: number; index?: number }
   setHoverInfo: (h?: { x: number; y: number; rgba?: number; index?: number }) => void
@@ -104,6 +104,16 @@ export type PixelState = {
   importJSON: (data: unknown) => void
   importPNGFromImageData: (img: ImageData) => void
   resizeCanvas: (w: number, h: number) => void
+}
+
+type Snapshot = {
+  width: number
+  height: number
+  mode: 'truecolor' | 'indexed'
+  layers: Array<{ id: string; visible: boolean; locked: boolean; data?: Uint32Array | undefined; indices?: Uint8Array | undefined }>
+  activeLayerId: string
+  palette: Uint32Array
+  transparentIndex: number
 }
 
 export const usePixelStore = create<PixelState>((set, get) => ({
@@ -175,7 +185,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   toggleVisible: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l) })),
   toggleLocked: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l) })),
   setTool: (t) => set(() => {
-    const patch: any = { tool: t }
+    const patch: Partial<PixelState> = { tool: t }
     if (t === 'select-rect' || t === 'select-lasso' || t === 'select-wand') patch.selectTool = t
     return patch
   }),
@@ -222,7 +232,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     pal[i] = (i === s.transparentIndex) ? 0x00000000 : (rgba >>> 0)
     if (equalU32(pal, s.palette)) return {}
     // If editing currently selected index, also sync visible color string
-    const patch: any = { palette: pal }
+    const patch: Partial<PixelState> = { palette: pal }
     if (s.currentPaletteIndex === i) patch.color = rgbaToCSSHex(pal[i] >>> 0)
     return patch
   }),
@@ -290,7 +300,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const ti = map[s.transparentIndex]
     // remap current palette index
     const ci = s.currentPaletteIndex !== undefined ? map[s.currentPaletteIndex] : undefined
-    const patch: any = { palette: pal, layers, transparentIndex: ti }
+    const patch: Partial<PixelState> = { palette: pal, layers, transparentIndex: ti }
     if (ci !== undefined) { patch.currentPaletteIndex = ci; patch.color = rgbaToCSSHex(pal[ci] ?? 0) }
     return patch
   }),
@@ -829,7 +839,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     return { selection: { mask, bounds: { left, top, right, bottom }, offsetX: 0, offsetY: 0, floating: float, floatingIndices: floatIdx }, tool: 'select-rect' }
   }),
   setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
-  beginStroke: () => set((s: any) => {
+  beginStroke: () => set((s) => {
     if (s._stroking) return {}
     // snapshot full state as JSON-serializable object of typed array buffers
     const snap = {
@@ -850,8 +860,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const undo = s._undo ? [...s._undo, snap] : [snap]
     return { _undo: undo, _redo: [], _stroking: true, canUndo: true, canRedo: false }
   }),
-  endStroke: () => set((s: any) => (s._stroking ? { _stroking: false } : {})),
-  undo: () => set((s: any) => {
+  endStroke: () => set((s) => (s._stroking ? { _stroking: false } : {})),
+  undo: () => set((s) => {
     if (!s._undo || s._undo.length === 0) return {}
     const prev = s._undo[s._undo.length - 1]
     const undo = s._undo.slice(0, -1)
@@ -875,7 +885,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       width: prev.width,
       height: prev.height,
       mode: prev.mode,
-      layers: prev.layers.map((l: any) => ({
+      layers: prev.layers.map((l: Snapshot['layers'][number]) => ({
         id: l.id,
         visible: l.visible,
         locked: l.locked,
@@ -892,7 +902,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
   }),
-  redo: () => set((s: any) => {
+  redo: () => set((s) => {
     if (!s._redo || s._redo.length === 0) return {}
     const next = s._redo[s._redo.length - 1]
     const redo = s._redo.slice(0, -1)
@@ -916,7 +926,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       width: next.width,
       height: next.height,
       mode: next.mode,
-      layers: next.layers.map((l: any) => ({
+      layers: next.layers.map((l: Snapshot['layers'][number]) => ({
         id: l.id,
         visible: l.visible,
         locked: l.locked,
@@ -933,7 +943,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
   }),
-  clear: () => set((s: any) => {
+  clear: () => set((s) => {
     const W = s.width, H = s.height
     const curSnap = {
       width: s.width,

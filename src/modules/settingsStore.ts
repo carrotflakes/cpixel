@@ -46,18 +46,18 @@ export const useSettingsStore = create<SettingsState>()(
         tiltParallaxAmount: s.tiltParallaxAmount,
       }),
       migrate: (persisted, fromVersion) => {
-    if (!persisted) return { checkerSize: 4, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5 }
+        if (!persisted) return { checkerSize: 4, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5 }
         if (fromVersion === 1) {
           const cs = Math.max(1, Math.min(64, Math.floor((persisted as any).checkerSize ?? 4)))
-      ; return { checkerSize: cs, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5 }
+            ; return { checkerSize: cs, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5 }
         }
         const cs = Math.max(1, Math.min(64, Math.floor((persisted as any).checkerSize ?? 4)))
         const en = typeof (persisted as any).tiltParallaxEnabled === 'boolean' ? (persisted as any).tiltParallaxEnabled : true
         const trgRaw = (persisted as any).tiltParallaxTrigger
         const trg = Math.max(20, Math.min(720, Number.isFinite(trgRaw) ? Math.round(trgRaw) : 180))
-    const amtRaw = (persisted as any).tiltParallaxAmount
-    const amount = Math.max(0.05, Math.min(5, Number.isFinite(amtRaw) ? Number(amtRaw) : 0.5))
-    return { checkerSize: cs, tiltParallaxEnabled: en, tiltParallaxTrigger: trg, tiltParallaxAmount: amount }
+        const amtRaw = (persisted as any).tiltParallaxAmount
+        const amount = Math.max(0.05, Math.min(5, Number.isFinite(amtRaw) ? Number(amtRaw) : 0.5))
+        return { checkerSize: cs, tiltParallaxEnabled: en, tiltParallaxTrigger: trg, tiltParallaxAmount: amount }
       },
     }
   )

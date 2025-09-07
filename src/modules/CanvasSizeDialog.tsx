@@ -35,7 +35,7 @@ export function CanvasSizeDialog({ open, initialWidth, initialHeight, onCancel, 
       if (e.key === 'Enter') { e.preventDefault(); submit() }
     }
     window.addEventListener('keydown', onKey, { capture: true })
-    return () => window.removeEventListener('keydown', onKey as any, { capture: true } as any)
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
   }, [open, wStr, hStr])
 
   const submit = () => {

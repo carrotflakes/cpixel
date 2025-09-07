@@ -31,8 +31,8 @@ export function ToolSelector() {
     window.addEventListener('keydown', onKey, { capture: true })
     window.addEventListener('pointerdown', onDown, { capture: true })
     return () => {
-      window.removeEventListener('keydown', onKey, { capture: true } as any)
-      window.removeEventListener('pointerdown', onDown, { capture: true } as any)
+      window.removeEventListener('keydown', onKey, { capture: true })
+      window.removeEventListener('pointerdown', onDown, { capture: true })
     }
   }, [selOpen])
 

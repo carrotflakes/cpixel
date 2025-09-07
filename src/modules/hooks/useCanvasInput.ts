@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { usePixelStore, MIN_SIZE, MAX_SIZE } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
-import { compositePixel, findTopPaletteIndex } from '../utils/composite'
+import { compositePixel, findTopPaletteIndex, LayerLike } from '../utils/composite'
 import { isPointInMask, polygonToMask, magicWandMask } from '../utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
@@ -94,14 +94,14 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (!inBounds(x, y)) { setHoverCell(null); setHoverInfo(undefined); return }
     setHoverCell({ x, y })
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
-    const idx = mode === 'indexed' ? findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
+    const idx = mode === 'indexed' ? findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
     setHoverInfo({ x, y, rgba: hov, index: idx })
   }
   const pickColorAt = (x: number, y: number, updateHoverInfo: boolean) => {
     if (!inBounds(x, y)) return
     const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
     if (mode === 'indexed') {
-      const idx = findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) ?? transparentIndex
+      const idx = findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex
       if (updateHoverInfo) setHoverInfo({ x, y, rgba, index: idx })
       setColorIndex(idx)
     } else {
@@ -165,7 +165,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           if (mode === 'truecolor') {
             return compositePixel(layers, px, py, mode, palette, transparentIndex, W, H) >>> 0
           } else {
-            const idx = findTopPaletteIndex(layers as any, px, py, W, H, transparentIndex) ?? transparentIndex
+            const idx = findTopPaletteIndex(layers as LayerLike[], px, py, W, H, transparentIndex) ?? transparentIndex
             return idx & 0xff
           }
         }

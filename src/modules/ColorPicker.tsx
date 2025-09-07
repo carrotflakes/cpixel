@@ -93,8 +93,8 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
     window.addEventListener('keydown', onKey, { capture: true })
     window.addEventListener('pointerdown', onDown, { capture: true })
     return () => {
-      window.removeEventListener('keydown', onKey, { capture: true } as any)
-      window.removeEventListener('pointerdown', onDown, { capture: true } as any)
+      window.removeEventListener('keydown', onKey, { capture: true })
+      window.removeEventListener('pointerdown', onDown, { capture: true })
     }
   }, [open, onClose, hsv])
 

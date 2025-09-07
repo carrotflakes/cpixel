@@ -26,13 +26,13 @@ export function normalizeImportedJSON(
   data: unknown,
   defaults: { palette: Uint32Array; color: string; recentColorsTruecolor: string[]; recentColorsIndexed: number[] },
 ): NormalizedImport | null {
-  const isObj = (v: any) => v && typeof v === 'object'
+  const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
   if (!isObj(data)) return null
-  const obj: any = data
+  const obj = data as Record<string, unknown>
   if (obj.app !== 'cpixel') return null
   const impMode: 'truecolor' | 'indexed' = obj.mode === 'indexed' ? 'indexed' : 'truecolor'
-  const width = Math.max(1, (obj.width | 0))
-  const height = Math.max(1, (obj.height | 0))
+  const width = Math.max(1, (typeof obj.width === 'number' ? (obj.width | 0) : 0))
+  const height = Math.max(1, (typeof obj.height === 'number' ? (obj.height | 0) : 0))
   const targetSize = width * height
   const clampSize = (arr: number[], fill = 0) => {
     const out = new Array<number>(targetSize)
@@ -51,17 +51,18 @@ export function normalizeImportedJSON(
   const ti = Math.max(0, Math.min(transparentIndexIn | 0, Math.max(0, nextPalette.length - 1)))
   if (nextPalette.length > 0) nextPalette[ti] = 0x00000000
 
-  const nextLayers = layersIn.map((l: any, idx: number) => {
-    const id = typeof l?.id === 'string' ? l.id : `L${idx + 1}`
-    const visible = l?.visible !== false
-    const locked = !!l?.locked
+  const nextLayers = layersIn.map((l: unknown, idx: number) => {
+    const rec = l as Record<string, unknown> | undefined
+    const id = typeof rec?.id === 'string' ? rec.id : `L${idx + 1}`
+    const visible = rec?.visible !== false
+    const locked = !!rec?.locked
     if (impMode === 'truecolor') {
-      if (Array.isArray(l?.data)) {
-        const dataArr: number[] = clampSize(l.data, 0)
+      if (Array.isArray(rec?.data)) {
+        const dataArr: number[] = clampSize(rec.data as number[], 0)
         const data = new Uint32Array(dataArr.map(v => v >>> 0))
         return { id, visible, locked, data }
-      } else if (Array.isArray(l?.indices)) {
-        const idxArr: number[] = clampSize(l.indices, ti)
+      } else if (Array.isArray(rec?.indices)) {
+        const idxArr: number[] = clampSize(rec.indices as number[], ti)
         const data = new Uint32Array(targetSize)
         for (let i = 0; i < targetSize; i++) {
           const pi = (idxArr[i] | 0) & 0xff
@@ -73,12 +74,12 @@ export function normalizeImportedJSON(
         return { id, visible, locked, data }
       }
     } else {
-      if (Array.isArray(l?.indices)) {
-        const idxArr: number[] = clampSize(l.indices, ti)
+      if (Array.isArray(rec?.indices)) {
+        const idxArr: number[] = clampSize(rec.indices as number[], ti)
         const indices = new Uint8Array(idxArr.map(v => (v | 0) & 0xff))
         return { id, visible, locked, indices }
-      } else if (Array.isArray(l?.data)) {
-        const srcArr: number[] = clampSize(l.data, 0)
+      } else if (Array.isArray(rec?.data)) {
+        const srcArr: number[] = clampSize(rec.data as number[], 0)
         const indices = new Uint8Array(targetSize)
         for (let i = 0; i < targetSize; i++) {
           const rgba = (srcArr[i] >>> 0)
@@ -98,13 +99,13 @@ export function normalizeImportedJSON(
   const nextColor = typeof obj.color === 'string' ? obj.color : defaults.color
   // Backward compatibility: if flat recentColors provided, apply to truecolor list
   const flatRecent = Array.isArray(obj.recentColors)
-    ? obj.recentColors.filter((x: any) => typeof x === 'string').slice(0, 10)
+    ? (obj.recentColors as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 10)
     : undefined
   const rcTrue = Array.isArray(obj.recentColorsTruecolor)
-    ? obj.recentColorsTruecolor.filter((x: any) => typeof x === 'string').slice(0, 10)
+    ? (obj.recentColorsTruecolor as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 10)
     : (flatRecent ?? defaults.recentColorsTruecolor)
   const rcIndexed = Array.isArray(obj.recentColorsIndexed)
-    ? obj.recentColorsIndexed.filter((x: any) => Number.isFinite(x)).map((x: any) => x | 0).slice(0, 10)
+    ? (obj.recentColorsIndexed as unknown[]).filter(x => Number.isFinite(Number(x))).map(x => Number(x) | 0).slice(0, 10)
     : defaults.recentColorsIndexed
 
   return {

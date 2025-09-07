@@ -45,8 +45,8 @@ export function PalettePanel() {
     window.addEventListener('pointerdown', close, { capture: true })
     window.addEventListener('keydown', close, { capture: true })
     return () => {
-      window.removeEventListener('pointerdown', close, { capture: true } as any)
-      window.removeEventListener('keydown', close, { capture: true } as any)
+      window.removeEventListener('pointerdown', close, { capture: true })
+      window.removeEventListener('keydown', close, { capture: true })
     }
   }, [mode])
 

@@ -22,8 +22,8 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     if (!open) return
     setCheckerStr(String(checkerSize))
     setTiltTriggerStr(String(tiltTrigger))
-  setTiltEnabledLocal(tiltEnabled)
-  setTiltAmountStr(String(tiltAmount))
+    setTiltEnabledLocal(tiltEnabled)
+    setTiltAmountStr(String(tiltAmount))
     const t = setTimeout(() => firstRef.current?.focus(), 0)
     return () => clearTimeout(t)
   }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount])
@@ -35,7 +35,7 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
       if (e.key === 'Enter') { e.preventDefault(); apply() }
     }
     window.addEventListener('keydown', onKey, { capture: true })
-    return () => window.removeEventListener('keydown', onKey as any, { capture: true } as any)
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
   }, [open, checkerStr])
 
   const apply = () => {
