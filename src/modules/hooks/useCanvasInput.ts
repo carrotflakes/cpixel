@@ -142,6 +142,10 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const startTool = (x: number, y: number, e: { button: number, shiftKey: boolean }) => {
     if (!inBounds(x, y)) return false
+
+    // If a selection mask exists and pointer is outside, block starting paint / shape tools (selection tools still allowed)
+    if (!isSelectionTool() && selectionMask && !pointInSelection(x, y)) return false
+
     if (isSelectionTool()) {
       // drag move if inside selection, else start creating
       if (selectionMask && pointInSelection(x, y)) {

@@ -395,6 +395,15 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     set((s) => {
       const W = s.width, H = s.height
       if (x < 0 || y < 0 || x >= W || y >= H) return {}
+
+      // Block painting while a floating selection exists to force commit first
+      if (s.selection?.floating) return {}
+      // Selection mask constraint
+      if (s.selection?.mask) {
+        const i = y * W + x
+        if (!s.selection.mask[i]) return {}
+      }
+
       const li = s.layers.findIndex(l => l.id === s.activeLayerId)
       if (li < 0) return {}
       const layer = s.layers[li]
@@ -428,13 +437,17 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       if (li < 0) return {}
       const layer = s.layers[li]
       if (layer.locked) return {}
+      if (s.selection?.floating) return {}
       if (!inBounds(x0, y0) && !inBounds(x1, y1)) return {}
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
         const out = new Uint32Array(layer.data ?? new Uint32Array(W * H))
         // Rasterize line using shared Bresenham helper
         rasterizeLine(x0, y0, x1, y1, (x, y) => {
-          if (inBounds(x, y)) out[y * W + x] = rgbaOrIndex >>> 0
+          if (!inBounds(x, y)) return
+          const i = y * W + x
+          if (s.selection?.mask && !s.selection.mask[i]) return
+          out[i] = rgbaOrIndex >>> 0
         })
         if (layer.data && equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
@@ -444,7 +457,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         const writeIndex = rgbaOrIndex
         const out = new Uint8Array(idxArr)
         rasterizeLine(x0, y0, x1, y1, (x, y) => {
-          if (inBounds(x, y)) out[y * W + x] = writeIndex & 0xff
+          if (!inBounds(x, y)) return
+          const i = y * W + x
+          if (s.selection?.mask && !s.selection.mask[i]) return
+          out[i] = writeIndex & 0xff
         })
         if (equalU8(out, idxArr)) return {}
         layers[li] = { ...layer, indices: out }
@@ -466,19 +482,24 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       if (li < 0) return {}
       const layer = s.layers[li]
       if (layer.locked) return {}
+      if (s.selection?.floating) return {}
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
         const out = new Uint32Array(layer.data ?? new Uint32Array(W * H))
         const pix = rgbaOrIndex >>> 0
         // top/bottom
         for (let x = left; x <= right; x++) {
-          out[top * W + x] = pix
-          out[bottom * W + x] = pix
+          const it = top * W + x
+          const ib = bottom * W + x
+          if (!s.selection?.mask || s.selection.mask[it]) out[it] = pix
+          if (!s.selection?.mask || s.selection.mask[ib]) out[ib] = pix
         }
         // sides
         for (let y = top; y <= bottom; y++) {
-          out[y * W + left] = pix
-          out[y * W + right] = pix
+          const il = y * W + left
+          const ir = y * W + right
+          if (!s.selection?.mask || s.selection.mask[il]) out[il] = pix
+          if (!s.selection?.mask || s.selection.mask[ir]) out[ir] = pix
         }
         if (layer.data && equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
@@ -488,12 +509,16 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         const writeIndex = rgbaOrIndex
         const out = new Uint8Array(idxArr)
         for (let x = left; x <= right; x++) {
-          out[top * W + x] = writeIndex & 0xff
-          out[bottom * W + x] = writeIndex & 0xff
+          const it = top * W + x
+          const ib = bottom * W + x
+          if (!s.selection?.mask || s.selection.mask[it]) out[it] = writeIndex & 0xff
+          if (!s.selection?.mask || s.selection.mask[ib]) out[ib] = writeIndex & 0xff
         }
         for (let y = top; y <= bottom; y++) {
-          out[y * W + left] = writeIndex & 0xff
-          out[y * W + right] = writeIndex & 0xff
+          const il = y * W + left
+          const ir = y * W + right
+          if (!s.selection?.mask || s.selection.mask[il]) out[il] = writeIndex & 0xff
+          if (!s.selection?.mask || s.selection.mask[ir]) out[ir] = writeIndex & 0xff
         }
         if (equalU8(out, idxArr)) return {}
         layers[li] = { ...layer, indices: out }
@@ -506,6 +531,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     set((s) => {
       const W = s.width, H = s.height
       if (x < 0 || y < 0 || x >= W || y >= H) return {}
+      if (s.selection?.floating) return {}
+      const mask = s.selection?.mask
+      if (mask) {
+        const i0 = y * W + x
+        if (!mask[i0]) return {}
+      }
       const li = s.layers.findIndex(l => l.id === s.activeLayerId)
       if (li < 0) return {}
       const layer = s.layers[li]
@@ -513,7 +544,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
         const src = layer.data ?? new Uint32Array(W * H)
-        const out = floodFillTruecolor(src, W, H, x, y, rgbaOrIndex, contiguous)
+        const out = floodFillTruecolor(src, W, H, x, y, rgbaOrIndex, contiguous, mask)
         if (out === src || (layer.data && equalU32(out, layer.data))) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
@@ -521,7 +552,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         // indexed mode
         const idxArr = layer.indices ?? new Uint8Array(W * H)
         const replacementIdx = rgbaOrIndex
-        const out = floodFillIndexed(idxArr, W, H, x, y, replacementIdx, contiguous, s.transparentIndex)
+        const out = floodFillIndexed(idxArr, W, H, x, y, replacementIdx, contiguous, s.transparentIndex, mask)
         if (out === idxArr || equalU8(out, idxArr)) return {}
         layers[li] = { ...layer, indices: out }
         return { layers }
