@@ -23,14 +23,10 @@ export function PixelCanvas() {
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
   const tiltAmount = useSettingsStore(s => s.tiltParallaxAmount)
   const setView = usePixelStore(s => s.setView)
-  const selectionMask = usePixelStore(s => s.selectionMask)
-  const selectionBounds = usePixelStore(s => s.selectionBounds)
-  const selectionOffsetX = usePixelStore(s => s.selectionOffsetX)
-  const selectionOffsetY = usePixelStore(s => s.selectionOffsetY)
-  const selectionFloating = usePixelStore(s => s.selectionFloating)
+  const selection = usePixelStore(s => s.selection)
   const clearSelection = usePixelStore(s => s.clearSelection)
 
-  const { rotationRate, rotationRateRef, motionPermission, requestMotionPermission } = useTilt({enabled: tiltEnabled})
+  const { rotationRate, rotationRateRef, motionPermission, requestMotionPermission } = useTilt({ enabled: tiltEnabled })
   const { active: parallaxActive, shiftOffsetRef, shiftTick } = useTiltParallax(rotationRate, rotationRateRef, { trigger: tiltTrigger, amount: tiltAmount, enabled: tiltEnabled && !interactionActive })
 
   const scaledW = W * view.scale
@@ -62,7 +58,7 @@ export function PixelCanvas() {
 
   // Animate marching ants
   useEffect(() => {
-    if (!selectionMask || !selectionBounds) {
+    if (!selection.mask || !selection.bounds) {
       setAntsPhase(0)
       return
     }
@@ -75,7 +71,7 @@ export function PixelCanvas() {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [selectionMask, selectionBounds])
+  }, [selection.mask, selection.bounds])
 
   useEffect(() => {
     const cvs = canvasRef.current
@@ -159,24 +155,24 @@ export function PixelCanvas() {
       )
     }
     // selection overlay and floating
-    if (selectionMask && selectionBounds) {
-      drawSelectionOverlay(ctx, selectionMask, W, H, view.scale)
-      const dx = (selectionOffsetX ?? 0)
-      const dy = (selectionOffsetY ?? 0)
+    if (selection.mask && selection.bounds) {
+      drawSelectionOverlay(ctx, selection.mask, W, H, view.scale)
+      const dx = (selection.offsetX ?? 0)
+      const dy = (selection.offsetY ?? 0)
       const s = view.scale
-      const left = (selectionBounds.left + dx) * s + 0.5
-      const top = (selectionBounds.top + dy) * s + 0.5
-      const width = (selectionBounds.right - selectionBounds.left + 1) * s - 1
-      const height = (selectionBounds.bottom - selectionBounds.top + 1) * s - 1
+      const left = (selection.bounds.left + dx) * s + 0.5
+      const top = (selection.bounds.top + dy) * s + 0.5
+      const width = (selection.bounds.right - selection.bounds.left + 1) * s - 1
+      const height = (selection.bounds.bottom - selection.bounds.top + 1) * s - 1
       ctx.save()
       ctx.strokeStyle = '#000'
       ctx.setLineDash([4, 3])
       ctx.lineDashOffset = -antsPhase
       ctx.strokeRect(left, top, width, height)
       ctx.restore()
-      if (selectionFloating) {
-        const bw = selectionBounds.right - selectionBounds.left + 1
-        const bh = selectionBounds.bottom - selectionBounds.top + 1
+      if (selection.floating) {
+        const bw = selection.bounds.right - selection.bounds.left + 1
+        const bh = selection.bounds.bottom - selection.bounds.top + 1
         if (!floatCanvasRef.current) floatCanvasRef.current = document.createElement('canvas')
         if (floatCanvasRef.current.width !== bw || floatCanvasRef.current.height !== bh) {
           floatCanvasRef.current.width = bw
@@ -184,7 +180,7 @@ export function PixelCanvas() {
         }
         const fctx = floatCanvasRef.current.getContext('2d')!
         const img = fctx.createImageData(bw, bh)
-        const src = selectionFloating
+        const src = selection.floating
         for (let i = 0, p = 0; i < src.length; i++, p += 4) {
           const rgba = src[i] >>> 0
           img.data[p] = (rgba >>> 24) & 0xff
@@ -193,14 +189,14 @@ export function PixelCanvas() {
           img.data[p + 3] = rgba & 0xff
         }
         fctx.putImageData(img, 0, 0)
-        ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selectionBounds.left + dx) * s, (selectionBounds.top + dy) * s, bw * s, bh * s)
+        ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selection.bounds.left + dx) * s, (selection.bounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selectionMask, selectionBounds, selectionOffsetX, selectionOffsetY, selectionFloating, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick])
+  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick])
 
   const overlay = (() => {
     if (parallaxActive) return null // hide selection UI in parallax mode
-    if (!selectionMask || !selectionBounds) return null
+    if (!selection.mask || !selection.bounds) return null
     return (
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
         <button

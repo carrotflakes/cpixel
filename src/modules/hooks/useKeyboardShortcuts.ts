@@ -7,9 +7,7 @@ export function useKeyboardShortcuts(
 ) {
   const undo = usePixelStore(s => s.undo)
   const redo = usePixelStore(s => s.redo)
-  const copySelection = usePixelStore(s => s.copySelection)
-  const cutSelection = usePixelStore(s => s.cutSelection)
-  const pasteClipboard = usePixelStore(s => s.pasteClipboard)
+  const selectionBounds = usePixelStore(s => s.selection.bounds)
 
   // beginStroke/endStroke and selectionBounds are referenced via getState when needed
   useEffect(() => {
@@ -21,7 +19,7 @@ export function useKeyboardShortcuts(
     }
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', onKeyDown, { capture: true })
     }
   }, [canvasRef, clearSelection])
 
@@ -33,33 +31,33 @@ export function useKeyboardShortcuts(
       const k = e.key.toLowerCase()
       if (k === 'z') {
         if (e.shiftKey) { redo(); e.preventDefault() }
-        else { undo(); e.preventDefault() }
+        else { undo(); e.preventDefault(); }
         return
       }
       // Copy / Cut / Paste for selections
       if (k === 'c') {
-        if ((usePixelStore.getState() as any).selectionBounds) {
-          copySelection();
+        if (selectionBounds) {
+          usePixelStore.getState().copySelection();
           e.preventDefault()
         }
         return
       }
       if (k === 'x') {
-        if ((usePixelStore.getState() as any).selectionBounds) {
-          (usePixelStore.getState() as any).beginStroke()
-          cutSelection();
-          (usePixelStore.getState() as any).endStroke()
+        if (selectionBounds) {
+          usePixelStore.getState().beginStroke()
+          usePixelStore.getState().cutSelection();
+          usePixelStore.getState().endStroke()
           e.preventDefault()
         }
         return
       }
       if (k === 'v') {
-        pasteClipboard();
+        usePixelStore.getState().pasteClipboard();
         e.preventDefault()
         return
       }
     }
     window.addEventListener('keydown', onKey, { capture: true })
-    return () => window.removeEventListener('keydown', onKey as any, { capture: true } as any)
-  }, [undo, redo, copySelection, cutSelection, pasteClipboard])
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [undo, redo, selectionBounds])
 }

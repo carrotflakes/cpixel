@@ -142,7 +142,7 @@ export function MoreMenu() {
   const pasteClipboard = usePixelStore(s => s.pasteClipboard)
   const canUndo = usePixelStore(s => s.canUndo)
   const canRedo = usePixelStore(s => s.canRedo)
-  const hasSelection = usePixelStore(s => !!s.selectionBounds)
+  const hasSelection = usePixelStore(s => !!s.selection?.bounds)
   const hasClipboard = usePixelStore(s => !!s.clipboard)
 
   return (

@@ -56,7 +56,7 @@ export function useTilt({ enabled = true }: { enabled?: boolean }) {
       if (motionPermission === 'unknown' || motionPermission === 'prompt') setMotionPermission('granted')
       forceRender()
     }
-    window.addEventListener('devicemotion', handler, { passive: true })
+    window.addEventListener('devicemotion', handler)
     return () => window.removeEventListener('devicemotion', handler)
   }, [enabled, forceRender, motionPermission])
 

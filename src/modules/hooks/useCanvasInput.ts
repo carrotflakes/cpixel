@@ -32,7 +32,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const tool = usePixelStore(s => s.tool)
   const setView = usePixelStore(s => s.setView)
   const setHoverInfo = usePixelStore(s => s.setHoverInfo)
-  const selectionMask = usePixelStore(s => s.selectionMask)
+  const selectionMask = usePixelStore(s => s.selection?.mask)
   const setSelectionRect = usePixelStore(s => s.setSelectionRect)
   const setSelectionMask = usePixelStore(s => s.setSelectionMask)
   const clearSelection = usePixelStore(s => s.clearSelection)
