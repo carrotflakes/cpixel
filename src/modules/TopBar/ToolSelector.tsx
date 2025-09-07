@@ -1,5 +1,5 @@
 import { FaEraser } from 'react-icons/fa'
-import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette } from 'react-icons/lu'
+import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette, LuCheck } from 'react-icons/lu'
 import { PiLasso, PiRectangleDashed, PiMagicWand } from 'react-icons/pi'
 import { usePixelStore } from '../store'
 import { useRef, useState, useEffect } from 'react'
@@ -123,7 +123,7 @@ export function ToolSelector() {
           const Icon = t.icon
           return (
             <MenuItem key={t.id} onSelect={() => { setTool(t.id); setSelOpen(false) }}>
-              {selectTool === t.id ? <span className="w-4 inline-block">✓</span> : <span className="w-4 inline-block" />}
+              {selectTool === t.id ? <span className="w-4 inline-block"><LuCheck /></span> : <span className="w-4 inline-block" />}
               <Icon />
               <span>{t.name}</span>
             </MenuItem>
