@@ -12,9 +12,12 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const setTiltTrigger = useSettingsStore(s => s.setTiltParallaxTrigger)
   const tiltAmount = useSettingsStore(s => s.tiltParallaxAmount)
   const setTiltAmount = useSettingsStore(s => s.setTiltParallaxAmount)
+  const tiltAlpha = useSettingsStore(s => s.tiltParallaxAlpha)
+  const setTiltAlpha = useSettingsStore(s => s.setTiltParallaxAlpha)
   const [checkerStr, setCheckerStr] = useState(String(checkerSize))
   const [tiltTriggerStr, setTiltTriggerStr] = useState(String(tiltTrigger))
   const [tiltAmountStr, setTiltAmountStr] = useState(String(tiltAmount))
+  const [tiltAlphaStr, setTiltAlphaStr] = useState(String(tiltAlpha))
   const [tiltEnabledLocal, setTiltEnabledLocal] = useState<boolean>(tiltEnabled)
   const firstRef = useRef<HTMLInputElement | null>(null)
 
@@ -24,9 +27,10 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     setTiltTriggerStr(String(tiltTrigger))
     setTiltEnabledLocal(tiltEnabled)
     setTiltAmountStr(String(tiltAmount))
+    setTiltAlphaStr(String(tiltAlpha))
     const t = setTimeout(() => firstRef.current?.focus(), 0)
     return () => clearTimeout(t)
-  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount])
+  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount, tiltAlpha])
 
   useEffect(() => {
     if (!open) return
@@ -53,6 +57,11 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     if (Number.isFinite(a)) {
       const normA = Math.max(0.05, Math.min(5, a))
       setTiltAmount(normA)
+    }
+    const al = Number(tiltAlphaStr)
+    if (Number.isFinite(al)) {
+      const normAl = Math.max(0.05, Math.min(1, al))
+      setTiltAlpha(normAl)
     }
     setTiltEnabled(tiltEnabledLocal)
     onClose()
@@ -116,6 +125,20 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
                 className="w-full rounded border border-border bg-surface p-1"
                 value={tiltAmountStr}
                 onChange={(e) => setTiltAmountStr(e.target.value)}
+                disabled={!tiltEnabledLocal}
+              />
+            </label>
+            <label className="flex flex-col gap-1 max-w-40">
+              <span className="text-sm text-muted">Layer alpha</span>
+              <input
+                type="number"
+                step={0.05}
+                min={0.05}
+                max={1}
+                inputMode="decimal"
+                className="w-full rounded border border-border bg-surface p-1"
+                value={tiltAlphaStr}
+                onChange={(e) => setTiltAlphaStr(e.target.value)}
                 disabled={!tiltEnabledLocal}
               />
             </label>

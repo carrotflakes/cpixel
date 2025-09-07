@@ -22,6 +22,7 @@ export function PixelCanvas() {
   const tiltEnabled = useSettingsStore(s => s.tiltParallaxEnabled)
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
   const tiltAmount = useSettingsStore(s => s.tiltParallaxAmount)
+  const tiltAlpha = useSettingsStore(s => s.tiltParallaxAlpha)
   const setView = usePixelStore(s => s.setView)
   const selection = usePixelStore(s => s.selection)
   const clearSelection = usePixelStore(s => s.clearSelection)
@@ -112,7 +113,10 @@ export function PixelCanvas() {
         const dx = -shiftOffsetRef.current.dx * depth / layers.length
         const dy = -shiftOffsetRef.current.dy * depth / layers.length
         const s = view.scale
+        ctx.save()
+        ctx.globalAlpha = tiltAlpha
         ctx.drawImage(layerCvs, 0, 0, W, H, dx * s, dy * s, scaledW, scaledH)
+        ctx.restore()
       }
       drawBorder(ctx, scaledW, scaledH)
       return
