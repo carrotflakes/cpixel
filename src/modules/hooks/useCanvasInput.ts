@@ -41,6 +41,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
 
+  const TOUCH_MOVE_DIST_THRESHOLD = 5 * window.devicePixelRatio
+
   const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null)
   const [shapePreview, setShapePreview] = useState<ShapePreview>({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
 
@@ -119,9 +121,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const endBrush = () => {
     mouseStroke.current = { active: false, erase: false }
   }
-  const addPointer = (id: number, x: number, y: number) => {
-    if (!touchState.current.pointers.some(p => p.id === id))
-      touchState.current.pointers.push({ id, startX: x, startY: y })
+  const addPointer = (e: { pointerId: number, clientX: number, clientY: number }) => {
+    if (!touchState.current.pointers.some(p => p.id === e.pointerId))
+      touchState.current.pointers.push({ id: e.pointerId, startX: e.clientX, startY: e.clientY })
   }
 
   const startTool = (x: number, y: number, e: { button: number, shiftKey: boolean }) => {
@@ -206,7 +208,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (e.pointerType === 'touch') {
           state.current = 'firstTouch'
 
-          addPointer(e.pointerId, x, y)
+          addPointer(e)
 
           firstTouch.current = { x, y, clientX: e.clientX, clientY: e.clientY, button: e.button, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey }
         } else {
@@ -228,15 +230,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           onPointer(e)
         }
         return
-      case "pinch":
-        if (e.pointerType === 'touch') {
-          addPointer(e.pointerId, x, y)
-          touchState.current.maxPointers = Math.max(touchState.current.maxPointers, touchState.current.pointers.length)
-        }
-        return
       case "firstTouch":
         if (e.pointerType === 'touch') {
-          addPointer(e.pointerId, x, y)
+          addPointer(e)
           if (touchState.current.pointers.length === 2) {
             state.current = "pinch"
 
@@ -249,6 +245,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             touchState.current.gestureMoved = false
             touchState.current.maxPointers = 2
           }
+        }
+        return
+      case "pinch":
+        if (e.pointerType === 'touch') {
+          addPointer(e)
+          touchState.current.maxPointers = Math.max(touchState.current.maxPointers, touchState.current.pointers.length)
         }
         return
       case "tool":
@@ -269,6 +271,10 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       case "firstTouch":
         const f = firstTouch.current
         if (f) {
+          const dist = Math.hypot(e.clientX - f.clientX, e.clientY - f.clientY)
+          if (dist < TOUCH_MOVE_DIST_THRESHOLD)
+            return
+
           firstTouch.current = null
           state.current = 'tool'
           toolPointerId.current = e.pointerId
@@ -386,10 +392,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (e.pointerType === 'touch') {
       const pointer = touchState.current.pointers.find(p => p.id === e.pointerId)
       if (pointer) {
-        const { x, y } = pickPoint(e.clientX, e.clientY)
-        if (Math.hypot(pointer.startX - x, pointer.startY - y) > 10) {
+        if (Math.hypot(pointer.startX - e.clientX, pointer.startY - e.clientY) > TOUCH_MOVE_DIST_THRESHOLD)
           touchState.current.gestureMoved = true
-        }
       }
       touchState.current.pointers = touchState.current.pointers.filter(p => p.id !== e.pointerId)
       if (touchState.current.pointers.length < 2) {
