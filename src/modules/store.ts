@@ -22,6 +22,8 @@ type Layer = {
   indices?: Uint8Array
 }
 
+export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand'
+
 export type PixelState = {
   width: number
   height: number
@@ -35,7 +37,7 @@ export type PixelState = {
   mode: 'truecolor' | 'indexed'
   palette: Uint32Array
   transparentIndex: number
-  tool: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand'
+  tool: ToolType
   selectTool: 'select-rect' | 'select-lasso' | 'select-wand'
   setColor: (c: string) => void
   pushRecentColor: () => void
@@ -54,7 +56,7 @@ export type PixelState = {
   removePaletteIndex: (idx: number) => void
   movePaletteIndex: (from: number, to: number) => void
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
-  setTool: (t: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand') => void
+  setTool: (t: ToolType) => void
   setView: (x: number, y: number, scale: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
   drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
