@@ -197,3 +197,67 @@ export function drawRectOutlineIndexed(
   }
   return changed ? out : src
 }
+
+// Filled rectangle (includes outline) for truecolor mode
+export function drawRectFilledTruecolor(
+  src: Uint32Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  rgba: number,
+  selectionMask?: Uint8Array,
+): Uint32Array {
+  const out = new Uint32Array(src)
+  let changed = false
+  x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
+  let left = Math.max(0, Math.min(x0, x1))
+  let right = Math.min(W - 1, Math.max(x0, x1))
+  let top = Math.max(0, Math.min(y0, y1))
+  let bottom = Math.min(H - 1, Math.max(y0, y1))
+  if (left > right || top > bottom) return src
+  const pix = rgba >>> 0
+  for (let y = top; y <= bottom; y++) {
+    const row = y * W
+    for (let x = left; x <= right; x++) {
+      const i = row + x
+      if (selectionMask && !selectionMask[i]) continue
+      if (out[i] !== pix) { out[i] = pix; changed = true }
+    }
+  }
+  return changed ? out : src
+}
+
+// Filled rectangle (includes outline) for indexed mode
+export function drawRectFilledIndexed(
+  src: Uint8Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  index: number,
+  selectionMask?: Uint8Array,
+): Uint8Array {
+  const out = new Uint8Array(src)
+  let changed = false
+  x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
+  let left = Math.max(0, Math.min(x0, x1))
+  let right = Math.min(W - 1, Math.max(x0, x1))
+  let top = Math.max(0, Math.min(y0, y1))
+  let bottom = Math.min(H - 1, Math.max(y0, y1))
+  if (left > right || top > bottom) return src
+  const v = index & 0xff
+  for (let y = top; y <= bottom; y++) {
+    const row = y * W
+    for (let x = left; x <= right; x++) {
+      const i = row + x
+      if (selectionMask && !selectionMask[i]) continue
+      if (out[i] !== v) { out[i] = v; changed = true }
+    }
+  }
+  return changed ? out : src
+}

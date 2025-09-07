@@ -27,17 +27,30 @@ export function ToolSelector() {
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
   const maxDim = Math.max(W, H)
+  const rectFill = usePixelStore(s => s.rectFill)
+  const toggleRectFill = usePixelStore(s => s.toggleRectFill)
+
+  // Rect options menu (fill toggle)
+  const rectBtnRef = useRef<HTMLButtonElement | null>(null)
+  const rectMenuRef = useRef<HTMLDivElement | null>(null)
+  const [rectOpen, setRectOpen] = useState(false)
+  const [rectPos, setRectPos] = useState({ x: 0, y: 0 })
 
   // Outside click & Escape close
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelOpen(false); setBrushOpen(false) } }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelOpen(false); setBrushOpen(false); setRectOpen(false) } }
     const onDown = (e: MouseEvent | PointerEvent) => {
       const t = e.target as Node | null
-      const insideBtn = t && [selBtnRef.current, brushBtnRef.current].some(btn => btn && btn.contains(t))
-      const insideMenu = t && [selMenuRef.current, brushMenuRef.current].some(menu => menu && menu.contains(t))
-      if (insideBtn || insideMenu) return
-      setSelOpen(false)
-      setBrushOpen(false)
+      for (const [btn, menu, setOpen] of [
+        [selBtnRef.current, selMenuRef.current, setSelOpen] as const,
+        [brushBtnRef.current, brushMenuRef.current, setBrushOpen] as const,
+        [rectBtnRef.current, rectMenuRef.current, setRectOpen] as const
+      ]) {
+        const insideBtn = btn && btn.contains(t)
+        const insideMenu = menu && menu.contains(t)
+        if (insideBtn || insideMenu) continue
+        setOpen(false)
+      }
     }
     window.addEventListener('keydown', onKey, { capture: true })
     window.addEventListener('pointerdown', onDown, { capture: true })
@@ -110,10 +123,23 @@ export function ToolSelector() {
           <span className="hidden sm:inline">Line</span>
         </button>
         <button
+          ref={rectBtnRef}
           className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'rect' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-          onClick={() => setTool('rect')}
+          onClick={() => {
+            setTool('rect')
+            if (!rectBtnRef.current) return
+            const r = rectBtnRef.current.getBoundingClientRect()
+            const margin = 6
+            const minW = 160
+            const x = Math.min(window.innerWidth - minW - margin, Math.max(margin, r.left))
+            const y = Math.min(window.innerHeight - 10 - margin, r.bottom + margin)
+            setRectPos({ x, y })
+            setRectOpen(o => !o)
+          }}
           aria-pressed={tool === 'rect'}
-          title="Rect"
+          aria-haspopup="menu"
+          aria-expanded={rectOpen}
+          title={`Rect (${rectFill ? 'Filled' : 'Outline'})`}
         >
           <LuSquare aria-hidden />
           <span className="hidden sm:inline">Rect</span>
@@ -176,6 +202,18 @@ export function ToolSelector() {
                 className={`px-2 py-1 rounded border text-xs ${brushSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
               >{sz}</button>
             ))}
+          </div>
+        </div>
+      </Menu>
+      {/* Rect options menu */}
+      <Menu open={rectOpen} x={rectPos.x} y={rectPos.y} menuRef={rectMenuRef} minWidth={160}>
+        <div className="px-3 py-2 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <span>Fill</span>
+            <button
+              onClick={() => { toggleRectFill(); setRectOpen(false) }}
+              className={`px-2 py-1 rounded border text-xs ${rectFill ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
+            >{rectFill ? 'On' : 'Off'}</button>
           </div>
         </div>
       </Menu>

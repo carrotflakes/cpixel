@@ -5,7 +5,7 @@ import { generatePaletteFromComposite } from './utils/palette'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 import { equalU32, equalU8 } from './utils/arrays'
-import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed } from './utils/paint'
+import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed } from './utils/paint'
 import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard } from './utils/selection'
 import { resizeLayers } from './utils/resize'
 import { compositeImageData } from './utils/composite'
@@ -33,6 +33,7 @@ export type PixelState = {
   view: { x: number; y: number; scale: number }
   color: string
   brushSize: number
+  rectFill: boolean
   currentPaletteIndex?: number
   recentColorsTruecolor: string[]
   recentColorsIndexed: number[] // palette indices
@@ -60,6 +61,7 @@ export type PixelState = {
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
   setTool: (t: ToolType) => void
   setBrushSize: (n: number) => void
+  toggleRectFill: () => void
   setView: (x: number, y: number, scale: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
   drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
@@ -126,6 +128,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   view: { x: 0, y: 0, scale: 5 },
   color: '#000000',
   brushSize: 1,
+  rectFill: false,
   currentPaletteIndex: 1,
   recentColorsTruecolor: ['#000000', '#ffffff'],
   recentColorsIndexed: [],
@@ -197,6 +200,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const size = Math.max(1, Math.min(Math.floor(n), maxDim))
     return { brushSize: size }
   }),
+  toggleRectFill: () => set((s) => ({ rectFill: !s.rectFill })),
   setColor: (c) => set((s) => {
     if (s.mode === 'indexed') {
       // In indexed, pick nearest palette index and sync color/index
@@ -481,13 +485,17 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
         const src = layer.data ?? new Uint32Array(W * H)
-        const out = drawRectOutlineTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
+        const out = (s.rectFill
+          ? drawRectFilledTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
+          : drawRectOutlineTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
         if (out === src || (layer.data && equalU32(out, layer.data))) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
         const src = layer.indices ?? new Uint8Array(W * H)
-        const out = drawRectOutlineIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
+        const out = (s.rectFill
+          ? drawRectFilledIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
+          : drawRectOutlineIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
         if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
         layers[li] = { ...layer, indices: out }
         return { layers }

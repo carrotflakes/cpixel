@@ -104,6 +104,7 @@ export function drawShapePreview(
   curX: number,
   curY: number,
   size: number,
+  fillRect: boolean = false,
 ) {
   ctx.save()
   ctx.strokeStyle = 'rgba(0,0,0,0.8)'
@@ -118,6 +119,13 @@ export function drawShapePreview(
     const top = Math.min(y0, y1)
     const w = Math.abs(x1 - x0) + (s - 1)
     const h = Math.abs(y1 - y0) + (s - 1)
+    if (fillRect) {
+      ctx.save()
+      ctx.setLineDash([])
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'
+      ctx.fillRect(left, top, w, h)
+      ctx.restore()
+    }
     ctx.strokeRect(left, top, w, h)
   } else {
     ctx.beginPath()
