@@ -27,14 +27,16 @@ export function MoreMenu() {
   const exportSubRef = useRef<HTMLDivElement | null>(null)
   const importSubRef = useRef<HTMLDivElement | null>(null)
   const driveSubRef = useRef<HTMLDivElement | null>(null)
+  const editSubRef = useRef<HTMLDivElement | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
-  const [openSub, setOpenSub] = useState<null | 'mode' | 'export' | 'import' | 'drive'>(null)
+  const [openSub, setOpenSub] = useState<null | 'mode' | 'export' | 'import' | 'drive' | 'edit'>(null)
   const [subPos, setSubPos] = useState<{ x: number, y: number } | null>(null)
   const modeItemRef = useRef<HTMLButtonElement | null>(null)
   const importItemRef = useRef<HTMLButtonElement | null>(null)
   const exportItemRef = useRef<HTMLButtonElement | null>(null)
   const driveItemRef = useRef<HTMLButtonElement | null>(null)
+  const editItemRef = useRef<HTMLButtonElement | null>(null)
   const [sizeOpen, setSizeOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -60,7 +62,8 @@ export function MoreMenu() {
       const insideExport = exportSubRef.current && t && exportSubRef.current.contains(t)
       const insideImport = importSubRef.current && t && importSubRef.current.contains(t)
       const insideDrive = driveSubRef.current && t && driveSubRef.current.contains(t)
-      if (insideMore || insideRoot || insideMode || insideExport || insideImport || insideDrive) return
+      const insideEdit = editSubRef.current && t && editSubRef.current.contains(t)
+      if (insideMore || insideRoot || insideMode || insideExport || insideImport || insideDrive || insideEdit) return
       setMenuOpen(false); setOpenSub(null)
     }
     window.addEventListener('keydown', onKey, { capture: true })
@@ -84,11 +87,12 @@ export function MoreMenu() {
   }
 
   const MAIN_MENU_WIDTH = 208
-  const SUB_MENU_META: Record<'mode' | 'export' | 'import' | 'drive', { width: number; approxHeight: number; ref: React.RefObject<HTMLButtonElement | null> }> = {
+  const SUB_MENU_META: Record<'mode' | 'export' | 'import' | 'drive' | 'edit', { width: number; approxHeight: number; ref: React.RefObject<HTMLButtonElement | null> }> = {
     mode: { width: 160, approxHeight: 100, ref: modeItemRef },
     export: { width: 160, approxHeight: 100, ref: exportItemRef },
     import: { width: 180, approxHeight: 100, ref: importItemRef },
     drive: { width: 224, approxHeight: 140, ref: driveItemRef },
+    edit: { width: 200, approxHeight: 160, ref: editItemRef },
   }
   function computeSubmenuPos(kind: keyof typeof SUB_MENU_META) {
     const meta = SUB_MENU_META[kind]
@@ -109,6 +113,17 @@ export function MoreMenu() {
     return { x, y }
   }
 
+  // edit actions / state
+  const undo = usePixelStore(s => s.undo)
+  const redo = usePixelStore(s => s.redo)
+  const cutSelection = usePixelStore(s => s.cutSelection)
+  const copySelection = usePixelStore(s => s.copySelection)
+  const pasteClipboard = usePixelStore(s => s.pasteClipboard)
+  const canUndo = usePixelStore(s => s.canUndo)
+  const canRedo = usePixelStore(s => s.canRedo)
+  const hasSelection = usePixelStore(s => !!s.selectionBounds)
+  const hasClipboard = usePixelStore(s => !!s.clipboard)
+
   return (
     <>
       <button
@@ -123,8 +138,17 @@ export function MoreMenu() {
         <span className="hidden sm:inline">More</span>
       </button>
       <Menu open={menuOpen} x={menuPos.x} y={menuPos.y} menuRef={menuRootRef} minWidth={208}>
-        <MenuItem onSelect={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}>
-          <span>Canvas size…</span>
+
+        <MenuItem
+          ref={editItemRef}
+          onSelect={() => {
+            if (openSub === 'edit') { setOpenSub(null); setSubPos(null); return }
+            setSubPos(computeSubmenuPos('edit'))
+            setOpenSub('edit')
+          }}
+        >
+          <span>Edit</span>
+          <LuChevronRight className="ml-auto" aria-hidden />
         </MenuItem>
         <MenuItem
           ref={modeItemRef}
@@ -173,11 +197,49 @@ export function MoreMenu() {
         <MenuItem onSelect={() => { setSettingsOpen(true); setMenuOpen(false); setOpenSub(null) }}>
           <span>Settings…</span>
         </MenuItem>
-        <MenuDivider />
-        <MenuItem danger onSelect={() => { clear(); setMenuOpen(false); setOpenSub(null); setSubPos(null) }}>
-          <FaEraser aria-hidden />
-          <span>Clear</span>
-        </MenuItem>
+
+        {/* Edit submenu */}
+        <Menu open={openSub === 'edit'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={editSubRef} minWidth={SUB_MENU_META.edit.width}>
+          <MenuItem
+            disabled={!canUndo}
+            onSelect={() => { if (!canUndo) return; undo(); setMenuOpen(false); setOpenSub(null) }}
+          >
+            <span>Undo</span>
+          </MenuItem>
+          <MenuItem
+            disabled={!canRedo}
+            onSelect={() => { if (!canRedo) return; redo(); setMenuOpen(false); setOpenSub(null) }}
+          >
+            <span>Redo</span>
+          </MenuItem>
+          <MenuDivider />
+          <MenuItem
+            disabled={!hasSelection}
+            onSelect={() => { if (!hasSelection) return; copySelection(); setMenuOpen(false); setOpenSub(null) }}
+          >
+            <span>Copy</span>
+          </MenuItem>
+          <MenuItem
+            disabled={!hasSelection}
+            onSelect={() => { if (!hasSelection) return; usePixelStore.getState().beginStroke(); cutSelection(); usePixelStore.getState().endStroke(); setMenuOpen(false); setOpenSub(null) }}
+          >
+            <span>Cut</span>
+          </MenuItem>
+          <MenuItem
+            disabled={!hasClipboard}
+            onSelect={() => { if (!hasClipboard) return; pasteClipboard(); setMenuOpen(false); setOpenSub(null) }}
+          >
+            <span>Paste</span>
+          </MenuItem>
+          <MenuDivider />
+          <MenuItem onSelect={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}>
+            <span>Canvas size…</span>
+          </MenuItem>
+          <MenuItem danger onSelect={() => { clear(); setMenuOpen(false); setOpenSub(null); setSubPos(null) }}>
+            <FaEraser aria-hidden />
+            <span>Clear</span>
+          </MenuItem>
+        </Menu>
         {/* Submenus */}
         <Menu open={openSub === 'mode'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={modeSubRef} minWidth={SUB_MENU_META.mode.width}>
           <MenuItem onSelect={() => { setMode('truecolor'); setMenuOpen(false); setOpenSub(null) }}>
