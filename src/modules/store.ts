@@ -105,9 +105,11 @@ export type PixelState = {
   clear: () => void
   exportPNG: () => void
   exportJSON: () => void
+  exportAse: () => Promise<void>
   importJSON: (data: unknown) => void
   importPNGFromImageData: (img: ImageData) => void
   resizeCanvas: (w: number, h: number) => void
+  importAse: (buffer: ArrayBuffer) => Promise<void>
 }
 
 type Snapshot = {
@@ -1018,6 +1020,28 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   },
+  exportAse: async () => {
+    const { mode, layers, palette, transparentIndex, width, height } = get()
+    try {
+      const { encodeAseprite } = await import('./utils/aseprite.ts')
+      const buffer = encodeAseprite({
+        width,
+        height,
+        mode,
+        layers: layers.map(l => ({ id: l.id, visible: l.visible, data: l.data, indices: l.indices })),
+        palette,
+        transparentIndex,
+      })
+      const blob = new Blob([buffer], { type: 'application/octet-stream' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = 'cpixel.aseprite'
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 1500)
+    } catch (e) {
+      console.error('Ase export failed', e)
+    }
+  },
   importJSON: (data: unknown) => {
     const current = get()
     const normalized = normalizeImportedJSON(data, {
@@ -1108,4 +1132,36 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
   }),
+  importAse: async (buffer: ArrayBuffer) => {
+    try {
+      const { decodeAseprite, aseToCpixel } = await import('./utils/aseprite.ts')
+      const parsed = await decodeAseprite(buffer, { preserveIndexed: true })
+      if (!parsed) return
+      const converted = aseToCpixel(parsed)
+      const layersTopFirst = converted.layers.reverse()
+      const statePatch: Partial<PixelState> = {
+        width: converted.width,
+        height: converted.height,
+        layers: layersTopFirst.length > 0 ? layersTopFirst : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(converted.width * converted.height) }],
+        activeLayerId: layersTopFirst[0]?.id || 'L1',
+        _undo: [],
+        _redo: [],
+        canUndo: false,
+        canRedo: false,
+        selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+      }
+      if (converted.mode === 'indexed') {
+        statePatch.mode = 'indexed'
+        statePatch.palette = converted.palette
+        statePatch.transparentIndex = converted.transparentIndex ?? 0
+        statePatch.currentPaletteIndex = converted.transparentIndex ?? 0
+        statePatch.color = '#000000'
+      } else {
+        statePatch.mode = 'truecolor'
+      }
+      set(statePatch)
+    } catch (e) {
+      console.error('Ase import failed', e)
+    }
+  },
 }))

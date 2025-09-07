@@ -14,8 +14,10 @@ export function MoreMenu() {
   const clear = usePixelStore(s => s.clear)
   const exportPNG = usePixelStore(s => s.exportPNG)
   const exportJSON = usePixelStore(s => s.exportJSON)
+  const exportAse = usePixelStore(s => s.exportAse)
   const importJSON = usePixelStore(s => s.importJSON)
   const importPNGFromImageData = usePixelStore(s => s.importPNGFromImageData)
+  const importAse = usePixelStore(s => s.importAse)
   const resizeCanvas = usePixelStore(s => s.resizeCanvas)
   const curW = usePixelStore(s => s.width)
   const curH = usePixelStore(s => s.height)
@@ -304,6 +306,10 @@ export function MoreMenu() {
             <LuDownload aria-hidden />
             <span>Project JSON</span>
           </MenuItem>
+          <MenuItem onSelect={() => { exportAse(); setMenuOpen(false); setOpenSub(null) }}>
+            <LuDownload aria-hidden />
+            <span>Aseprite (.aseprite)</span>
+          </MenuItem>
         </Menu>
         <Menu open={openSub === 'import'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={importSubRef} minWidth={SUB_MENU_META.import.width}>
           <MenuItem onSelect={() => { pickAndImportPNG(importPNGFromImageData); setMenuOpen(false); setOpenSub(null) }}>
@@ -311,6 +317,9 @@ export function MoreMenu() {
           </MenuItem>
           <MenuItem onSelect={() => { importProjectJSON(importJSON); setMenuOpen(false); setOpenSub(null) }}>
             <span>Project JSON…</span>
+          </MenuItem>
+          <MenuItem onSelect={() => { pickAndImportAse(importAse); setMenuOpen(false); setOpenSub(null) }}>
+            <span>Aseprite (.ase/.aseprite)…</span>
           </MenuItem>
         </Menu>
         <Menu open={openSub === 'drive'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={driveSubRef} minWidth={SUB_MENU_META.drive.width}>
@@ -416,6 +425,21 @@ function pickAndImportPNG(onComplete: (img: ImageData) => void) {
       img.onerror = () => { URL.revokeObjectURL(url); console.error('Failed to load image') }
       img.src = url
     } catch (e) { console.error('Import PNG failed', e) }
+  }
+  input.click()
+}
+
+function pickAndImportAse(onComplete: (buffer: ArrayBuffer) => Promise<void>) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.ase,.aseprite,application/octet-stream'
+  input.onchange = async () => {
+    const f = input.files?.[0]
+    if (!f) return
+    try {
+      const buf = await f.arrayBuffer()
+      await onComplete(buf)
+    } catch (e) { console.error('Import Aseprite failed', e) }
   }
   input.click()
 }
