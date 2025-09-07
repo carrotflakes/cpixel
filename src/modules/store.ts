@@ -35,8 +35,8 @@ export type PixelState = {
   mode: 'truecolor' | 'indexed'
   palette: Uint32Array
   transparentIndex: number
-  tool: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'select-lasso'
-  selectTool: 'select-rect' | 'select-lasso'
+  tool: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'select-lasso' | 'select-wand'
+  selectTool: 'select-rect' | 'select-lasso' | 'select-wand'
   setColor: (c: string) => void
   pushRecentColor: () => void
   setColorIndex: (i: number) => void
@@ -54,7 +54,7 @@ export type PixelState = {
   removePaletteIndex: (idx: number) => void
   movePaletteIndex: (from: number, to: number) => void
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
-  setTool: (t: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'select-lasso') => void
+  setTool: (t: 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'select-rect' | 'select-lasso' | 'select-wand') => void
   setView: (x: number, y: number, scale: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
   drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
@@ -177,7 +177,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   toggleLocked: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l) })),
   setTool: (t) => set(() => {
     const patch: any = { tool: t }
-    if (t === 'select-rect' || t === 'select-lasso') patch.selectTool = t
+    if (t === 'select-rect' || t === 'select-lasso' || t === 'select-wand') patch.selectTool = t
     return patch
   }),
   setColor: (c) => set((s) => {

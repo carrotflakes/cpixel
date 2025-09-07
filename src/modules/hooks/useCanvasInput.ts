@@ -3,7 +3,7 @@ import { usePixelStore, MIN_SIZE, MAX_SIZE } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel, findTopPaletteIndex } from '../utils/composite'
-import { isPointInMask, polygonToMask } from '../utils/selection'
+import { isPointInMask, polygonToMask, magicWandMask } from '../utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
 
@@ -84,7 +84,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       : erase ? 0x00000000 : parseCSSColor(color)
   )
   const isShapeTool = () => tool === 'line' || tool === 'rect'
-  const isSelectionTool = () => tool === 'select-rect' || tool === 'select-lasso'
+  const isSelectionTool = () => tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand'
   const isBrushishTool = () => tool === 'brush' || tool === 'eraser'
   const isBucketTool = () => tool === 'bucket'
   const updateHover = (x: number, y: number) => {
@@ -143,6 +143,19 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       } else if (tool === 'select-lasso') {
         lassoPath.current = [{ x, y }]
         const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
+        setSelectionMask(mask, bounds)
+        return true
+      } else if (tool === 'select-wand') {
+        const contiguous = !e.shiftKey
+        const colorGetter = (px: number, py: number) => {
+          if (mode === 'truecolor') {
+            return compositePixel(layers, px, py, mode, palette, transparentIndex, W, H) >>> 0
+          } else {
+            const idx = findTopPaletteIndex(layers as any, px, py, W, H, transparentIndex) ?? transparentIndex
+            return idx & 0xff
+          }
+        }
+        const { mask, bounds } = magicWandMask(W, H, x, y, colorGetter, contiguous)
         setSelectionMask(mask, bounds)
         return true
       }

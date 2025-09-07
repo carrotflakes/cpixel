@@ -226,3 +226,66 @@ export function buildFloatingFromClipboard(
     }
   }
 }
+
+// Magic wand: build a mask selecting all pixels connected (contiguous=true) or all matching color (contiguous=false)
+// colorRef is either RGBA (truecolor mode) or palette index (indexed mode with provideIndices=true)
+export function magicWandMask(
+  W: number,
+  H: number,
+  startX: number,
+  startY: number,
+  getColor: (x: number, y: number) => number,
+  contiguous: boolean,
+) {
+  if (startX < 0 || startY < 0 || startX >= W || startY >= H) {
+    return { mask: new Uint8Array(W * H), bounds: { left: 0, top: 0, right: -1, bottom: -1 } }
+  }
+  const target = getColor(startX, startY)
+  const mask = new Uint8Array(W * H)
+  let left = startX, right = startX, top = startY, bottom = startY
+  if (contiguous) {
+    const qx = new Int16Array(W * H)
+    const qy = new Int16Array(W * H)
+    let qs = 0, qe = 0
+    qx[qe] = startX; qy[qe] = startY; qe++
+    mask[startY * W + startX] = 1
+    while (qs < qe) {
+      const x = qx[qs]; const y = qy[qs]; qs++
+      if (x < left) left = x
+      if (x > right) right = x
+      if (y < top) top = y
+      if (y > bottom) bottom = y
+      // 4-neighbors
+      if (x > 0) {
+        const nx = x - 1, ny = y, i = ny * W + nx
+        if (!mask[i] && getColor(nx, ny) === target) { mask[i] = 1; qx[qe] = nx; qy[qe] = ny; qe++ }
+      }
+      if (x + 1 < W) {
+        const nx = x + 1, ny = y, i = ny * W + nx
+        if (!mask[i] && getColor(nx, ny) === target) { mask[i] = 1; qx[qe] = nx; qy[qe] = ny; qe++ }
+      }
+      if (y > 0) {
+        const nx = x, ny = y - 1, i = ny * W + nx
+        if (!mask[i] && getColor(nx, ny) === target) { mask[i] = 1; qx[qe] = nx; qy[qe] = ny; qe++ }
+      }
+      if (y + 1 < H) {
+        const nx = x, ny = y + 1, i = ny * W + nx
+        if (!mask[i] && getColor(nx, ny) === target) { mask[i] = 1; qx[qe] = nx; qy[qe] = ny; qe++ }
+      }
+    }
+  } else {
+    // Non-contiguous: select all pixels with the same color
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (getColor(x, y) === target) {
+          mask[y * W + x] = 1
+          if (x < left) left = x
+          if (x > right) right = x
+          if (y < top) top = y
+          if (y > bottom) bottom = y
+        }
+      }
+    }
+  }
+  return { mask, bounds: { left, top, right, bottom } }
+}

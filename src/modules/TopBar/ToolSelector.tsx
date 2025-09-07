@@ -1,6 +1,6 @@
 import { FaEraser } from 'react-icons/fa'
 import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare } from 'react-icons/lu'
-import { PiLasso, PiRectangleDashed } from 'react-icons/pi'
+import { PiLasso, PiRectangleDashed, PiMagicWand } from 'react-icons/pi'
 import { usePixelStore } from '../store'
 import { useRef, useState, useEffect } from 'react'
 import { Menu, MenuItem } from '../ui/ContextMenu'
@@ -13,6 +13,9 @@ export function ToolSelector() {
   const selMenuRef = useRef<HTMLDivElement | null>(null)
   const [selOpen, setSelOpen] = useState(false)
   const [selPos, setSelPos] = useState({ x: 0, y: 0 })
+
+  const selToolObj = SELECT_TOOLS.find(s => s.id === selectTool) ?? SELECT_TOOLS[0]
+  const SelIcon = selToolObj.icon
 
   // Outside click & Escape close (moved from TopBar)
   useEffect(() => {
@@ -84,7 +87,7 @@ export function ToolSelector() {
         </button>
         <button
           ref={selBtnRef}
-          className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${(tool === 'select-rect' || tool === 'select-lasso') ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+          className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${(tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand') ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
           onClick={() => {
             if (!selBtnRef.current) return
             const r = selBtnRef.current.getBoundingClientRect()
@@ -96,32 +99,34 @@ export function ToolSelector() {
             setSelOpen(v => !v)
             setTool(selectTool)
           }}
-          aria-pressed={tool === 'select-rect' || tool === 'select-lasso'}
+          aria-pressed={tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand'}
           aria-haspopup="menu"
           aria-expanded={selOpen}
-          title={selectTool === 'select-lasso' ? 'Lasso' : 'Rect Select'}
+          title={selToolObj.name}
         >
-          {selectTool === 'select-lasso' ? (
-            <PiLasso />
-          ) : (
-            <PiRectangleDashed />
-          )}
-          <span className="hidden sm:inline">{selectTool === 'select-lasso' ? 'Lasso' : 'Select'}</span>
+          <SelIcon />
+          <span className="hidden sm:inline">{selToolObj.shortName}</span>
         </button>
       </div>
       {/* Selection dropdown menu */}
       <Menu open={selOpen} x={selPos.x} y={selPos.y} menuRef={selMenuRef} minWidth={160}>
-        <MenuItem onSelect={() => { setTool('select-rect'); setSelOpen(false) }}>
-          {selectTool === 'select-rect' ? <span className="w-4 inline-block">✓</span> : <span className="w-4 inline-block" />}
-          <PiRectangleDashed />
-          <span>Rect Select</span>
-        </MenuItem>
-        <MenuItem onSelect={() => { setTool('select-lasso'); setSelOpen(false) }}>
-          {selectTool === 'select-lasso' ? <span className="w-4 inline-block">✓</span> : <span className="w-4 inline-block" />}
-          <PiLasso />
-          <span>Lasso</span>
-        </MenuItem>
+        {SELECT_TOOLS.map(t => {
+          const Icon = t.icon
+          return (
+            <MenuItem key={t.id} onSelect={() => { setTool(t.id); setSelOpen(false) }}>
+              {selectTool === t.id ? <span className="w-4 inline-block">✓</span> : <span className="w-4 inline-block" />}
+              <Icon />
+              <span>{t.name}</span>
+            </MenuItem>
+          )
+        })}
       </Menu>
     </div>
   )
 }
+
+const SELECT_TOOLS = [
+  { id: 'select-rect', name: 'Rect Select', shortName: 'Select', icon: PiRectangleDashed },
+  { id: 'select-lasso', name: 'Lasso', shortName: 'Lasso', icon: PiLasso },
+  { id: 'select-wand', name: 'Magic Wand', shortName: 'Wand', icon: PiMagicWand },
+] as const
