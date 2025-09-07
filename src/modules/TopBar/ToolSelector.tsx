@@ -1,5 +1,5 @@
 import { FaEraser } from 'react-icons/fa'
-import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare } from 'react-icons/lu'
+import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette } from 'react-icons/lu'
 import { PiLasso, PiRectangleDashed, PiMagicWand } from 'react-icons/pi'
 import { usePixelStore } from '../store'
 import { useRef, useState, useEffect } from 'react'
@@ -48,6 +48,15 @@ export function ToolSelector() {
         >
           <LuPaintbrush aria-hidden />
           <span className="hidden sm:inline">Brush</span>
+        </button>
+        <button
+          className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'eyedropper' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+          onClick={() => setTool('eyedropper')}
+          aria-pressed={tool === 'eyedropper'}
+          title="Eyedropper"
+        >
+          <LuPipette aria-hidden />
+          <span className="hidden sm:inline">Eye</span>
         </button>
         <button
           className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'eraser' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}

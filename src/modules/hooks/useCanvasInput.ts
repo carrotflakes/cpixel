@@ -19,6 +19,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const view = usePixelStore(s => s.view)
   const color = usePixelStore(s => s.color)
   const setColor = usePixelStore(s => s.setColor)
+  const setColorIndex = usePixelStore(s => s.setColorIndex)
   const setAt = usePixelStore(s => s.setAt)
   const fillBucket = usePixelStore(s => s.fillBucket)
   const beginStroke = usePixelStore(s => s.beginStroke)
@@ -87,6 +88,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const isSelectionTool = () => tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand'
   const isBrushishTool = () => tool === 'brush' || tool === 'eraser'
   const isBucketTool = () => tool === 'bucket'
+  const isEyedropperTool = () => tool === 'eyedropper'
   const updateHover = (x: number, y: number) => {
     if (touchState.current.multiGesture) return
     if (!inBounds(x, y)) { setHoverCell(null); setHoverInfo(undefined); return }
@@ -94,6 +96,18 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
     const idx = mode === 'indexed' ? findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
     setHoverInfo({ x, y, rgba: hov, index: idx })
+  }
+  const pickColorAt = (x: number, y: number, updateHoverInfo: boolean) => {
+    if (!inBounds(x, y)) return
+    const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
+    if (mode === 'indexed') {
+      const idx = findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) ?? transparentIndex
+      if (updateHoverInfo) setHoverInfo({ x, y, rgba, index: idx })
+      setColorIndex(idx)
+    } else {
+      if (updateHoverInfo) setHoverInfo({ x, y, rgba })
+      setColor(rgbaToCSSHex(rgba))
+    }
   }
   const pointInSelection = (x: number, y: number) => isPointInMask(selectionMask, W, H, x, y)
   const startShapeAt = (x: number, y: number) => {
@@ -184,12 +198,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     // Selection tools: only hover/update, do not paint via move
     if (isSelectionTool()) return
+    if (isEyedropperTool()) { if (e.buttons & 1) pickColorAt(x, y, true); return }
     if (e.altKey) {
-      // Pick color from canvas
-      const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
-      const idx = mode === 'indexed' ? findTopPaletteIndex(layers as any, x, y, W, H, transparentIndex) : undefined
-      setHoverInfo({ x, y, rgba, index: idx })
-      setColor(rgbaToCSSHex(rgba))
+      pickColorAt(x, y, true)
       e.preventDefault();
       return
     }
@@ -236,6 +247,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             return
           }
 
+          if (isEyedropperTool()) { pickColorAt(x, y, true); e.preventDefault(); return }
           if (startTool(x, y, e)) {
             e.preventDefault()
             return
@@ -300,6 +312,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             return
           }
 
+          if (isEyedropperTool()) { pickColorAt(f.x, f.y, true); e.preventDefault(); return }
           if (startTool(f.x, f.y, e)) {
             e.preventDefault()
             return
@@ -463,6 +476,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             return
           }
 
+          if (isEyedropperTool()) { pickColorAt(f.x, f.y, true); e.preventDefault(); return }
           if (startTool(f.x, f.y, e)) {
             e.preventDefault()
             return
