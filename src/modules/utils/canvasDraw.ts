@@ -79,11 +79,20 @@ export function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: n
   }
 }
 
-export function drawHoverCell(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+export function drawHoverCell(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, brushSize: number = 1) {
   ctx.save()
   ctx.strokeStyle = 'rgba(0,128,255,0.9)'
   ctx.lineWidth = 2
-  ctx.strokeRect(x * size + 0.5, y * size + 0.5, size - 1, size - 1)
+  if (brushSize <= 1) {
+    ctx.strokeRect(x * size + 0.5, y * size + 0.5, size - 1, size - 1)
+  } else {
+    const half = Math.floor(brushSize / 2)
+    const left = (x - half) * size + 0.5
+    const top = (y - half) * size + 0.5
+    const w = brushSize * size - 1
+    const h = brushSize * size - 1
+    ctx.strokeRect(left, top, w, h)
+  }
   ctx.restore()
 }
 

@@ -18,6 +18,7 @@ export function PixelCanvas() {
   const mode = usePixelStore(s => s.mode)
   const palette = usePixelStore(s => s.palette)
   const transparentIndex = usePixelStore(s => s.transparentIndex)
+  const brushSize = usePixelStore(s => s.brushSize)
   const checkerSize = useSettingsStore(s => s.checkerSize)
   const tiltEnabled = useSettingsStore(s => s.tiltParallaxEnabled)
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
@@ -144,7 +145,7 @@ export function PixelCanvas() {
     }
     // hover highlight
     if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < W && hoverCell.y < H) {
-      drawHoverCell(ctx, hoverCell.x, hoverCell.y, view.scale)
+      drawHoverCell(ctx, hoverCell.x, hoverCell.y, view.scale, brushSize)
     }
     // shape preview overlay
     if (shapePreview.kind) {

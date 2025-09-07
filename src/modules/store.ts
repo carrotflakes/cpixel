@@ -5,7 +5,7 @@ import { generatePaletteFromComposite } from './utils/palette'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 import { equalU32, equalU8 } from './utils/arrays'
-import { rasterizeLine } from './utils/lines'
+import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed } from './utils/paint'
 import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard } from './utils/selection'
 import { resizeLayers } from './utils/resize'
 import { compositeImageData } from './utils/composite'
@@ -32,6 +32,7 @@ export type PixelState = {
   activeLayerId: string
   view: { x: number; y: number; scale: number }
   color: string
+  brushSize: number
   currentPaletteIndex?: number
   recentColorsTruecolor: string[]
   recentColorsIndexed: number[] // palette indices
@@ -58,6 +59,7 @@ export type PixelState = {
   movePaletteIndex: (from: number, to: number) => void
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
   setTool: (t: ToolType) => void
+  setBrushSize: (n: number) => void
   setView: (x: number, y: number, scale: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
   drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
@@ -123,6 +125,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   activeLayerId: 'L1',
   view: { x: 0, y: 0, scale: 5 },
   color: '#000000',
+  brushSize: 1,
   currentPaletteIndex: 1,
   recentColorsTruecolor: ['#000000', '#ffffff'],
   recentColorsIndexed: [],
@@ -188,6 +191,11 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const patch: Partial<PixelState> = { tool: t }
     if (t === 'select-rect' || t === 'select-lasso' || t === 'select-wand') patch.selectTool = t
     return patch
+  }),
+  setBrushSize: (n) => set((s) => {
+    const maxDim = Math.max(s.width, s.height)
+    const size = Math.max(1, Math.min(Math.floor(n), maxDim))
+    return { brushSize: size }
   }),
   setColor: (c) => set((s) => {
     if (s.mode === 'indexed') {
@@ -409,19 +417,18 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const layer = s.layers[li]
       if (layer.locked) return {}
       const layers = s.layers.slice()
+      const size = Math.max(1, s.brushSize | 0)
       if (s.mode === 'truecolor') {
         const src = layer.data ?? new Uint32Array(W * H)
-        const next = new Uint32Array(src)
-        next[y * W + x] = rgbaOrIndex >>> 0
-        layers[li] = { ...layer, data: next }
+        const out = stampTruecolor(src, W, H, x, y, size, rgbaOrIndex >>> 0, s.selection?.mask)
+        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
+        layers[li] = { ...layer, data: out }
         return { layers }
       } else {
         const src = layer.indices ?? new Uint8Array(W * H)
-        const i = y * W + x
-        const writeIndex = rgbaOrIndex
-        const next = new Uint8Array(src)
-        next[i] = writeIndex & 0xff
-        layers[li] = { ...layer, indices: next }
+        const out = stampIndexed(src, W, H, x, y, size, rgbaOrIndex & 0xff, s.selection?.mask)
+        if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
+        layers[li] = { ...layer, indices: out }
         return { layers }
       }
     })
@@ -440,29 +447,17 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       if (s.selection?.floating) return {}
       if (!inBounds(x0, y0) && !inBounds(x1, y1)) return {}
       const layers = s.layers.slice()
+      const size = Math.max(1, s.brushSize | 0)
       if (s.mode === 'truecolor') {
-        const out = new Uint32Array(layer.data ?? new Uint32Array(W * H))
-        // Rasterize line using shared Bresenham helper
-        rasterizeLine(x0, y0, x1, y1, (x, y) => {
-          if (!inBounds(x, y)) return
-          const i = y * W + x
-          if (s.selection?.mask && !s.selection.mask[i]) return
-          out[i] = rgbaOrIndex >>> 0
-        })
-        if (layer.data && equalU32(out, layer.data)) return {}
+        const src = layer.data ?? new Uint32Array(W * H)
+        const out = drawLineBrushTruecolor(src, W, H, x0, y0, x1, y1, size, rgbaOrIndex >>> 0, s.selection?.mask)
+        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
-        const idxArr = layer.indices ?? new Uint8Array(W * H)
-        const writeIndex = rgbaOrIndex
-        const out = new Uint8Array(idxArr)
-        rasterizeLine(x0, y0, x1, y1, (x, y) => {
-          if (!inBounds(x, y)) return
-          const i = y * W + x
-          if (s.selection?.mask && !s.selection.mask[i]) return
-          out[i] = writeIndex & 0xff
-        })
-        if (equalU8(out, idxArr)) return {}
+        const src = layer.indices ?? new Uint8Array(W * H)
+        const out = drawLineBrushIndexed(src, W, H, x0, y0, x1, y1, size, rgbaOrIndex & 0xff, s.selection?.mask)
+        if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
         layers[li] = { ...layer, indices: out }
         return { layers }
       }
@@ -485,42 +480,15 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       if (s.selection?.floating) return {}
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
-        const out = new Uint32Array(layer.data ?? new Uint32Array(W * H))
-        const pix = rgbaOrIndex >>> 0
-        // top/bottom
-        for (let x = left; x <= right; x++) {
-          const it = top * W + x
-          const ib = bottom * W + x
-          if (!s.selection?.mask || s.selection.mask[it]) out[it] = pix
-          if (!s.selection?.mask || s.selection.mask[ib]) out[ib] = pix
-        }
-        // sides
-        for (let y = top; y <= bottom; y++) {
-          const il = y * W + left
-          const ir = y * W + right
-          if (!s.selection?.mask || s.selection.mask[il]) out[il] = pix
-          if (!s.selection?.mask || s.selection.mask[ir]) out[ir] = pix
-        }
-        if (layer.data && equalU32(out, layer.data)) return {}
+        const src = layer.data ?? new Uint32Array(W * H)
+        const out = drawRectOutlineTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
+        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
-        const idxArr = layer.indices ?? new Uint8Array(W * H)
-        const writeIndex = rgbaOrIndex
-        const out = new Uint8Array(idxArr)
-        for (let x = left; x <= right; x++) {
-          const it = top * W + x
-          const ib = bottom * W + x
-          if (!s.selection?.mask || s.selection.mask[it]) out[it] = writeIndex & 0xff
-          if (!s.selection?.mask || s.selection.mask[ib]) out[ib] = writeIndex & 0xff
-        }
-        for (let y = top; y <= bottom; y++) {
-          const il = y * W + left
-          const ir = y * W + right
-          if (!s.selection?.mask || s.selection.mask[il]) out[il] = writeIndex & 0xff
-          if (!s.selection?.mask || s.selection.mask[ir]) out[ir] = writeIndex & 0xff
-        }
-        if (equalU8(out, idxArr)) return {}
+        const src = layer.indices ?? new Uint8Array(W * H)
+        const out = drawRectOutlineIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
+        if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
         layers[li] = { ...layer, indices: out }
         return { layers }
       }

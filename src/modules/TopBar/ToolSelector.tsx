@@ -17,16 +17,27 @@ export function ToolSelector() {
   const selToolObj = SELECT_TOOLS.find(s => s.id === selectTool) ?? SELECT_TOOLS[0]
   const SelIcon = selToolObj.icon
 
-  // Outside click & Escape close (moved from TopBar)
+  // Brush size menu
+  const brushBtnRef = useRef<HTMLButtonElement | null>(null)
+  const brushMenuRef = useRef<HTMLDivElement | null>(null)
+  const [brushOpen, setBrushOpen] = useState(false)
+  const [brushPos, setBrushPos] = useState({ x: 0, y: 0 })
+  const brushSize = usePixelStore(s => s.brushSize)
+  const setBrushSize = usePixelStore(s => s.setBrushSize)
+  const W = usePixelStore(s => s.width)
+  const H = usePixelStore(s => s.height)
+  const maxDim = Math.max(W, H)
+
+  // Outside click & Escape close
   useEffect(() => {
-    if (!selOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelOpen(false); setBrushOpen(false) } }
     const onDown = (e: MouseEvent | PointerEvent) => {
       const t = e.target as Node | null
-      const insideBtn = selBtnRef.current && t && selBtnRef.current.contains(t)
-      const insideMenu = selMenuRef.current && t && selMenuRef.current.contains(t)
+      const insideBtn = t && [selBtnRef.current, brushBtnRef.current].some(btn => btn && btn.contains(t))
+      const insideMenu = t && [selMenuRef.current, brushMenuRef.current].some(menu => menu && menu.contains(t))
       if (insideBtn || insideMenu) return
       setSelOpen(false)
+      setBrushOpen(false)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     window.addEventListener('pointerdown', onDown, { capture: true })
@@ -34,17 +45,30 @@ export function ToolSelector() {
       window.removeEventListener('keydown', onKey, { capture: true })
       window.removeEventListener('pointerdown', onDown, { capture: true })
     }
-  }, [selOpen])
+  }, [])
 
   return (
     <div className="flex items-center gap-2 ml-auto">
       <label className="hidden sm:inline text-sm text-muted">Tool</label>
       <div className="inline-flex rounded border border-border overflow-hidden">
         <button
+          ref={brushBtnRef}
           className={`px-2 py-1 text-sm inline-flex items-center gap-1 ${tool === 'brush' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-          onClick={() => setTool('brush')}
+          onClick={() => {
+            setTool('brush')
+            if (!brushBtnRef.current) return
+            const r = brushBtnRef.current.getBoundingClientRect()
+            const margin = 6
+            const minW = 180
+            const x = Math.min(window.innerWidth - minW - margin, Math.max(margin, r.left))
+            const y = Math.min(window.innerHeight - 10 - margin, r.bottom + margin)
+            setBrushPos({ x, y })
+            setBrushOpen(o => !o)
+          }}
           aria-pressed={tool === 'brush'}
-          title="Brush"
+          aria-haspopup="menu"
+          aria-expanded={brushOpen}
+          title={`Brush (size ${brushSize})`}
         >
           <LuPaintbrush aria-hidden />
           <span className="hidden sm:inline">Brush</span>
@@ -98,6 +122,7 @@ export function ToolSelector() {
           ref={selBtnRef}
           className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${(tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand') ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
           onClick={() => {
+            setTool(selectTool)
             if (!selBtnRef.current) return
             const r = selBtnRef.current.getBoundingClientRect()
             const margin = 6
@@ -106,7 +131,6 @@ export function ToolSelector() {
             const y = Math.min(window.innerHeight - 10 - margin, r.bottom + margin)
             setSelPos({ x, y })
             setSelOpen(v => !v)
-            setTool(selectTool)
           }}
           aria-pressed={tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand'}
           aria-haspopup="menu"
@@ -130,6 +154,31 @@ export function ToolSelector() {
           )
         })}
       </Menu>
+      {/* Brush size menu */}
+      <Menu open={brushOpen} x={brushPos.x} y={brushPos.y} menuRef={brushMenuRef} minWidth={200}>
+        <div className="px-3 py-2 flex flex-col gap-2">
+          <div className="flex gap-2 text-sm">
+            Brush Size: {brushSize}
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={maxDim}
+            value={brushSize}
+            onChange={e => setBrushSize(Number(e.target.value))}
+            aria-label="Brush size"
+          />
+          <div className="flex flex-wrap gap-1">
+            {PRESET_SIZES.map(sz => (
+              <button
+                key={sz}
+                onClick={() => { setBrushSize(sz); setBrushOpen(false) }}
+                className={`px-2 py-1 rounded border text-xs ${brushSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
+              >{sz}</button>
+            ))}
+          </div>
+        </div>
+      </Menu>
     </div>
   )
 }
@@ -139,3 +188,5 @@ const SELECT_TOOLS = [
   { id: 'select-lasso', name: 'Lasso', shortName: 'Lasso', icon: PiLasso },
   { id: 'select-wand', name: 'Magic Wand', shortName: 'Wand', icon: PiMagicWand },
 ] as const
+
+const PRESET_SIZES = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32]
