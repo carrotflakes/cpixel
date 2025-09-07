@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FaEllipsisV, FaEraser } from 'react-icons/fa'
-import { LuCheck, LuChevronRight, LuDownload, LuMaximize } from 'react-icons/lu'
+import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings } from 'react-icons/lu'
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
 import { SettingsDialog } from '../SettingsDialog'
 import { usePixelStore } from '../store'
@@ -216,6 +216,7 @@ export function MoreMenu() {
           <LuChevronRight className="ml-auto" aria-hidden />
         </MenuItem>
         <MenuItem onSelect={() => { setSettingsOpen(true); setMenuOpen(false); setOpenSub(null) }}>
+          <LuSettings aria-hidden />
           <span>Settings…</span>
         </MenuItem>
         <MenuDivider />
