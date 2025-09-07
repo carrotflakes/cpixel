@@ -63,6 +63,7 @@ export function Menu(props: {
 }) {
   const ref = props.menuRef ?? useRef<HTMLDivElement | null>(null)
   const [pos, setPos] = useState<{ x: number; y: number }>({ x: props.x, y: props.y })
+  const [ready, setReady] = useState(false)
   const minW = props.minWidth ?? 128
   const margin = props.margin ?? 8
 
@@ -77,6 +78,7 @@ export function Menu(props: {
     const nextX = Math.max(margin, Math.min(props.x, maxX))
     const nextY = Math.max(margin, Math.min(props.y, maxY))
     setPos({ x: nextX, y: nextY })
+    setReady(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.open, props.x, props.y, minW, margin])
 
@@ -90,7 +92,7 @@ export function Menu(props: {
       role="menu"
       ref={ref}
       className={className}
-      style={{ left: pos.x, top: pos.y, minWidth: minW }}
+      style={{ left: pos.x, top: pos.y, minWidth: minW, visibility: ready ? 'visible' : 'hidden', pointerEvents: ready ? 'auto' : 'none' }}
       onContextMenu={(e) => e.preventDefault()}
     >
       {props.children}
