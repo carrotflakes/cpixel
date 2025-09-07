@@ -1,0 +1,105 @@
+import { usePixelStore } from './store'
+
+// Simple localStorage autosave / restore
+// - Periodic save (every 10s)
+// - Debounced save (1s after a change)
+// - Save on page unload
+// - Restore on load (runs once)
+
+const KEY = 'cpixel.autosave.v1'
+let started = false
+
+type PersistPayload = {
+  app: 'cpixel'
+  version: 1
+  width: number
+  height: number
+  mode: 'truecolor' | 'indexed'
+  layers: Array<{
+    id: string; visible: boolean; locked: boolean; data?: number[]; indices?: number[]
+  }>
+  activeLayerId: string
+  palette: number[]
+  transparentIndex: number
+  color: string
+  recentColorsTruecolor: string[]
+  recentColorsIndexed: number[]
+}
+
+function buildPayload(): PersistPayload {
+  const s = usePixelStore.getState()
+  return {
+    app: 'cpixel',
+    version: 1,
+    width: s.width,
+    height: s.height,
+    mode: s.mode,
+    layers: s.layers.map(l => ({
+      id: l.id,
+      visible: l.visible,
+      locked: l.locked,
+      data: l.data ? Array.from(l.data) : undefined,
+      indices: l.indices ? Array.from(l.indices) : undefined,
+    })),
+    activeLayerId: s.activeLayerId,
+    palette: Array.from(s.palette ?? new Uint32Array(0)),
+    transparentIndex: s.transparentIndex,
+    color: s.color,
+    recentColorsTruecolor: s.recentColorsTruecolor ?? [],
+    recentColorsIndexed: s.recentColorsIndexed ?? [],
+  }
+}
+
+function saveNow() {
+  try {
+    const s = usePixelStore.getState()
+    // Avoid saving mid-stroke to prevent excessive snapshots
+    if ((s as any)._stroking) return
+    const payload = buildPayload()
+    localStorage.setItem(KEY, JSON.stringify(payload))
+  } catch {
+    // ignore
+  }
+}
+
+function restore() {
+  try {
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return
+    const data = JSON.parse(raw)
+    if (data && data.app === 'cpixel') {
+      // Reuse existing import path for validation / normalization
+      usePixelStore.getState().importJSON(data)
+    }
+  } catch {
+    // ignore corrupt
+  }
+}
+
+export function initAutosave() {
+  if (typeof window === 'undefined') return
+  if (started) return
+  started = true
+  restore()
+
+  // Debounced change save
+  let timeout: number | undefined
+  usePixelStore.subscribe(() => {
+    if (timeout) window.clearTimeout(timeout)
+    timeout = window.setTimeout(saveNow, 1000)
+  })
+
+  // Periodic safety save
+  const interval = window.setInterval(saveNow, 10000)
+
+  // Save on unload
+  const handleUnload = () => { try { saveNow() } catch { /* noop */ } }
+  window.addEventListener('beforeunload', handleUnload)
+
+    // Optional cleanup if ever needed (not used now)
+    ; (window as any).__cpixelStopAutosave = () => {
+      window.removeEventListener('beforeunload', handleUnload)
+      window.clearInterval(interval)
+      if (timeout) window.clearTimeout(timeout)
+    }
+}
