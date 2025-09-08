@@ -39,7 +39,7 @@ export function PixelCanvas() {
   const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const floatCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const [antsPhase, setAntsPhase] = useState(0)
-  const resizeTick = useWindowResizeRedraw()
+  const resizeTick = useWindowResizeRedraw(canvasRef)
 
   // One-time init: restore previous view/zoom or center initially
   const inited = useRef(false)
@@ -260,21 +260,18 @@ export function PixelCanvas() {
   )
 }
 
-// Custom hook: returns a counter that increments on window resize (RAF-throttled)
-function useWindowResizeRedraw() {
+// Resize redraw counter using only ResizeObserver
+function useWindowResizeRedraw(targetRef: React.RefObject<Element | null>) {
   const [tick, setTick] = useState(0)
   useEffect(() => {
-    let raf = 0
-    const onResize = () => {
-      if (raf) cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => setTick(t => t + 1))
-    }
-    window.addEventListener('resize', onResize)
-    return () => {
-      window.removeEventListener('resize', onResize)
-      if (raf) cancelAnimationFrame(raf)
-    }
-  }, [])
+    const el = targetRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setTick(t => t + 1))
+    ro.observe(el)
+    // initial
+    setTick(t => t + 1)
+    return () => ro.disconnect()
+  }, [targetRef?.current])
   return tick
 }
 
