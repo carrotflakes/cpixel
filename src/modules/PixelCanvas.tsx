@@ -104,14 +104,12 @@ export function PixelCanvas() {
       }
       const layerCvs = tmpCanvasRef.current
       const lctx = layerCvs.getContext('2d')!
-      // Draw bottom to top: store ordering has top-most first (new added at front) -> reverse
-      const order = [...layers].reverse()
-      for (let li = 0; li < order.length; li++) {
-        const layer = order[li]
+      for (let li = 0; li < layers.length; li++) {
+        const layer = layers[li]
         if (!layer.visible) continue
         const single = compositeImageData([layer], mode, palette, transparentIndex, lctx, W, H)
         lctx.putImageData(single, 0, 0)
-        const depth = layers.length - layers.findIndex(l => l === layer)
+        const depth = li + 1
         const dx = -shiftOffsetRef.current.dx * depth / layers.length
         const dy = -shiftOffsetRef.current.dy * depth / layers.length
         const s = view.scale

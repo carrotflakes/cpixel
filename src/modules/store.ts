@@ -156,7 +156,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const layer: Layer = s.mode === 'truecolor'
       ? { id, visible: true, locked: false, data: new Uint32Array(s.width * s.height) }
       : { id, visible: true, locked: false, indices: new Uint8Array(s.width * s.height) }
-    return { layers: [layer, ...s.layers], activeLayerId: id }
+    return { layers: [...s.layers, layer], activeLayerId: id }
   }),
   removeLayer: (id) => set((s) => {
     if (s.layers.length <= 1) return {}
@@ -1138,12 +1138,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const parsed = await decodeAseprite(buffer, { preserveIndexed: true })
       if (!parsed) return
       const converted = aseToCpixel(parsed)
-      const layersTopFirst = converted.layers.reverse()
+      const layersBottomFirst = converted.layers
       const statePatch: Partial<PixelState> = {
         width: converted.width,
         height: converted.height,
-        layers: layersTopFirst.length > 0 ? layersTopFirst : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(converted.width * converted.height) }],
-        activeLayerId: layersTopFirst[0]?.id || 'L1',
+        layers: layersBottomFirst.length > 0 ? layersBottomFirst : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(converted.width * converted.height) }],
+        activeLayerId: layersBottomFirst[layersBottomFirst.length - 1]?.id || 'L1', // top-most
         _undo: [],
         _redo: [],
         canUndo: false,

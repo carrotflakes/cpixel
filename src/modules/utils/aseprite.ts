@@ -214,9 +214,7 @@ function writeU32(buf: Uint8Array, off: number, v: number) { buf[off] = v & 0xff
 export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
   const { width, height, mode, layers, palette, transparentIndex } = state
   const colorDepth = mode === 'indexed' ? 8 : 32
-  // Ase expects bottom-to-top order: our store likely has top-first, so reverse copy
-  const layerOrder = layers.slice().reverse()
-  const layerCount = layerOrder.length
+  const layerCount = layers.length
   const includePalette = mode === 'indexed'
   const chunkCount = layerCount /* layer chunks */ + layerCount /* cel chunks */ + (includePalette ? 1 : 0)
 
@@ -254,7 +252,7 @@ export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
   }
 
   // Layer + Cel chunks (pair per layer in order)
-  layerOrder.forEach((layer, li) => {
+  layers.forEach((layer, li) => {
     // LAYER chunk 0x2004
     const nameBytes = new TextEncoder().encode(layer.id)
     const payloadLen = 2 + 2 + 2 + 2 + 2 + 2 + 1 + 3 + 2 + nameBytes.length
@@ -359,5 +357,3 @@ export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
 
   return out.buffer
 }
-
-export default { decodeAseprite, aseToCpixel, encodeAseprite }

@@ -35,7 +35,7 @@ export function compositePixel(
 ): number {
   if (x < 0 || y < 0 || x >= width || y >= height) return 0x00000000
   let out = 0x00000000
-  for (let li = 0; li < layers.length; li++) {
+  for (let li = layers.length - 1; li >= 0; li--) {
     const L = layers[li]
     if (!L.visible) continue
     let rgba = 0x00000000
