@@ -5,7 +5,7 @@ import { generatePaletteFromComposite } from './utils/palette'
 import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 import { equalU32, equalU8 } from './utils/arrays'
-import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed } from './utils/paint'
+import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed, drawEllipseOutlineTruecolor, drawEllipseOutlineIndexed, drawEllipseFilledTruecolor, drawEllipseFilledIndexed } from './utils/paint'
 import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard } from './utils/selection'
 import { resizeLayers } from './utils/resize'
 import { compositeImageData } from './utils/composite'
@@ -23,7 +23,7 @@ type Layer = {
   indices?: Uint8Array
 }
 
-export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand'
+export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand'
 
 export type PixelState = {
   width: number
@@ -33,7 +33,7 @@ export type PixelState = {
   view: { x: number; y: number; scale: number }
   color: string
   brushSize: number
-  rectFill: boolean
+  shapeFill: boolean
   currentPaletteIndex?: number
   recentColorsTruecolor: string[]
   recentColorsIndexed: number[] // palette indices
@@ -41,6 +41,7 @@ export type PixelState = {
   palette: Uint32Array
   transparentIndex: number
   tool: ToolType
+  shapeTool: 'rect' | 'ellipse'
   selectTool: 'select-rect' | 'select-lasso' | 'select-wand'
   setColor: (c: string) => void
   pushRecentColor: () => void
@@ -61,11 +62,12 @@ export type PixelState = {
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
   setTool: (t: ToolType) => void
   setBrushSize: (n: number) => void
-  toggleRectFill: () => void
+  toggleShapeFill: () => void
   setView: (x: number, y: number, scale: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
   drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   drawRect: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
+  drawEllipse: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   fillBucket: (x: number, y: number, rgbaOrIndex: number, contiguous: boolean) => void
   setMode: (m: 'truecolor' | 'indexed') => void
   selection: {
@@ -130,12 +132,13 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   view: { x: 0, y: 0, scale: 5 },
   color: '#000000',
   brushSize: 1,
-  rectFill: false,
+  shapeFill: false,
   currentPaletteIndex: 1,
   recentColorsTruecolor: ['#000000', '#ffffff'],
   recentColorsIndexed: [],
   mode: 'truecolor',
   tool: 'brush',
+  shapeTool: 'rect',
   selectTool: 'select-rect',
   // simple default palette (16 base colors + transparent at 0)
   palette: new Uint32Array([
@@ -194,6 +197,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   toggleLocked: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l) })),
   setTool: (t) => set(() => {
     const patch: Partial<PixelState> = { tool: t }
+    if (t === 'rect' || t === 'ellipse') patch.shapeTool = t
     if (t === 'select-rect' || t === 'select-lasso' || t === 'select-wand') patch.selectTool = t
     return patch
   }),
@@ -202,7 +206,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const size = Math.max(1, Math.min(Math.floor(n), maxDim))
     return { brushSize: size }
   }),
-  toggleRectFill: () => set((s) => ({ rectFill: !s.rectFill })),
+  toggleShapeFill: () => set((s) => ({ shapeFill: !s.shapeFill })),
   setColor: (c) => set((s) => {
     if (s.mode === 'indexed') {
       // In indexed, pick nearest palette index and sync color/index
@@ -487,7 +491,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
         const src = layer.data ?? new Uint32Array(W * H)
-        const out = (s.rectFill
+        const out = (s.shapeFill
           ? drawRectFilledTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
           : drawRectOutlineTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
         if (out === src || (layer.data && equalU32(out, layer.data))) return {}
@@ -495,9 +499,40 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         return { layers }
       } else {
         const src = layer.indices ?? new Uint8Array(W * H)
-        const out = (s.rectFill
+        const out = (s.shapeFill
           ? drawRectFilledIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
           : drawRectOutlineIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
+        if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
+        layers[li] = { ...layer, indices: out }
+        return { layers }
+      }
+    })
+    get().pushRecentColor()
+  },
+  drawEllipse: (x0, y0, x1, y1, rgbaOrIndex) => {
+    set((s) => {
+      const W = s.width, H = s.height
+      x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
+      // x0 += 0.5; y0 += 0.5; x1 += 0.5; y1 += 0.5 // offset by 0.5 to align to pixel centers
+      const li = s.layers.findIndex(l => l.id === s.activeLayerId)
+      if (li < 0) return {}
+      const layer = s.layers[li]
+      if (layer.locked) return {}
+      if (s.selection?.floating) return {}
+      const layers = s.layers.slice()
+      if (s.mode === 'truecolor') {
+        const src = layer.data ?? new Uint32Array(W * H)
+        const out = (s.shapeFill
+          ? drawEllipseFilledTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
+          : drawEllipseOutlineTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
+        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
+        layers[li] = { ...layer, data: out }
+        return { layers }
+      } else {
+        const src = layer.indices ?? new Uint8Array(W * H)
+        const out = (s.shapeFill
+          ? drawEllipseFilledIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
+          : drawEllipseOutlineIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
         if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
         layers[li] = { ...layer, indices: out }
         return { layers }

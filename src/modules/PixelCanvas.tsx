@@ -27,7 +27,7 @@ export function PixelCanvas() {
   const setView = usePixelStore(s => s.setView)
   const selection = usePixelStore(s => s.selection)
   const clearSelection = usePixelStore(s => s.clearSelection)
-  const rectFill = usePixelStore(s => s.rectFill)
+  const shapeFill = usePixelStore(s => s.shapeFill)
 
   const { rotationRate, rotationRateRef, motionPermission, requestMotionPermission } = useTilt({ enabled: tiltEnabled })
   const { active: parallaxActive, shiftOffsetRef, shiftTick } = useTiltParallax(rotationRate, rotationRateRef, { trigger: tiltTrigger, amount: tiltAmount, enabled: tiltEnabled && !interactionActive })
@@ -156,7 +156,7 @@ export function PixelCanvas() {
         shapePreview.curX,
         shapePreview.curY,
         view.scale,
-        shapePreview.kind === 'rect' ? rectFill : false,
+        (shapePreview.kind === 'rect' || shapePreview.kind === 'ellipse') ? shapeFill : false,
       )
     }
     // selection overlay and floating
@@ -197,7 +197,7 @@ export function PixelCanvas() {
         ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selection.bounds.left + dx) * s, (selection.bounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, rectFill])
+  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
 
   const overlay = (() => {
     if (parallaxActive) return null // hide selection UI in parallax mode

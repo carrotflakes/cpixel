@@ -98,7 +98,7 @@ export function drawHoverCell(ctx: CanvasRenderingContext2D, x: number, y: numbe
 
 export function drawShapePreview(
   ctx: CanvasRenderingContext2D,
-  kind: 'line' | 'rect',
+  kind: 'line' | 'rect' | 'ellipse',
   startX: number,
   startY: number,
   curX: number,
@@ -127,6 +127,27 @@ export function drawShapePreview(
       ctx.restore()
     }
     ctx.strokeRect(left, top, w, h)
+  } else if (kind === 'ellipse') {
+    const left = Math.min(x0, x1)
+    const top = Math.min(y0, y1)
+    const w = Math.abs(x1 - x0) + (s - 1)
+    const h = Math.abs(y1 - y0) + (s - 1)
+    const cx = left + w / 2
+    const cy = top + h / 2
+    const rx = w / 2
+    const ry = h / 2
+    ctx.save()
+    if (fillRect) {
+      ctx.setLineDash([])
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'
+      ctx.beginPath()
+      ctx.ellipse(cx, cy, Math.max(0, rx), Math.max(0, ry), 0, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.beginPath()
+    ctx.ellipse(cx, cy, Math.max(0, rx), Math.max(0, ry), 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
   } else {
     ctx.beginPath()
     ctx.moveTo(x0, y0)

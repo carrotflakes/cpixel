@@ -8,7 +8,7 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
 
 export type ShapePreview = {
-  kind: 'line' | 'rect' | null
+  kind: 'line' | 'rect' | 'ellipse' | null
   startX: number
   startY: number
   curX: number
@@ -84,7 +84,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       ? (erase ? transparentIndex : currentPaletteIndex) ?? 0
       : erase ? 0x00000000 : parseCSSColor(color)
   )
-  const isShapeTool = () => tool === 'line' || tool === 'rect'
+  const isShapeTool = () => tool === 'line' || tool === 'rect' || tool === 'ellipse'
   const isSelectionTool = () => tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand'
   const isBrushishTool = () => tool === 'brush' || tool === 'eraser'
   const isBucketTool = () => tool === 'bucket'
@@ -111,7 +111,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
   const pointInSelection = (x: number, y: number) => isPointInMask(selectionMask, W, H, x, y)
   const startShapeAt = (x: number, y: number) => {
-    setShapePreview({ kind: tool as 'line' | 'rect', startX: x, startY: y, curX: x, curY: y })
+    setShapePreview({ kind: tool as 'line' | 'rect' | 'ellipse', startX: x, startY: y, curX: x, curY: y })
     beginStroke()
   }
   const updateShapeTo = (x: number, y: number) => {
@@ -125,6 +125,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const rgba = paintFor(erase)
     if (s.kind === 'line') usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
     else if (s.kind === 'rect') usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
+    else if (s.kind === 'ellipse') usePixelStore.getState().drawEllipse(s.startX, s.startY, s.curX, s.curY, rgba)
     setShapePreview({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
     endStroke()
   }

@@ -1,19 +1,22 @@
 import { FaEraser } from 'react-icons/fa'
-import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette, LuCheck } from 'react-icons/lu'
+import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette, LuCheck, LuCircle } from 'react-icons/lu'
 import { PiLasso, PiRectangleDashed, PiMagicWand } from 'react-icons/pi'
 import { usePixelStore } from '../store'
 import { useRef, useState, useEffect } from 'react'
-import { Menu, MenuItem } from '../ui/ContextMenu'
+import { Menu, MenuDivider, MenuItem } from '../ui/ContextMenu'
 
 export function ToolSelector() {
   const tool = usePixelStore(s => s.tool)
   const setTool = usePixelStore(s => s.setTool)
+  const shapeTool = usePixelStore(s => s.shapeTool)
   const selectTool = usePixelStore(s => s.selectTool)
   const selBtnRef = useRef<HTMLButtonElement | null>(null)
   const selMenuRef = useRef<HTMLDivElement | null>(null)
   const [selOpen, setSelOpen] = useState(false)
   const [selPos, setSelPos] = useState({ x: 0, y: 0 })
 
+  const shapeToolObj = SHAPE_TOOLS.find(s => s.id === shapeTool) ?? SHAPE_TOOLS[0]
+  const ShapeIcon = shapeToolObj.icon
   const selToolObj = SELECT_TOOLS.find(s => s.id === selectTool) ?? SELECT_TOOLS[0]
   const SelIcon = selToolObj.icon
 
@@ -27,24 +30,24 @@ export function ToolSelector() {
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
   const maxDim = Math.max(W, H)
-  const rectFill = usePixelStore(s => s.rectFill)
-  const toggleRectFill = usePixelStore(s => s.toggleRectFill)
+  const shapeFill = usePixelStore(s => s.shapeFill)
+  const toggleShapeFill = usePixelStore(s => s.toggleShapeFill)
 
-  // Rect options menu (fill toggle)
-  const rectBtnRef = useRef<HTMLButtonElement | null>(null)
-  const rectMenuRef = useRef<HTMLDivElement | null>(null)
-  const [rectOpen, setRectOpen] = useState(false)
-  const [rectPos, setRectPos] = useState({ x: 0, y: 0 })
+  // Shape options menu
+  const shapeBtnRef = useRef<HTMLButtonElement | null>(null)
+  const shapeMenuRef = useRef<HTMLDivElement | null>(null)
+  const [shapeOpen, setShapeOpen] = useState(false)
+  const [shapePos, setShapePos] = useState({ x: 0, y: 0 })
 
   // Outside click & Escape close
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelOpen(false); setBrushOpen(false); setRectOpen(false) } }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelOpen(false); setBrushOpen(false); setShapeOpen(false) } }
     const onDown = (e: MouseEvent | PointerEvent) => {
       const t = e.target as Node | null
       for (const [btn, menu, setOpen] of [
         [selBtnRef.current, selMenuRef.current, setSelOpen] as const,
         [brushBtnRef.current, brushMenuRef.current, setBrushOpen] as const,
-        [rectBtnRef.current, rectMenuRef.current, setRectOpen] as const
+        [shapeBtnRef.current, shapeMenuRef.current, setShapeOpen] as const
       ]) {
         const insideBtn = btn && btn.contains(t)
         const insideMenu = menu && menu.contains(t)
@@ -123,26 +126,26 @@ export function ToolSelector() {
           <span className="hidden sm:inline">Line</span>
         </button>
         <button
-          ref={rectBtnRef}
-          className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'rect' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+          ref={shapeBtnRef}
+          className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'rect' || tool === 'ellipse' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
           onClick={() => {
-            setTool('rect')
-            if (!rectBtnRef.current) return
-            const r = rectBtnRef.current.getBoundingClientRect()
+            setTool(shapeTool)
+            if (!shapeBtnRef.current) return
+            const r = shapeBtnRef.current.getBoundingClientRect()
             const margin = 6
             const minW = 160
             const x = Math.min(window.innerWidth - minW - margin, Math.max(margin, r.left))
             const y = Math.min(window.innerHeight - 10 - margin, r.bottom + margin)
-            setRectPos({ x, y })
-            setRectOpen(o => !o)
+            setShapePos({ x, y })
+            setShapeOpen(o => !o)
           }}
           aria-pressed={tool === 'rect'}
           aria-haspopup="menu"
-          aria-expanded={rectOpen}
-          title={`Rect (${rectFill ? 'Filled' : 'Outline'})`}
+          aria-expanded={shapeOpen}
+          title={`${shapeToolObj.name} (${shapeFill ? 'Filled' : 'Outline'})`}
         >
-          <LuSquare aria-hidden />
-          <span className="hidden sm:inline">Rect</span>
+          <ShapeIcon aria-hidden />
+          <span className="hidden sm:inline">{shapeToolObj.shortName}</span>
         </button>
         <button
           ref={selBtnRef}
@@ -167,19 +170,6 @@ export function ToolSelector() {
           <span className="hidden sm:inline">{selToolObj.shortName}</span>
         </button>
       </div>
-      {/* Selection dropdown menu */}
-      <Menu open={selOpen} x={selPos.x} y={selPos.y} menuRef={selMenuRef} minWidth={160}>
-        {SELECT_TOOLS.map(t => {
-          const Icon = t.icon
-          return (
-            <MenuItem key={t.id} onSelect={() => { setTool(t.id); setSelOpen(false) }}>
-              {selectTool === t.id ? <span className="w-4 inline-block"><LuCheck /></span> : <span className="w-4 inline-block" />}
-              <Icon />
-              <span>{t.name}</span>
-            </MenuItem>
-          )
-        })}
-      </Menu>
       {/* Brush size menu */}
       <Menu open={brushOpen} x={brushPos.x} y={brushPos.y} menuRef={brushMenuRef} minWidth={200}>
         <div className="px-3 py-2 flex flex-col gap-2">
@@ -205,21 +195,50 @@ export function ToolSelector() {
           </div>
         </div>
       </Menu>
-      {/* Rect options menu */}
-      <Menu open={rectOpen} x={rectPos.x} y={rectPos.y} menuRef={rectMenuRef} minWidth={160}>
+      {/* Shape options menu */}
+      <Menu open={shapeOpen} x={shapePos.x} y={shapePos.y} menuRef={shapeMenuRef} minWidth={160}>
+        {SHAPE_TOOLS.map(t => {
+          const Icon = t.icon
+          return (
+            <MenuItem key={t.id} onSelect={() => { setTool(t.id); setShapeOpen(false) }}>
+              {shapeTool === t.id ? <span className="w-4 inline-block"><LuCheck /></span> : <span className="w-4 inline-block" />}
+              <Icon />
+              <span>{t.name}</span>
+            </MenuItem>
+          )
+        })}
+        <MenuDivider />
         <div className="px-3 py-2 flex flex-col gap-2">
           <div className="flex items-center justify-between gap-4 text-sm">
             <span>Fill</span>
             <button
-              onClick={() => { toggleRectFill(); setRectOpen(false) }}
-              className={`px-2 py-1 rounded border text-xs ${rectFill ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
-            >{rectFill ? 'On' : 'Off'}</button>
+              onClick={() => { toggleShapeFill() }}
+              className={`px-2 py-1 rounded border text-xs ${shapeFill ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
+            >{shapeFill ? 'On' : 'Off'}</button>
           </div>
         </div>
+      </Menu>
+      {/* Selection dropdown menu */}
+      <Menu open={selOpen} x={selPos.x} y={selPos.y} menuRef={selMenuRef} minWidth={160}>
+        {SELECT_TOOLS.map(t => {
+          const Icon = t.icon
+          return (
+            <MenuItem key={t.id} onSelect={() => { setTool(t.id); setSelOpen(false) }}>
+              {selectTool === t.id ? <span className="w-4 inline-block"><LuCheck /></span> : <span className="w-4 inline-block" />}
+              <Icon />
+              <span>{t.name}</span>
+            </MenuItem>
+          )
+        })}
       </Menu>
     </div>
   )
 }
+
+const SHAPE_TOOLS = [
+  { id: 'rect', name: 'Rectangle', shortName: 'Rect', icon: LuSquare },
+  { id: 'ellipse', name: 'Ellipse', shortName: 'Ellipse', icon: LuCircle },
+] as const
 
 const SELECT_TOOLS = [
   { id: 'select-rect', name: 'Rect Select', shortName: 'Select', icon: PiRectangleDashed },

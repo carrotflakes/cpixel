@@ -261,3 +261,195 @@ export function drawRectFilledIndexed(
   }
   return changed ? out : src
 }
+
+function rasterizeEllipse(x0: number, y0: number, x1: number, y1: number, plot: (x: number, y: number) => void) {
+  const a = Math.abs(x1 - x0) / 2
+  const b = Math.abs(y1 - y0) / 2
+  const cx = (x0 + x1) / 2
+  const cy = (y0 + y1) / 2
+
+  if (a > b) {
+    rasterizeEllipse(y0, x0, y1, x1, (y, x) => plot(x, y))
+    return
+  }
+
+  let x = 0.25
+  let y = b
+  const a2 = a * a
+  const b2 = b * b
+
+  const plots = () => {
+    plot(Math.round(cx + x), Math.round(cy + y))
+    plot(Math.round(cx - x), Math.round(cy + y))
+    plot(Math.round(cx + x), Math.round(cy - y))
+    plot(Math.round(cx - x), Math.round(cy - y))
+  }
+
+  // Region 1
+  let d1 = b2 - a2 * b + 0.25 * a2
+  while (b2 * (x + 1) < a2 * (y - 0.5)) {
+    plots()
+    if (d1 < 0) {
+      d1 += b2 * (2 * x + 3)
+    } else {
+      d1 += b2 * (2 * x + 3) + a2 * (-2 * y + 2)
+      y -= 1
+    }
+    x += 1
+  }
+
+  // Region 2
+  let d2 = b2 * (x + 0.5) * (x + 0.5) + a2 * (y - 1) * (y - 1) - a2 * b2
+  while (y >= 0) {
+    plots()
+    if (d2 > 0) {
+      d2 += a2 * (-2 * y + 3)
+    } else {
+      d2 += b2 * (2 * x + 2) + a2 * (-2 * y + 3)
+      x += 1
+    }
+    y -= 1
+  }
+}
+
+function rasterizeEllipseFilled(x0: number, y0: number, x1: number, y1: number, plot: (x: number, y: number) => void) {
+  const a = Math.abs(x1 - x0) / 2
+  const b = Math.abs(y1 - y0) / 2
+  const cx = (x0 + x1) / 2
+  const cy = (y0 + y1) / 2
+
+  if (a > b) {
+    rasterizeEllipseFilled(y0, x0, y1, x1, (y, x) => plot(x, y))
+    return
+  }
+
+  let x = 0.25
+  let y = b
+  const a2 = a * a
+  const b2 = b * b
+
+  const plots = () => {
+    for (let px = Math.round(cx - x); px <= Math.round(cx + x); px++) {
+      plot(px, Math.round(cy + y))
+      plot(px, Math.round(cy - y))
+    }
+  }
+
+  // Region 1
+  let d1 = b2 - a2 * b + 0.25 * a2
+  while (b2 * (x + 1) < a2 * (y - 0.5)) {
+    plots()
+    if (d1 < 0) {
+      d1 += b2 * (2 * x + 3)
+    } else {
+      d1 += b2 * (2 * x + 3) + a2 * (-2 * y + 2)
+      y -= 1
+    }
+    x += 1
+  }
+
+  // Region 2
+  let d2 = b2 * (x + 0.5) * (x + 0.5) + a2 * (y - 1) * (y - 1) - a2 * b2
+  while (y >= 0) {
+    plots()
+    if (d2 > 0) {
+      d2 += a2 * (-2 * y + 3)
+    } else {
+      d2 += b2 * (2 * x + 2) + a2 * (-2 * y + 3)
+      x += 1
+    }
+    y -= 1
+  }
+}
+
+export function drawEllipseOutlineTruecolor(
+  src: Uint32Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  rgba: number,
+  selectionMask?: Uint8Array,
+): Uint32Array {
+  const out = new Uint32Array(src)
+  let changed = false
+  const pix = rgba >>> 0
+  rasterizeEllipse(x0, y0, x1, y1, (px, py) => {
+    if (px < 0 || py < 0 || px >= W || py >= H) return
+    const i = py * W + px
+    if (selectionMask && !selectionMask[i]) return
+    if (out[i] !== pix) { out[i] = pix; changed = true }
+  })
+  return changed ? out : src
+}
+
+export function drawEllipseOutlineIndexed(
+  src: Uint8Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  index: number,
+  selectionMask?: Uint8Array,
+): Uint8Array {
+  const out = new Uint8Array(src)
+  let changed = false
+  const v = index & 0xff
+  rasterizeEllipse(x0, y0, x1, y1, (px, py) => {
+    if (px < 0 || py < 0 || px >= W || py >= H) return
+    const i = py * W + px
+    if (selectionMask && !selectionMask[i]) return
+    if (out[i] !== v) { out[i] = v; changed = true }
+  })
+  return changed ? out : src
+}
+
+export function drawEllipseFilledTruecolor(
+  src: Uint32Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  rgba: number,
+  selectionMask?: Uint8Array,
+): Uint32Array {
+  const out = new Uint32Array(src)
+  let changed = false
+  const pix = rgba >>> 0
+  rasterizeEllipseFilled(x0, y0, x1, y1, (px, py) => {
+    if (px < 0 || py < 0 || px >= W || py >= H) return
+    const i = py * W + px
+    if (selectionMask && !selectionMask[i]) return
+    if (out[i] !== pix) { out[i] = pix; changed = true }
+  })
+  return changed ? out : src
+}
+
+export function drawEllipseFilledIndexed(
+  src: Uint8Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  index: number,
+  selectionMask?: Uint8Array,
+): Uint8Array {
+  const out = new Uint8Array(src)
+  let changed = false
+  const v = index & 0xff
+  rasterizeEllipseFilled(x0, y0, x1, y1, (px, py) => {
+    if (px < 0 || py < 0 || px >= W || py >= H) return
+    const i = py * W + px
+    if (selectionMask && !selectionMask[i]) return
+    if (out[i] !== v) { out[i] = v; changed = true }
+  })
+  return changed ? out : src
+}
