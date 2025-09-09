@@ -10,7 +10,7 @@ const GRID_THRESHOLD = 8
 
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const { hoverCell, shapePreview, interactionActive, onPointerDown, onPointerMove, onPointerUp, onPointerLeave } = useCanvasInput(canvasRef)
+  const { hoverCell, shapePreview, interactionActive, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave } = useCanvasInput(canvasRef)
   const view = usePixelStore(s => s.view)
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
@@ -225,6 +225,7 @@ export function PixelCanvas() {
         onPointerMove={parallaxActive ? undefined : onPointerMove}
         onPointerUp={parallaxActive ? undefined : onPointerUp}
         onPointerLeave={parallaxActive ? undefined : onPointerLeave}
+        onPointerCancel={parallaxActive ? undefined : onPointerCancel}
         onContextMenu={(e) => e.preventDefault()}
         className="w-full h-full block shadow cursor-crosshair focus:outline-2 focus:outline-blue-500"
         tabIndex={0}

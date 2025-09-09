@@ -419,6 +419,34 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
   }
 
+  const endTool = () => {
+    dragState.current.panning = false
+    if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
+    if (selectionDrag.current.active) {
+      commitSelectionMove()
+      endStroke()
+      selectionDrag.current.active = false
+      return
+    }
+    if (rectSelecting.current.active) {
+      rectSelecting.current.active = false
+      return
+    }
+    if (lassoPath.current) {
+      const pts = lassoPath.current
+      const { mask, bounds } = polygonToMask(W, H, pts)
+      setSelectionMask(mask, bounds)
+      lassoPath.current = null
+      return
+    }
+    if (shapePreview.kind) {
+      commitShape()
+      return
+    }
+    endStroke()
+    endBrush()
+  }
+
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'touch') {
       const pointer = touchState.current.pointers.find(p => p.id === e.pointerId)
@@ -432,34 +460,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         touchState.current.lastDist = undefined
         touchState.current.lastCenter = undefined
       }
-    }
-
-    const endTool = () => {
-      dragState.current.panning = false
-      if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
-      if (selectionDrag.current.active) {
-        commitSelectionMove()
-        endStroke()
-        selectionDrag.current.active = false
-        return
-      }
-      if (rectSelecting.current.active) {
-        rectSelecting.current.active = false
-        return
-      }
-      if (lassoPath.current) {
-        const pts = lassoPath.current
-        const { mask, bounds } = polygonToMask(W, H, pts)
-        setSelectionMask(mask, bounds)
-        lassoPath.current = null
-        return
-      }
-      if (shapePreview.kind) {
-        commitShape()
-        return
-      }
-      endStroke()
-      endBrush()
     }
 
     switch (state.current) {
@@ -516,6 +516,36 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
   }
 
+  const onPointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === 'touch') {
+      touchState.current.pointers = touchState.current.pointers.filter(p => p.id !== e.pointerId)
+      if (touchState.current.pointers.length < 2) {
+        touchState.current.multiGesture = false
+        touchState.current.lastDist = undefined
+        touchState.current.lastCenter = undefined
+      }
+    }
+
+    switch (state.current) {
+      case null:
+        return
+      case "firstTouch":
+        state.current = null
+        firstTouch.current = null
+        return
+      case "pinch":
+        if (touchState.current.pointers.length === 0) {
+          state.current = null
+        }
+        return
+      case "tool":
+        if (e.pointerId !== toolPointerId.current) return
+        state.current = null
+        endTool()
+        return
+    }
+  }
+
   const onPointerLeave = () => { setHoverCell(null); setHoverInfo(undefined) }
 
   const interactionActive = state.current !== null;
@@ -526,6 +556,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     onPointerDown,
     onPointerMove,
     onPointerUp,
+    onPointerCancel,
     onPointerLeave,
     interactionActive,
   }
