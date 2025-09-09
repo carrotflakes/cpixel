@@ -1,6 +1,7 @@
 import { usePixelStore } from '../store'
 import { ColorPicker, useColorPopover } from '../ColorPicker'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
+import { ColorBoxInner, COLOR_BOX_STYLE } from '../ColorBox'
 
 export function ColorSection() {
   const color = usePixelStore(s => s.color)
@@ -44,7 +45,7 @@ export function ColorSection() {
             <button
               key={mode === 'indexed' ? `${recentIndexed[idx]}` : c}
               className="h-5 w-5 rounded border border-border/60 hover:border-border focus:outline-none"
-              style={{ background: c }}
+              style={COLOR_BOX_STYLE}
               title={mode === 'indexed' ? `Palette index ${recentIndexed[idx]}` : c}
               onClick={() => {
                 if (mode === 'indexed' && currentPaletteIndex !== undefined) {
@@ -53,7 +54,9 @@ export function ColorSection() {
                   setColor(c)
                 }
               }}
-            />
+            >
+              <ColorBoxInner color={c} />
+            </button>
           ))}
         </div>
       )}
@@ -67,13 +70,15 @@ function ColorButton({ color, onLive, onDone }: { color: string; onLive: (c: str
     <>
       <button
         ref={btnRef}
-        className="h-7 w-10 rounded border border-border bg-surface"
-        style={{ background: color }}
+        className="h-7 w-10 rounded border border-border"
+        style={COLOR_BOX_STYLE}
         onClick={toggle}
         aria-haspopup="dialog"
         aria-expanded={open}
         title={color}
-      />
+      >
+        <ColorBoxInner color={color} />
+      </button>
       <ColorPicker
         color={color}
         open={open}
@@ -81,7 +86,7 @@ function ColorButton({ color, onLive, onDone }: { color: string; onLive: (c: str
         onClose={close}
         onChangeLive={onLive}
         onChangeDone={(c) => { onDone(c); close() }}
-        showAlpha={false}
+        showAlpha={true}
       />
     </>
   )

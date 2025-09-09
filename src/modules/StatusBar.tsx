@@ -1,5 +1,6 @@
 import { rgbaToCSSHex } from './utils/color'
 import { usePixelStore } from './store'
+import { ColorBox } from './ColorBox'
 
 export function StatusBar() {
   const size = usePixelStore(s => s.view.scale)
@@ -16,7 +17,7 @@ export function StatusBar() {
           <span>Pos: ({hover.x}, {hover.y})</span>
           {hover.rgba !== undefined ? (
             <span className="flex items-center gap-2">
-              Color: <i className="inline-block align-middle w-4 h-4 rounded border border-border" style={{ background: rgbaToCSSHex(hover.rgba) }} /> {rgbaToCSSHex(hover.rgba)}{mode === 'indexed' && hover.index !== undefined ? <span className="text-muted"> ({hover.index})</span> : null}
+              Color: <ColorBox className="inline-block align-middle w-4 h-4 rounded border border-border" color={rgbaToCSSHex(hover.rgba)} /> {rgbaToCSSHex(hover.rgba)}{mode === 'indexed' && hover.index !== undefined ? <span className="text-muted"> ({hover.index})</span> : null}
             </span>
           ) : (
             <span>Color: -</span>

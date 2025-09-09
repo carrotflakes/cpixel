@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { PALETTE_PRESETS, PalettePreset } from './presets/palettes'
 import { rgbaToCSSHex } from './utils/color'
+import { ColorBox } from './ColorBox'
 
 type Props = {
   open: boolean
@@ -48,11 +49,9 @@ export function PalettePresetsDialog({ open, onCancel, onSelect }: Props) {
               <div className="flex flex-wrap gap-1">
                 {Array.from(p.colors.slice(0, 32)).map((c, i) => {
                   const isTransparent = (p.transparentIndex ?? -1) === i || ((c >>> 0) & 0xff) === 0
-                  const style = isTransparent
-                    ? { backgroundImage: 'repeating-conic-gradient(#cccccc 0% 25%, transparent 0% 50%)', backgroundSize: '8px 8px', backgroundColor: '#ffffff' }
-                    : { background: rgbaToCSSHex(c) }
+                  const color = isTransparent ? "#0000" : rgbaToCSSHex(c)
                   return (
-                    <span key={i} className="w-4 h-4 inline-block rounded border border-border" style={style} />
+                    <ColorBox key={i} className="w-4 h-4 rounded border border-border" color={color} />
                   )
                 })}
                 {p.colors.length > 32 && (

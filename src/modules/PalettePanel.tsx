@@ -5,6 +5,7 @@ import { LuPin, LuArrowUp, LuArrowDown, LuTrash2, LuChevronDown, LuChevronUp } f
 import { ColorPicker } from './ColorPicker'
 import { Menu, MenuItem, useContextMenu } from './ui/ContextMenu'
 import { PalettePresetsDialog } from './PalettePresetsDialog'
+import { COLOR_BOX_STYLE, ColorBoxInner } from './ColorBox'
 
 export function PalettePanel() {
   const mode = usePixelStore(s => s.mode)
@@ -118,16 +119,14 @@ export function PalettePanel() {
           {Array.from(palette).map((rgba, i) => {
             const isTransparent = i === transparentIndex
             const isSelected = currentPaletteIndex === i
-            const style = isTransparent
-              ? { backgroundImage: 'repeating-conic-gradient(#cccccc 0% 25%, transparent 0% 50%)', backgroundSize: '8px 8px', backgroundColor: '#ffffff' }
-              : { background: rgbaToCSSHex(rgba) }
+            const color = isTransparent ? "#0000" : rgbaToCSSHex(rgba)
             return (
               <button
                 key={i}
                 title={`#${i}`}
                 aria-pressed={isSelected}
                 className={`w-7 h-7 rounded border border-border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-accent' : ''}`}
-                style={style}
+                style={COLOR_BOX_STYLE}
                 onClick={(e) => {
                   if (suppressClickRef.current) {
                     e.preventDefault()
@@ -173,6 +172,7 @@ export function PalettePanel() {
                   touchStartPos.current = null
                 }}
               >
+                <ColorBoxInner color={color} />
                 {isTransparent && (
                   <span className="absolute inset-0 flex items-center justify-center pointer-events-none select-none text-base font-bold">t</span>
                 )}

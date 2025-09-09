@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { parseCSSColor, rgbaToCSSHex, unpackRGBA, packRGBA } from './utils/color'
+import { ColorBox } from './ColorBox'
 
 type Props = {
   color: string
@@ -222,15 +223,7 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
 
       {/* Hex input + preview */}
       <div className="flex items-center gap-2">
-        <div
-          className="w-6 h-6 rounded border border-border"
-          style={{
-            backgroundImage: 'linear-gradient(45deg, #0003 25%, transparent 25%), linear-gradient(-45deg, #0003 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #0003 75%), linear-gradient(-45deg, transparent 75%, #0003 75%)',
-            backgroundSize: '8px 8px', backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0'
-          }}
-        >
-          <div className="w-full h-full rounded" style={{ background: rgbaToCSSHex(packRGBA({ r: curRGB.r, g: curRGB.g, b: curRGB.b, a: Math.round(hsv.a * 255) })) }} />
-        </div>
+        <ColorBox className="w-6 h-6 rounded border border-border" color={rgbaToCSSHex(packRGBA({ r: curRGB.r, g: curRGB.g, b: curRGB.b, a: Math.round(hsv.a * 255) }))} />
         <input
           className="w-24 px-2 py-1 rounded border border-border bg-surface"
           value={hexInput}

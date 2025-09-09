@@ -48,6 +48,7 @@ const PICO8 = new Uint32Array(PICO8_COLORS_RGB.map(packRGB))
 
 // Game Boy (DMG) 4-color palette
 const GB_DMG = new Uint32Array([
+  0x00000000,
   packRGB(0x0F380F), // darkest
   packRGB(0x306230),
   packRGB(0x8BAC0F),
