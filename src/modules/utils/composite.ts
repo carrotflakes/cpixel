@@ -56,7 +56,7 @@ export function findTopPaletteIndex(
   transparentIndex: number,
 ): number | undefined {
   if (x < 0 || y < 0 || x >= width || y >= height) return undefined
-  for (let li = 0; li < layers.length; li++) {
+  for (let li = layers.length - 1; li >= 0; li--) {
     const L = layers[li]
     if (!L.visible) continue
     const pi = L.indices?.[y * width + x]

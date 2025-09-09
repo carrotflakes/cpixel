@@ -97,15 +97,13 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const idx = mode === 'indexed' ? findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
     setHoverInfo({ x, y, rgba: hov, index: idx })
   }
-  const pickColorAt = (x: number, y: number, updateHoverInfo: boolean) => {
+  const pickColorAt = (x: number, y: number) => {
     if (!inBounds(x, y)) return
     const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
     if (mode === 'indexed') {
       const idx = findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex
-      if (updateHoverInfo) setHoverInfo({ x, y, rgba, index: idx })
       setColorIndex(idx)
     } else {
-      if (updateHoverInfo) setHoverInfo({ x, y, rgba })
       setColor(rgbaToCSSHex(rgba))
     }
   }
@@ -203,9 +201,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     // Selection tools: only hover/update, do not paint via move
     if (isSelectionTool()) return
-    if (isEyedropperTool()) { if (e.buttons & 1) pickColorAt(x, y, true); return }
+    if (isEyedropperTool()) { if (e.buttons & 1) pickColorAt(x, y); return }
     if (e.altKey) {
-      pickColorAt(x, y, true)
+      pickColorAt(x, y)
       e.preventDefault();
       return
     }
@@ -252,7 +250,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             return
           }
 
-          if (isEyedropperTool()) { pickColorAt(x, y, true); e.preventDefault(); return }
+          if (isEyedropperTool()) { pickColorAt(x, y); e.preventDefault(); return }
           if (startTool(x, y, e)) {
             e.preventDefault()
             return
@@ -317,7 +315,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             return
           }
 
-          if (isEyedropperTool()) { pickColorAt(f.x, f.y, true); e.preventDefault(); return }
+          if (isEyedropperTool()) { pickColorAt(f.x, f.y); e.preventDefault(); return }
           if (startTool(f.x, f.y, e)) {
             e.preventDefault()
             return
@@ -481,7 +479,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             return
           }
 
-          if (isEyedropperTool()) { pickColorAt(f.x, f.y, true); e.preventDefault(); return }
+          if (isEyedropperTool()) { pickColorAt(f.x, f.y); e.preventDefault(); return }
           if (startTool(f.x, f.y, e)) {
             e.preventDefault()
             return
