@@ -34,20 +34,14 @@ export function compositePixel(
   height = 64,
 ): number {
   if (x < 0 || y < 0 || x >= width || y >= height) return 0x00000000
+  const i = y * width + x
   let out = 0x00000000
-  for (let li = layers.length - 1; li >= 0; li--) {
-    const L = layers[li]
-    if (!L.visible) continue
-    let rgba = 0x00000000
-    if (mode === 'truecolor') {
-      rgba = (L.data?.[y * width + x] ?? 0) >>> 0
-    } else {
-      const pi = L.indices?.[y * width + x] ?? transparentIndex
-      if (pi === transparentIndex) continue
-      rgba = palette[pi] ?? 0x00000000
-    }
-    out = over(rgba, out)
-    if ((out & 0xff) === 255) break
+  for (const layer of layers) {
+    if (!layer.visible) continue
+    const src = mode === 'truecolor'
+      ? layer.data?.[i] ?? 0x00000000
+      : palette[layer.indices?.[i] ?? transparentIndex] ?? 0x00000000
+    out = over(src, out)
   }
   return out >>> 0
 }
