@@ -4,7 +4,7 @@ import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings } from 'rea
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
 import { SettingsDialog } from '../SettingsDialog'
 import { usePixelStore } from '../store'
-import { Menu, MenuDivider, MenuItem } from '../ui/ContextMenu'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { GoogleDrive } from '../utils/googleDrive'
 
 export function MoreMenu() {
@@ -21,29 +21,13 @@ export function MoreMenu() {
   const curW = usePixelStore(s => s.width)
   const curH = usePixelStore(s => s.height)
 
-  // root menu state
-  const moreBtnRef = useRef<HTMLButtonElement | null>(null)
-  const menuRootRef = useRef<HTMLDivElement | null>(null)
-  const modeSubRef = useRef<HTMLDivElement | null>(null)
-  const exportSubRef = useRef<HTMLDivElement | null>(null)
-  const importSubRef = useRef<HTMLDivElement | null>(null)
-  const driveSubRef = useRef<HTMLDivElement | null>(null)
-  const editSubRef = useRef<HTMLDivElement | null>(null)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [menuPos, setMenuPos] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
-  const [openSub, setOpenSub] = useState<null | 'mode' | 'export' | 'import' | 'drive' | 'edit'>(null)
-  const [subPos, setSubPos] = useState<{ x: number, y: number } | null>(null)
-  const modeItemRef = useRef<HTMLButtonElement | null>(null)
-  const importItemRef = useRef<HTMLButtonElement | null>(null)
-  const exportItemRef = useRef<HTMLButtonElement | null>(null)
-  const driveItemRef = useRef<HTMLButtonElement | null>(null)
-  const editItemRef = useRef<HTMLButtonElement | null>(null)
+  const [open, setOpen] = useState(false)
   const [sizeOpen, setSizeOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  // Drive state
+  // Drive state & fullscreen
   const [driveOpen, setDriveOpen] = useState<null | 'open' | 'save'>(null)
-  // fullscreen state
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const [driveFiles, setDriveFiles] = useState<{ id: string; name: string; modifiedTime?: string }[]>([])
   const [driveBusy, setDriveBusy] = useState(false)
@@ -73,68 +57,6 @@ export function MoreMenu() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!menuOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenuOpen(false); setOpenSub(null) } }
-    const onDown = (e: MouseEvent | PointerEvent) => {
-      const t = e.target as Node | null
-      const insideMore = moreBtnRef.current && t && moreBtnRef.current.contains(t)
-      const insideRoot = menuRootRef.current && t && menuRootRef.current.contains(t)
-      const insideMode = modeSubRef.current && t && modeSubRef.current.contains(t)
-      const insideExport = exportSubRef.current && t && exportSubRef.current.contains(t)
-      const insideImport = importSubRef.current && t && importSubRef.current.contains(t)
-      const insideDrive = driveSubRef.current && t && driveSubRef.current.contains(t)
-      const insideEdit = editSubRef.current && t && editSubRef.current.contains(t)
-      if (insideMore || insideRoot || insideMode || insideExport || insideImport || insideDrive || insideEdit) return
-      setMenuOpen(false); setOpenSub(null)
-    }
-    window.addEventListener('keydown', onKey, { capture: true })
-    window.addEventListener('pointerdown', onDown, { capture: true })
-    return () => {
-      window.removeEventListener('keydown', onKey, { capture: true })
-      window.removeEventListener('pointerdown', onDown, { capture: true })
-    }
-  }, [menuOpen])
-
-  const openMore = () => {
-    if (!moreBtnRef.current) return
-    const r = moreBtnRef.current.getBoundingClientRect()
-    const margin = 6
-    const x = Math.min(window.innerWidth - 220 - margin, Math.max(margin, r.right - 200))
-    const y = Math.min(window.innerHeight - 10 - margin, r.bottom + margin)
-    setMenuPos({ x, y })
-    setMenuOpen(v => !v)
-    setOpenSub(null)
-    setSubPos(null)
-  }
-
-  const MAIN_MENU_WIDTH = 208
-  const SUB_MENU_META: Record<'mode' | 'export' | 'import' | 'drive' | 'edit', { width: number; approxHeight: number; ref: React.RefObject<HTMLButtonElement | null> }> = {
-    mode: { width: 160, approxHeight: 100, ref: modeItemRef },
-    export: { width: 160, approxHeight: 100, ref: exportItemRef },
-    import: { width: 180, approxHeight: 100, ref: importItemRef },
-    drive: { width: 224, approxHeight: 140, ref: driveItemRef },
-    edit: { width: 200, approxHeight: 160, ref: editItemRef },
-  }
-  function computeSubmenuPos(kind: keyof typeof SUB_MENU_META) {
-    const meta = SUB_MENU_META[kind]
-    const margin = 8
-    const rightX = menuPos.x + MAIN_MENU_WIDTH
-    const fitsRight = rightX + meta.width + margin <= window.innerWidth
-    const x = fitsRight ? rightX : Math.max(margin, menuPos.x - meta.width)
-    let y = menuPos.y
-    const el = meta.ref.current
-    const rootMenuEl = menuRootRef.current
-    if (el && rootMenuEl) {
-      const itemRect = el.getBoundingClientRect()
-      y = itemRect.top
-      const maxY = window.innerHeight - meta.approxHeight - margin
-      if (y > maxY) y = maxY
-      if (y < margin) y = margin
-    }
-    return { x, y }
-  }
-
   // edit actions / state
   const undo = usePixelStore(s => s.undo)
   const redo = usePixelStore(s => s.redo)
@@ -146,190 +68,141 @@ export function MoreMenu() {
   const hasSelection = usePixelStore(s => !!s.selection?.bounds)
   const hasClipboard = usePixelStore(s => !!s.clipboard)
 
+  const itemCls = 'px-3 py-2 rounded-sm text-sm flex items-center gap-2 cursor-pointer select-none outline-none focus:bg-surface-muted data-[disabled]:opacity-50 data-[disabled]:cursor-default'
+  const contentCls = 'z-1000 p-1 border border-border bg-elevated rounded-md shadow-lg'
+  const subContentCls = 'p-1 border border-border bg-elevated rounded-md shadow-lg'
+  const separatorCls = 'my-1 h-px bg-border'
+
   return (
     <>
-      <button
-        ref={moreBtnRef}
-        className="px-2 py-1 rounded border border-border bg-surface text-sm inline-flex items-center gap-1 hover:bg-surface-muted"
-        onClick={openMore}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        title="More"
-      >
-        <FaEllipsisV aria-hidden />
-        <span className="hidden sm:inline">More</span>
-      </button>
-      <Menu open={menuOpen} x={menuPos.x} y={menuPos.y} menuRef={menuRootRef} minWidth={208}>
-
-        <MenuItem
-          ref={editItemRef}
-          onSelect={() => {
-            if (openSub === 'edit') { setOpenSub(null); setSubPos(null); return }
-            setSubPos(computeSubmenuPos('edit'))
-            setOpenSub('edit')
-          }}
-        >
-          <span>Edit</span>
-          <LuChevronRight className="ml-auto" aria-hidden />
-        </MenuItem>
-        <MenuItem
-          ref={modeItemRef}
-          onSelect={() => {
-            if (openSub === 'mode') { setOpenSub(null); setSubPos(null); return }
-            setSubPos(computeSubmenuPos('mode'))
-            setOpenSub('mode')
-          }}
-        >
-          <span>Mode</span>
-          <LuChevronRight className="ml-auto" aria-hidden />
-        </MenuItem>
-        <MenuItem
-          ref={importItemRef}
-          onSelect={() => {
-            if (openSub === 'import') { setOpenSub(null); setSubPos(null); return }
-            setSubPos(computeSubmenuPos('import'))
-            setOpenSub('import')
-          }}
-        >
-          <span>Import</span>
-          <LuChevronRight className="ml-auto" aria-hidden />
-        </MenuItem>
-        <MenuItem
-          ref={exportItemRef}
-          onSelect={() => {
-            if (openSub === 'export') { setOpenSub(null); setSubPos(null); return }
-            setSubPos(computeSubmenuPos('export'))
-            setOpenSub('export')
-          }}
-        >
-          <span>Export</span>
-          <LuChevronRight className="ml-auto" aria-hidden />
-        </MenuItem>
-        <MenuItem
-          ref={driveItemRef}
-          onSelect={() => {
-            if (openSub === 'drive') { setOpenSub(null); setSubPos(null); return }
-            setSubPos(computeSubmenuPos('drive'))
-            setOpenSub('drive')
-          }}
-        >
-          <span>Google Drive</span>
-          <LuChevronRight className="ml-auto" aria-hidden />
-        </MenuItem>
-        <MenuItem onSelect={() => { setSettingsOpen(true); setMenuOpen(false); setOpenSub(null) }}>
-          <LuSettings aria-hidden />
-          <span>Settings…</span>
-        </MenuItem>
-        <MenuDivider />
-        <MenuItem onSelect={async () => {
-          try {
-            if (!isFullscreen) {
-              const el = document.documentElement
-              if (el.requestFullscreen) await el.requestFullscreen()
-              else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen()
-              else if ((el as any).msRequestFullscreen) await (el as any).msRequestFullscreen()
-            } else {
-              if (document.exitFullscreen) await document.exitFullscreen()
-              else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen()
-              else if ((document as any).msExitFullscreen) await (document as any).msExitFullscreen()
-            }
-          } catch (e) {
-            console.error('Fullscreen toggle failed', e)
-          } finally {
-            setMenuOpen(false); setOpenSub(null)
-          }
-        }}>
-          <LuMaximize aria-hidden />
-          <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
-        </MenuItem>
-
-        {/* Edit submenu */}
-        <Menu open={openSub === 'edit'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={editSubRef} minWidth={SUB_MENU_META.edit.width}>
-          <MenuItem
-            disabled={!canUndo}
-            onSelect={() => { if (!canUndo) return; undo(); setMenuOpen(false); setOpenSub(null) }}
+      <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+        <DropdownMenu.Trigger asChild>
+          <button
+            ref={triggerRef}
+            className="px-2 py-1 rounded border border-border bg-surface text-sm inline-flex items-center gap-1 hover:bg-surface-muted"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            title="More"
           >
-            <span>Undo</span>
-          </MenuItem>
-          <MenuItem
-            disabled={!canRedo}
-            onSelect={() => { if (!canRedo) return; redo(); setMenuOpen(false); setOpenSub(null) }}
-          >
-            <span>Redo</span>
-          </MenuItem>
-          <MenuDivider />
-          <MenuItem
-            disabled={!hasSelection}
-            onSelect={() => { if (!hasSelection) return; copySelection(); setMenuOpen(false); setOpenSub(null) }}
-          >
-            <span>Copy</span>
-          </MenuItem>
-          <MenuItem
-            disabled={!hasSelection}
-            onSelect={() => { if (!hasSelection) return; usePixelStore.getState().beginStroke(); cutSelection(); usePixelStore.getState().endStroke(); setMenuOpen(false); setOpenSub(null) }}
-          >
-            <span>Cut</span>
-          </MenuItem>
-          <MenuItem
-            disabled={!hasClipboard}
-            onSelect={() => { if (!hasClipboard) return; pasteClipboard(); setMenuOpen(false); setOpenSub(null) }}
-          >
-            <span>Paste</span>
-          </MenuItem>
-          <MenuDivider />
-          <MenuItem onSelect={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}>
-            <span>Canvas size…</span>
-          </MenuItem>
-          <MenuItem onSelect={() => { usePixelStore.getState().clearLayer(); setMenuOpen(false); setOpenSub(null); setSubPos(null) }}>
-            <FaEraser aria-hidden />
-            <span>Clear layer</span>
-          </MenuItem>
-        </Menu>
-        {/* Submenus */}
-        <Menu open={openSub === 'mode'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={modeSubRef} minWidth={SUB_MENU_META.mode.width}>
-          <MenuItem onSelect={() => { setMode('truecolor'); setMenuOpen(false); setOpenSub(null) }}>
-            {mode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
-            <span>Truecolor</span>
-          </MenuItem>
-          <MenuItem onSelect={() => { setMode('indexed'); setMenuOpen(false); setOpenSub(null) }}>
-            {mode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
-            <span>Indexed</span>
-          </MenuItem>
-        </Menu>
-        <Menu open={openSub === 'export'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={exportSubRef} minWidth={SUB_MENU_META.export.width}>
-          <MenuItem onSelect={() => { exportPNG(); setMenuOpen(false); setOpenSub(null) }}>
-            <LuDownload aria-hidden />
-            <span>PNG</span>
-          </MenuItem>
-          <MenuItem onSelect={() => { exportJSON(); setMenuOpen(false); setOpenSub(null) }}>
-            <LuDownload aria-hidden />
-            <span>Project JSON</span>
-          </MenuItem>
-          <MenuItem onSelect={() => { exportAse(); setMenuOpen(false); setOpenSub(null) }}>
-            <LuDownload aria-hidden />
-            <span>Aseprite (.aseprite)</span>
-          </MenuItem>
-        </Menu>
-        <Menu open={openSub === 'import'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={importSubRef} minWidth={SUB_MENU_META.import.width}>
-          <MenuItem onSelect={() => { pickAndImportPNG(importPNGFromImageData); setMenuOpen(false); setOpenSub(null) }}>
-            <span>PNG…</span>
-          </MenuItem>
-          <MenuItem onSelect={() => { importProjectJSON(importJSON); setMenuOpen(false); setOpenSub(null) }}>
-            <span>Project JSON…</span>
-          </MenuItem>
-          <MenuItem onSelect={() => { pickAndImportAse(importAse); setMenuOpen(false); setOpenSub(null) }}>
-            <span>Aseprite (.ase/.aseprite)…</span>
-          </MenuItem>
-        </Menu>
-        <Menu open={openSub === 'drive'} x={subPos?.x ?? 0} y={subPos?.y ?? 0} menuRef={driveSubRef} minWidth={SUB_MENU_META.drive.width}>
-          <MenuItem onSelect={async () => { await handleDriveSignIn(setDriveError, setDriveOpen) }}>
-            {GoogleDrive.isSignedIn() ? 'Signed in' : 'Sign in'}
-          </MenuItem>
-          <MenuItem onSelect={() => { openDriveOpen(setDriveOpen, setDriveBusy, setDriveError, setDriveFiles) }}>Open from Drive…</MenuItem>
-          <MenuItem onSelect={() => { setDriveOpen('save'); setDriveFilename('cpixel.json'); setDriveFileId(undefined) }}>Save to Drive…</MenuItem>
-          {driveError && <div className="px-3 py-2 text-xs text-red-600">{driveError}</div>}
-        </Menu>
-      </Menu>
+            <FaEllipsisV aria-hidden />
+            <span className="hidden sm:inline">More</span>
+          </button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content className={contentCls} align="end" sideOffset={6}>
+            {/* Edit submenu */}
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className={itemCls}>
+                <span>Edit</span>
+                <LuChevronRight className="ml-auto" aria-hidden />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                <DropdownMenu.Item disabled={!canUndo} className={itemCls} onSelect={() => { if (!canUndo) return; undo(); setOpen(false) }}>Undo</DropdownMenu.Item>
+                <DropdownMenu.Item disabled={!canRedo} className={itemCls} onSelect={() => { if (!canRedo) return; redo(); setOpen(false) }}>Redo</DropdownMenu.Item>
+                <DropdownMenu.Separator className={separatorCls} />
+                <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; copySelection(); setOpen(false) }}>Copy</DropdownMenu.Item>
+                <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; usePixelStore.getState().beginStroke(); cutSelection(); usePixelStore.getState().endStroke(); setOpen(false) }}>Cut</DropdownMenu.Item>
+                <DropdownMenu.Item disabled={!hasClipboard} className={itemCls} onSelect={() => { if (!hasClipboard) return; pasteClipboard(); setOpen(false) }}>Paste</DropdownMenu.Item>
+                <DropdownMenu.Separator className={separatorCls} />
+                <DropdownMenu.Item className={itemCls} onSelect={() => { setSizeOpen(true); setOpen(false) }}>Canvas size…</DropdownMenu.Item>
+                {/* Mode submenu */}
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger className={itemCls}>
+                    <span>Mode</span>
+                    <LuChevronRight className="ml-auto" aria-hidden />
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { setMode('truecolor'); setOpen(false) }}>
+                      {mode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+                      <span>Truecolor</span>
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { setMode('indexed'); setOpen(false) }}>
+                      {mode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+                      <span>Indexed</span>
+                    </DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().clearLayer(); setOpen(false) }}>
+                  <FaEraser aria-hidden />
+                  <span>Clear layer</span>
+                </DropdownMenu.Item>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
+            {/* Import submenu */}
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className={itemCls}>
+                <span>Import</span>
+                <LuChevronRight className="ml-auto" aria-hidden />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportPNG(importPNGFromImageData); setOpen(false) }}>PNG…</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { importProjectJSON(importJSON); setOpen(false) }}>Project JSON…</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportAse(importAse); setOpen(false) }}>Aseprite (.ase/.aseprite)…</DropdownMenu.Item>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
+            {/* Export submenu */}
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className={itemCls}>
+                <span>Export</span>
+                <LuChevronRight className="ml-auto" aria-hidden />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { exportPNG(); setOpen(false) }}>
+                  <LuDownload aria-hidden />
+                  <span>PNG</span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { exportJSON(); setOpen(false) }}>
+                  <LuDownload aria-hidden />
+                  <span>Project JSON</span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { exportAse(); setOpen(false) }}>
+                  <LuDownload aria-hidden />
+                  <span>Aseprite (.aseprite)</span>
+                </DropdownMenu.Item>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
+            {/* Drive submenu */}
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className={itemCls}>
+                <span>Google Drive</span>
+                <LuChevronRight className="ml-auto" aria-hidden />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                <DropdownMenu.Item className={itemCls} onSelect={async () => { await handleDriveSignIn(setDriveError, setDriveOpen); setOpen(false) }}>
+                  {GoogleDrive.isSignedIn() ? 'Signed in' : 'Sign in'}
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { openDriveOpen(setDriveOpen, setDriveBusy, setDriveError, setDriveFiles); setOpen(false) }}>Open from Drive…</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { setDriveOpen('save'); setDriveFilename('cpixel.json'); setDriveFileId(undefined); setOpen(false) }}>Save to Drive…</DropdownMenu.Item>
+                {driveError && <div className="px-3 py-2 text-xs text-red-600 max-w-56">{driveError}</div>}
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
+            <DropdownMenu.Item className={itemCls} onSelect={() => { setSettingsOpen(true); setOpen(false) }}>
+              <LuSettings aria-hidden />
+              <span>Settings…</span>
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator className={separatorCls} />
+            <DropdownMenu.Item className={itemCls} onSelect={async () => {
+              try {
+                if (!isFullscreen) {
+                  const el = document.documentElement
+                  if (el.requestFullscreen) await el.requestFullscreen()
+                  else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen()
+                  else if ((el as any).msRequestFullscreen) await (el as any).msRequestFullscreen()
+                } else {
+                  if (document.exitFullscreen) await document.exitFullscreen()
+                  else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen()
+                  else if ((document as any).msExitFullscreen) await (document as any).msExitFullscreen()
+                }
+              } catch (e) {
+                console.error('Fullscreen toggle failed', e)
+              } finally { setOpen(false) }
+            }}>
+              <LuMaximize aria-hidden />
+              <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
 
       <CanvasSizeDialog
         open={sizeOpen}
@@ -354,7 +227,7 @@ export function MoreMenu() {
             try {
               const obj = await GoogleDrive.openFile(id)
               importJSON(obj)
-              setDriveOpen(null); setMenuOpen(false); setOpenSub(null)
+              setDriveOpen(null); setOpen(false)
             } catch (e: any) {
               setDriveError(e?.message || 'Failed to open file')
             } finally { setDriveBusy(false) }
@@ -374,7 +247,7 @@ export function MoreMenu() {
             setDriveBusy(true); setDriveError(null)
             try {
               await saveProjectToGoogleDrive(driveFilename, driveFileId)
-              setDriveOpen(null); setMenuOpen(false); setOpenSub(null)
+              setDriveOpen(null); setOpen(false)
             } catch (e: any) { setDriveError(e?.message || 'Failed to save') }
             finally { setDriveBusy(false) }
           }}

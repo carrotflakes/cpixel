@@ -3,7 +3,7 @@ import { rgbaToCSSHex, parseCSSColor } from './utils/color'
 import { usePixelStore } from './store'
 import { LuPin, LuArrowUp, LuArrowDown, LuTrash2, LuChevronDown, LuChevronUp } from 'react-icons/lu'
 import { ColorPicker } from './ColorPicker'
-import { Menu, MenuItem, useContextMenu } from './ui/ContextMenu'
+import { RCMenuRoot, RCMenuTrigger, RCMenuContent, RCMenuItem, RCMenuSeparator } from './ui/RadixContextMenu'
 import { PalettePresetsDialog } from './PalettePresetsDialog'
 import { COLOR_BOX_STYLE, ColorBoxInner } from './ColorBox'
 
@@ -21,7 +21,6 @@ export function PalettePanel() {
   const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
 
   const panelRef = useRef<HTMLDivElement | null>(null)
-  const { menu, openAt: openMenuAt, close: closeMenu, menuRef } = useContextMenu<{ index: number }>()
   const [presetsOpen, setPresetsOpen] = useState(false)
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('paletteCollapsed') === '1' } catch { return false }
@@ -31,30 +30,13 @@ export function PalettePanel() {
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
   const [edit, setEdit] = useState<{ open: boolean; index: number; x: number; y: number } | null>(null)
 
-  useEffect(() => {
-    if (mode !== 'indexed') return
-    const close = (e: MouseEvent | PointerEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent) {
-        if (e.key === 'Escape') { closeMenu(); setEdit(null); }
-        return
-      }
-      const target = e.target as Node | null
-      if (menuRef.current && target && menuRef.current.contains(target)) return
-      closeMenu()
-      suppressClickRef.current = false
-    }
-    window.addEventListener('pointerdown', close, { capture: true })
-    window.addEventListener('keydown', close, { capture: true })
-    return () => {
-      window.removeEventListener('pointerdown', close, { capture: true })
-      window.removeEventListener('keydown', close, { capture: true })
-    }
-  }, [mode])
+  // Track last context menu position (for opening Edit color picker near pointer)
+  const lastContextPos = useRef<{ x: number; y: number } | null>(null)
 
   // Persist collapse state and close popovers when collapsing
   useEffect(() => {
     try { localStorage.setItem('paletteCollapsed', collapsed ? '1' : '0') } catch { }
-    if (collapsed) { setPresetsOpen(false); closeMenu(); setEdit(null) }
+    if (collapsed) { setPresetsOpen(false); setEdit(null) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed])
 
@@ -66,10 +48,17 @@ export function PalettePanel() {
     setColorIndex(idx)
   }
 
-  const openContextMenu = (clientX: number, clientY: number, index: number) => {
-    suppressClickRef.current = true
-    const offset = 6
-    openMenuAt(clientX + offset, clientY + offset, { index })
+  // Long-press handling: dispatch synthetic contextmenu event for touch so Radix opens
+  const scheduleLongPress = (el: HTMLElement, index: number, clientX: number, clientY: number) => {
+    if (longPressRef.current?.timer) window.clearTimeout(longPressRef.current.timer)
+    const timer = window.setTimeout(() => {
+      suppressClickRef.current = true
+      lastContextPos.current = { x: clientX, y: clientY }
+      const evt = new MouseEvent('contextmenu', { bubbles: true, clientX, clientY })
+      el.dispatchEvent(evt)
+    }, 500)
+    longPressRef.current = { timer, index }
+    touchStartPos.current = { x: clientX, y: clientY }
   }
 
   return (
@@ -121,62 +110,108 @@ export function PalettePanel() {
             const isSelected = currentPaletteIndex === i
             const color = isTransparent ? "#0000" : rgbaToCSSHex(rgba)
             return (
-              <button
-                key={i}
-                title={`#${i}`}
-                aria-pressed={isSelected}
-                className={`w-7 h-7 rounded border border-border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-accent' : ''}`}
-                style={COLOR_BOX_STYLE}
-                onClick={(e) => {
-                  if (suppressClickRef.current) {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    suppressClickRef.current = false
-                    return
-                  }
-                  setColorIndex(i)
-                }}
-                onDoubleClick={(e) => {
-                  e.preventDefault()
-                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                  setColorIndex(i)
-                  setEdit({ open: true, index: i, x: r.left, y: r.bottom + 6 })
-                }}
-                onContextMenu={(e) => { e.preventDefault(); openContextMenu(e.clientX, e.clientY, i) }}
-                onPointerDown={(e) => {
-                  if (e.pointerType === 'touch') {
-                    if (longPressRef.current?.timer) window.clearTimeout(longPressRef.current.timer)
-                    const timer = window.setTimeout(() => {
-                      openContextMenu(e.clientX, e.clientY, i)
-                    }, 500)
-                    longPressRef.current = { timer, index: i }
-                    touchStartPos.current = { x: e.clientX, y: e.clientY }
-                  }
-                }}
-                onPointerMove={(e) => {
-                  if (e.pointerType === 'touch' && touchStartPos.current) {
-                    const dx = e.clientX - touchStartPos.current.x
-                    const dy = e.clientY - touchStartPos.current.y
-                    if (dx * dx + dy * dy > 16) {
+              <RCMenuRoot key={i}>
+                <RCMenuTrigger asChild>
+                  <button
+                    title={`#${i}`}
+                    aria-pressed={isSelected}
+                    className={`w-7 h-7 rounded border border-border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-accent' : ''}`}
+                    style={COLOR_BOX_STYLE}
+                    onClick={(e) => {
+                      if (suppressClickRef.current) {
+                        e.preventDefault(); e.stopPropagation(); suppressClickRef.current = false; return
+                      }
+                      setColorIndex(i)
+                    }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault()
+                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                      setColorIndex(i)
+                      setEdit({ open: true, index: i, x: r.left, y: r.bottom + 6 })
+                    }}
+                    onContextMenu={(e) => {
+                      lastContextPos.current = { x: e.clientX, y: e.clientY }
+                      suppressClickRef.current = true
+                    }}
+                    onPointerDown={(e) => {
+                      if (e.pointerType === 'touch') {
+                        scheduleLongPress(e.currentTarget as HTMLElement, i, e.clientX, e.clientY)
+                      }
+                    }}
+                    onPointerMove={(e) => {
+                      if (e.pointerType === 'touch' && touchStartPos.current) {
+                        const dx = e.clientX - touchStartPos.current.x
+                        const dy = e.clientY - touchStartPos.current.y
+                        if (dx * dx + dy * dy > 16) {
+                          if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
+                          touchStartPos.current = null
+                        }
+                      }
+                    }}
+                    onPointerUp={() => {
                       if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
                       touchStartPos.current = null
-                    }
-                  }
-                }}
-                onPointerUp={() => {
-                  if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
-                  touchStartPos.current = null
-                }}
-                onPointerCancel={() => {
-                  if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
-                  touchStartPos.current = null
-                }}
-              >
-                <ColorBoxInner color={color} />
-                {isTransparent && (
-                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none select-none text-base font-bold">t</span>
-                )}
-              </button>
+                    }}
+                    onPointerCancel={() => {
+                      if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
+                      touchStartPos.current = null
+                    }}
+                  >
+                    <ColorBoxInner color={color} />
+                    {isTransparent && (
+                      <span className="absolute inset-0 flex items-center justify-center pointer-events-none select-none text-base font-bold">t</span>
+                    )}
+                  </button>
+                </RCMenuTrigger>
+                <RCMenuContent>
+                  <RCMenuItem
+                    disabled={i === transparentIndex}
+                    onSelect={() => { if (i === transparentIndex) return; setTransparentIndex(i) }}
+                  >
+                    <LuPin aria-hidden />
+                    <span>Set transparent</span>
+                  </RCMenuItem>
+                  <RCMenuItem
+                    onSelect={() => {
+                      setColorIndex(i)
+                      const pos = lastContextPos.current
+                      if (pos) setEdit({ open: true, index: i, x: pos.x, y: pos.y })
+                      else {
+                        const btn = panelRef.current?.querySelectorAll('button')[i]
+                        if (btn) {
+                          const r = (btn as HTMLElement).getBoundingClientRect()
+                          setEdit({ open: true, index: i, x: r.left, y: r.bottom + 6 })
+                        }
+                      }
+                    }}
+                  >
+                    <span>Edit color</span>
+                  </RCMenuItem>
+                  <RCMenuItem
+                    disabled={i === 0}
+                    onSelect={() => { if (i === 0) return; movePaletteIndex(i, Math.max(0, i - 1)) }}
+                  >
+                    <LuArrowUp aria-hidden />
+                    <span>Move up</span>
+                  </RCMenuItem>
+                  <RCMenuItem
+                    disabled={i === palette.length - 1}
+                    onSelect={() => { if (i === palette.length - 1) return; movePaletteIndex(i, Math.min(palette.length - 1, i + 1)) }}
+                  >
+                    <LuArrowDown aria-hidden />
+                    <span>Move down</span>
+                  </RCMenuItem>
+                  <RCMenuSeparator />
+                  <RCMenuItem
+                    disabled={palette.length <= 1}
+                    danger
+                    onSelect={() => { if (palette.length <= 1) return; removePaletteIndex(i) }}
+                  >
+                    <LuTrash2 aria-hidden />
+                    <span>Remove</span>
+                  </RCMenuItem>
+                </RCMenuContent>
+              </RCMenuRoot>
             )
           })}
           {/* Add new color button at the end */}
@@ -190,38 +225,6 @@ export function PalettePanel() {
             </svg>
           </button>
         </div>
-      )}
-
-      {!collapsed && (
-        <Menu open={!!menu && menu.open === true} x={(menu && menu.open ? menu.x : 0) as number} y={(menu && menu.open ? menu.y : 0) as number} menuRef={menuRef}>
-          {menu?.open && (
-            <>
-              <MenuItem onSelect={() => { setTransparentIndex(menu.data!.index); closeMenu() }} disabled={menu.data!.index === transparentIndex}>
-                <LuPin aria-hidden />
-                <span>Set transparent</span>
-              </MenuItem>
-              <MenuItem onSelect={() => {
-                setColorIndex(menu.data!.index)
-                setEdit({ open: true, index: menu.data!.index, x: menu.x, y: menu.y })
-                closeMenu()
-              }}>
-                <span>Edit color</span>
-              </MenuItem>
-              <MenuItem onSelect={() => { movePaletteIndex(menu.data!.index, Math.max(0, menu.data!.index - 1)); closeMenu() }} disabled={menu.data!.index === 0}>
-                <LuArrowUp aria-hidden />
-                <span>Move up</span>
-              </MenuItem>
-              <MenuItem onSelect={() => { movePaletteIndex(menu.data!.index, Math.min(palette.length - 1, menu.data!.index + 1)); closeMenu() }} disabled={menu.data!.index === palette.length - 1}>
-                <LuArrowDown aria-hidden />
-                <span>Move down</span>
-              </MenuItem>
-              <MenuItem onSelect={() => { removePaletteIndex(menu.data!.index); closeMenu() }} disabled={palette.length <= 1} danger>
-                <LuTrash2 aria-hidden />
-                <span>Remove</span>
-              </MenuItem>
-            </>
-          )}
-        </Menu>
       )}
 
       {!collapsed && edit?.open && (
