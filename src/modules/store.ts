@@ -246,8 +246,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const i = index | 0
     if (i < 0 || i >= s.palette.length) return {}
     const pal = new Uint32Array(s.palette)
-    // Keep the transparent slot actually transparent for clarity
-    pal[i] = (i === s.transparentIndex) ? 0x00000000 : (rgba >>> 0)
+    // Allow visible colors at transparent index for better editing experience
+    // Transparency is applied during compositing, not storage
+    pal[i] = rgba >>> 0
     if (equalU32(pal, s.palette)) return {}
     // If editing currently selected index, also sync visible color string
     const patch: Partial<PixelState> = { palette: pal }
@@ -326,9 +327,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     // Limit to 256 colors
     const limited = colors.length > 256 ? colors.slice(0, 256) : colors
     const palette = new Uint32Array(limited)
-    // Ensure transparentIndex is in bounds and explicitly transparent
+    // Ensure transparentIndex is in bounds
     const transparentIndex = Math.max(0, Math.min(ti | 0, Math.max(0, palette.length - 1)))
-    palette[transparentIndex] = 0x00000000
 
     if (s.mode === 'indexed') {
       // Remap indices by nearest color in the new palette
@@ -338,13 +338,15 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         for (let i = 0; i < src.length; i++) {
           const pi = src[i] ?? s.transparentIndex
           const rgba = s.palette[pi] ?? 0x00000000
-          if ((rgba >>> 0) === 0x00000000) { dst[i] = transparentIndex; continue }
+          if ((rgba >>> 0) === 0x00000000 || pi === s.transparentIndex) { 
+            dst[i] = transparentIndex; continue 
+          }
           // nearest in new palette
           let best = transparentIndex, bestD = Infinity
           const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
           for (let k = 0; k < palette.length; k++) {
+            if (k === transparentIndex) continue // skip transparent slot for color matching
             const c = palette[k] >>> 0
-            if (c === 0x00000000 && k === transparentIndex) continue // prefer non-transparent unless exact
             const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
             const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
             if (d < bestD) { bestD = d; best = k }
@@ -356,7 +358,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       // choose current index nearest to previous selected color
       const prevRGBA = s.palette[s.currentPaletteIndex ?? s.transparentIndex] ?? 0x00000000
       let curIdx = transparentIndex
-      if ((prevRGBA >>> 0) !== 0x00000000) curIdx = nearestIndexInPalette(palette, prevRGBA, transparentIndex)
+      if ((prevRGBA >>> 0) !== 0x00000000 && (s.currentPaletteIndex ?? s.transparentIndex) !== s.transparentIndex) {
+        curIdx = nearestIndexInPalette(palette, prevRGBA, transparentIndex)
+      }
       const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
       return { palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex }
     } else {
@@ -367,12 +371,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         for (let i = 0; i < idx.length; i++) {
           const rgba = src[i] >>> 0
           if (rgba === 0x00000000) { idx[i] = transparentIndex; continue }
-          // nearest color search
+          // nearest color search (excluding transparent slot for color matching)
           let best = transparentIndex, bestD = Infinity
           const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
           for (let k = 0; k < palette.length; k++) {
+            if (k === transparentIndex) continue // skip transparent slot for color matching
             const c = palette[k] >>> 0
-            if (c === 0x00000000 && k === transparentIndex) continue
             const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
             const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
             if (d < bestD) { bestD = d; best = k }
@@ -576,7 +580,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   setMode: (m) => set((s) => {
     if (s.mode === m) return {}
     if (m === 'indexed') {
-      // Auto-generate a palette from current composited image (transparent at index 0)
+      // Auto-generate a palette from current composited image
+      // Try to preserve current transparent index if reasonable, otherwise use 0
+      const preferredTransparentIndex = (s.transparentIndex >= 0 && s.transparentIndex < 256) ? s.transparentIndex : 0
       const autoPalette = generatePaletteFromComposite(
         s.layers.map(l => ({ visible: l.visible, data: l.data, indices: l.indices })),
         s.width,
@@ -585,8 +591,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         s.palette,
         s.transparentIndex,
         256,
+        preferredTransparentIndex
       )
-      const transparentIndex = 0
+      const transparentIndex = preferredTransparentIndex < autoPalette.length ? preferredTransparentIndex : 0
       // Convert all layers: truecolor -> indices using the generated palette
       const layers = s.layers.map(l => {
         const src = l.data ?? new Uint32Array(s.width * s.height)
@@ -597,8 +604,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
           let best = transparentIndex, bestD = Infinity
           const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
           for (let k = 0; k < autoPalette.length; k++) {
+            if (k === transparentIndex) continue // skip transparent slot for color matching
             const c = autoPalette[k] >>> 0
-            if (c === 0x00000000 && k === transparentIndex) continue
             const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
             const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
             if (d < bestD) { bestD = d; best = k }
@@ -618,7 +625,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         const data = new Uint32Array(s.width * s.height)
         for (let i = 0; i < data.length; i++) {
           const pi = src[i] ?? s.transparentIndex
-          data[i] = s.palette[pi] ?? 0x00000000
+          // Apply transparency: if index equals transparent index, use transparent pixel
+          data[i] = (pi === s.transparentIndex) ? 0x00000000 : (s.palette[pi] ?? 0x00000000)
         }
         return { id: l.id, visible: l.visible, locked: l.locked, data } as Layer
       })
@@ -666,33 +674,30 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const idx = layer.indices ?? new Uint8Array(W * (s.height))
       const pal = s.palette
       const ti = s.transparentIndex
-      // Build both RGBA (for rendering) and raw indices (for precise paste back)
-      const float = extractFloatingIndexed(idx, pal, sel.mask, sel.bounds, W, ti)
+      
+      // Extract indices directly to preserve exact values
       const bw = sel.bounds.right - sel.bounds.left + 1
       const bh = sel.bounds.bottom - sel.bounds.top + 1
       const floatIdx = new Uint8Array(bw * bh)
-      for (let y = 0; y < bh; y++) {
-        for (let x = 0; x < bw; x++) {
-          const fi = y * bw + x
-          const rgba = float[fi] >>> 0
-          // Transparent: alpha==0 -> transparentIndex
-          if ((rgba & 0xff) === 0) floatIdx[fi] = ti & 0xff
-          else {
-            // Find exact index if possible else nearest
-            // (Nearest: small cost; float array already materialized)
-            let best = ti, bestD = Infinity
-            const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
-            for (let k = 0; k < pal.length; k++) {
-              const c = pal[k] >>> 0
-              if (c === 0x00000000 && k === ti) continue
-              const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
-              const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
-              if (d < bestD) { bestD = d; best = k }
-            }
-            floatIdx[fi] = best & 0xff
+      for (let y = sel.bounds.top; y <= sel.bounds.bottom; y++) {
+        for (let x: number = sel.bounds.left; x <= sel.bounds.right; x++) {
+          const i = y * W + x
+          const fi = (y - sel.bounds.top) * bw + (x - sel.bounds.left)
+          if (sel.mask && !sel.mask[i]) {
+            floatIdx[fi] = ti & 0xff
+          } else {
+            floatIdx[fi] = idx[i] ?? (ti & 0xff)
           }
         }
       }
+      
+      // Also build RGBA for rendering compatibility
+      const float = new Uint32Array(bw * bh)
+      for (let i = 0; i < floatIdx.length; i++) {
+        const pi = floatIdx[i]
+        float[i] = (pi === (ti & 0xff)) ? 0x00000000 : (pal[pi] ?? 0x00000000)
+      }
+      
       const out = clearSelectedIndexed(idx, sel.mask, sel.bounds, W, ti)
       const layers = s.layers.slice()
       layers[li] = { ...layer, indices: out }

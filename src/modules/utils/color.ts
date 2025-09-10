@@ -57,7 +57,8 @@ export function nearestIndexInPalette(palette: Uint32Array, rgba: number, fallba
   for (let i = 0; i < palette.length; i++) {
     const pi = palette[i] >>> 0
     const a = pi & 0xff
-    if (a === 0) continue // skip fully transparent entries (e.g., transparentIndex)
+    // Allow matching transparent colors when input is also transparent
+    if (a === 0 && (rgba & 0xff) !== 0) continue // skip transparent entries only if input is not transparent
     const d = dist2(c, unpackRGBA(pi))
     if (d < bestD) { bestD = d; best = i }
   }

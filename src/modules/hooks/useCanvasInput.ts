@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { usePixelStore, MIN_SIZE, MAX_SIZE } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
-import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
-import { compositePixel, findTopPaletteIndex, LayerLike } from '../utils/composite'
+import { parseCSSColor, rgbaToCSSHex, nearestIndexInPalette } from '../utils/color'
+import { compositePixel, findTopPaletteIndex } from '../utils/composite'
 import { isPointInMask, polygonToMask, magicWandMask } from '../utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
@@ -168,8 +168,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           if (mode === 'truecolor') {
             return compositePixel(layers, px, py, mode, palette, transparentIndex, W, H) >>> 0
           } else {
-            const idx = findTopPaletteIndex(layers as LayerLike[], px, py, W, H, transparentIndex) ?? transparentIndex
-            return idx & 0xff
+            // For consistency, use composited result in indexed mode too
+            // This considers all visible layers like truecolor mode
+            const rgba = compositePixel(layers, px, py, mode, palette, transparentIndex, W, H) >>> 0
+            // But return the palette index that best matches the composited color
+            if ((rgba & 0xff) === 0) return transparentIndex & 0xff
+            return nearestIndexInPalette(palette, rgba, transparentIndex) & 0xff
           }
         }
         const { mask, bounds } = magicWandMask(W, H, x, y, colorGetter, contiguous)
