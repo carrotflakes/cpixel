@@ -103,7 +103,7 @@ export type PixelState = {
   _stroking?: boolean
   hover?: { x: number; y: number; rgba?: number; index?: number }
   setHoverInfo: (h?: { x: number; y: number; rgba?: number; index?: number }) => void
-  clear: () => void
+  clearLayer: () => void
   exportPNG: () => void
   exportJSON: () => void
   exportAse: () => Promise<void>
@@ -883,7 +883,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
   }),
-  clear: () => set((s) => {
+  clearLayer: () => set((s) => {
     const W = s.width, H = s.height
     const snap = createSnapshot(s)
     const undo = (s._undo || []).concat([snap])
@@ -920,15 +920,15 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         id: l.id,
         visible: l.visible,
         locked: l.locked,
-        data: l.data ? Array.from(l.data) : undefined,
-        indices: l.indices ? Array.from(l.indices) : undefined,
+        data: l.data,
+        indices: l.indices,
       })),
       activeLayerId,
-      palette: Array.from(palette ?? new Uint32Array(0)),
+      palette,
       transparentIndex,
       color,
-      recentColorsTruecolor: recentColorsTruecolor ?? [],
-      recentColorsIndexed: recentColorsIndexed ?? [],
+      recentColorsTruecolor,
+      recentColorsIndexed,
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
@@ -945,7 +945,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         width,
         height,
         mode,
-        layers: layers.map(l => ({ id: l.id, visible: l.visible, data: l.data, indices: l.indices })),
+        layers,
         palette,
         transparentIndex,
       })
@@ -968,18 +968,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       recentColorsIndexed: current.recentColorsIndexed,
     })
     if (!normalized) return
-    const { width, height, mode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed } = normalized
     set({
-      width,
-      height,
-      mode,
-      layers: layers.length > 0 ? layers : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(width * height) }],
-      activeLayerId,
-      palette,
-      transparentIndex,
-      color,
-      recentColorsTruecolor,
-      recentColorsIndexed,
+      ...normalized,
       _undo: [],
       _redo: [],
       canUndo: false,

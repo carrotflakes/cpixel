@@ -11,7 +11,6 @@ export function MoreMenu() {
   // store selectors
   const mode = usePixelStore(s => s.mode)
   const setMode = usePixelStore(s => s.setMode)
-  const clear = usePixelStore(s => s.clear)
   const exportPNG = usePixelStore(s => s.exportPNG)
   const exportJSON = usePixelStore(s => s.exportJSON)
   const exportAse = usePixelStore(s => s.exportAse)
@@ -281,9 +280,9 @@ export function MoreMenu() {
           <MenuItem onSelect={() => { setSizeOpen(true); setMenuOpen(false); setOpenSub(null) }}>
             <span>Canvas size…</span>
           </MenuItem>
-          <MenuItem danger onSelect={() => { clear(); setMenuOpen(false); setOpenSub(null); setSubPos(null) }}>
+          <MenuItem onSelect={() => { usePixelStore.getState().clearLayer(); setMenuOpen(false); setOpenSub(null); setSubPos(null) }}>
             <FaEraser aria-hidden />
-            <span>Clear</span>
+            <span>Clear layer</span>
           </MenuItem>
         </Menu>
         {/* Submenus */}

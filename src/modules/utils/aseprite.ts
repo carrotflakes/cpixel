@@ -202,11 +202,11 @@ export function aseToCpixel(imported: AseImportResult) {
 
 // ------------------------- Encoding (export) ---------------------------------
 
-type CpixelLikeState = {
+type CpixelLikeState = Readonly<{
   width: number; height: number; mode: 'indexed' | 'truecolor';
-  layers: Array<{ id: string; visible: boolean; data?: Uint32Array; indices?: Uint8Array }>
+  layers: ReadonlyArray<{ id: string; visible: boolean; data?: Uint32Array; indices?: Uint8Array }>
   palette: Uint32Array; transparentIndex: number;
-}
+}>
 
 function writeU16(buf: Uint8Array, off: number, v: number) { buf[off] = v & 0xff; buf[off + 1] = (v >>> 8) & 0xff }
 function writeU32(buf: Uint8Array, off: number, v: number) { buf[off] = v & 0xff; buf[off + 1] = (v >>> 8) & 0xff; buf[off + 2] = (v >>> 16) & 0xff; buf[off + 3] = (v >>> 24) & 0xff }
