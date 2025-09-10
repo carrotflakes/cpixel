@@ -3,8 +3,20 @@ import { TopBar } from "./TopBar/index";
 import { StatusBar } from "./StatusBar";
 import { PalettePanel } from "./PalettePanel";
 import { LayersPanel } from "./LayersPanel";
+import { usePixelStore } from "./store";
+import { useEffect } from "react";
 
 export function App() {
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (usePixelStore.getState().dirty)
+        e.preventDefault();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   return (
     <div className="w-dvw h-dvh flex flex-col items-stretch overflow-hidden text-content bg-base">
       <div className="bg-surface border-b border-border">

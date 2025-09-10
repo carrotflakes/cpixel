@@ -101,6 +101,7 @@ export type PixelState = {
   _undo?: Snapshot[]
   _redo?: Snapshot[]
   _stroking?: boolean
+  dirty: boolean // TODO: need to update this
   hover?: { x: number; y: number; rgba?: number; index?: number }
   setHoverInfo: (h?: { x: number; y: number; rgba?: number; index?: number }) => void
   clearLayer: () => void
@@ -139,6 +140,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   tool: 'brush',
   shapeTool: 'rect',
   selectTool: 'select-rect',
+  dirty: false,
   // simple default palette (16 base colors + transparent at 0)
   palette: new Uint32Array([
     0x00000000, 0xffffffff, 0xff0000ff, 0x00ff00ff, 0x0000ffff, 0xffff00ff, 0xff00ffff, 0x00ffffff,
@@ -826,7 +828,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     if (s._stroking) return {}
     const snap = createSnapshot(s)
     const undo = s._undo ? [...s._undo, snap] : [snap]
-    return { _undo: undo, _redo: [], _stroking: true, canUndo: true, canRedo: false }
+    return { _undo: undo, _redo: [], _stroking: true, canUndo: true, canRedo: false, dirty: true }
   }),
   endStroke: () => set((s) => (s._stroking ? { _stroking: false } : {})),
   undo: () => set((s) => {
@@ -853,6 +855,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       _redo: redo,
       canUndo: undo.length > 0,
       canRedo: true,
+      dirty: true,
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
   }),
@@ -880,6 +883,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       _redo: redo,
       canUndo: true,
       canRedo: redo.length > 0,
+      dirty: true,
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
   }),
