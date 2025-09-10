@@ -72,7 +72,7 @@ export function compositeImageData(
   mode: 'truecolor' | 'indexed',
   palette: Uint32Array,
   transparentIndex: number,
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   width = 64,
   height = 64,
 ): ImageData {

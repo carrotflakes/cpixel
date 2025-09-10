@@ -14,44 +14,20 @@ export function ensureHiDPICanvas(cvs: HTMLCanvasElement, ctx: CanvasRenderingCo
   return { dpr, rect }
 }
 
-// Cached checkerboard pattern canvas per instance
-export function getCheckerPatternCanvas(tile = 12, light = '#f0f0f0', dark = '#d7d7d7') {
-  const patt = document.createElement('canvas')
-  patt.width = tile * 2
-  patt.height = tile * 2
-  const pctx = patt.getContext('2d')!
-  pctx.fillStyle = light
-  pctx.fillRect(0, 0, tile, tile)
-  pctx.fillRect(tile, tile, tile, tile)
-  pctx.fillStyle = dark
-  pctx.fillRect(tile, 0, tile, tile)
-  pctx.fillRect(0, tile, tile, tile)
-  return patt
-}
-
-export function drawChecker(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  tileCanvas: HTMLCanvasElement,
-  offsetX: number = 0,
-  offsetY: number = 0,
-  scale: number = 1,
-) {
-  const pattern = ctx.createPattern(tileCanvas, 'repeat')!
-
-  // DOMMatrix: a c e
-  //            b d f
-  // where a/d are scale, e/f are translate
-  const m = new DOMMatrix()
-  m.a = scale
-  m.d = scale
-  m.e = offsetX
-  m.f = offsetY
-  pattern.setTransform(m)
-
-  ctx.fillStyle = pattern
-  ctx.fillRect(0, 0, w, h)
+export function getCheckerCanvas(size: number, width: number, height: number, light = '#f0f0f0', dark = '#d7d7d7') {
+  const canvas = new OffscreenCanvas(width, height)
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = light
+  ctx.fillRect(0, 0, width, height)
+  ctx.fillStyle = dark
+  for (let x = 0; x < width; x += size) {
+    for (let y = 0; y < height; y += size) {
+      if ((x / size + y / size) % 2 !== 0) {
+        ctx.fillRect(x, y, size, size)
+      }
+    }
+  }
+  return canvas
 }
 
 export function drawBorder(ctx: CanvasRenderingContext2D, w: number, h: number) {

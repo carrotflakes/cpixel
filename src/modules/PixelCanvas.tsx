@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { useTilt } from './hooks/useTilt'
 import { useCanvasInput } from './hooks/useCanvasInput'
-import { usePixelStore } from './store'
+import { useTilt } from './hooks/useTilt'
 import { useSettingsStore } from './settingsStore'
-import { drawBorder, drawChecker, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerPatternCanvas } from './utils/canvasDraw'
+import { usePixelStore } from './store'
+import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas } from './utils/canvasDraw'
 import { compositeImageData } from './utils/composite'
 
 const GRID_THRESHOLD = 8
@@ -35,9 +35,9 @@ export function PixelCanvas() {
   const scaledW = W * view.scale
   const scaledH = H * view.scale
   // cache small helper canvases
-  const checkerTileRef = useRef<HTMLCanvasElement | null>(null)
-  const tmpCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const floatCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const checkerTileRef = useRef<OffscreenCanvas | null>(null)
+  const tmpCanvasRef = useRef<OffscreenCanvas | null>(null)
+  const floatCanvasRef = useRef<OffscreenCanvas | null>(null)
   const [antsPhase, setAntsPhase] = useState(0)
   const resizeTick = useWindowResizeRedraw(canvasRef)
 
@@ -59,6 +59,10 @@ export function PixelCanvas() {
     inited.current = true
   }, [view.scale, setView])
 
+  useEffect(() => {
+    checkerTileRef.current = getCheckerCanvas(checkerSize, W, H)
+  }, [checkerSize, W, H])
+
   // Animate marching ants
   useEffect(() => {
     if (!selection.mask || !selection.bounds) {
@@ -79,24 +83,20 @@ export function PixelCanvas() {
   useEffect(() => {
     const cvs = canvasRef.current
     if (!cvs) return
-    const ctx = cvs.getContext('2d', { willReadFrequently: true })!
+    const ctx = cvs.getContext('2d')!
     ensureHiDPICanvas(cvs, ctx)
     // translate to current view (rounded for crisper grid in CSS px space)
     const vx = Math.round(view.x)
     const vy = Math.round(view.y)
-    // draw checkerboard in content space so it follows pan/zoom (cached tile)
-    if (!checkerTileRef.current || checkerTileRef.current.width !== checkerSize * 2) {
-      checkerTileRef.current = getCheckerPatternCanvas(checkerSize)
-    }
+
     ctx.translate(vx, vy)
+
+    checkerTileRef.current && ctx.drawImage(checkerTileRef.current, 0, 0, W, H, 0, 0, scaledW, scaledH)
 
     // If in shift mode, render each layer with offset, suppress overlays
     if (parallaxActive) {
-      drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, view.scale)
       if (!tmpCanvasRef.current) {
-        const t = document.createElement('canvas')
-        t.width = W
-        t.height = H
+        const t = new OffscreenCanvas(W, H)
         tmpCanvasRef.current = t
       } else if (tmpCanvasRef.current.width !== W || tmpCanvasRef.current.height !== H) {
         tmpCanvasRef.current.width = W
@@ -123,12 +123,9 @@ export function PixelCanvas() {
     }
 
     // Normal composited rendering
-    drawChecker(ctx, scaledW, scaledH, checkerTileRef.current, 0, 0, view.scale)
     const img = compositeImageData(layers, mode, palette, transparentIndex, ctx, W, H)
     if (!tmpCanvasRef.current) {
-      const t = document.createElement('canvas')
-      t.width = W
-      t.height = H
+      const t = new OffscreenCanvas(W, H)
       tmpCanvasRef.current = t
     } else if (tmpCanvasRef.current.width !== W || tmpCanvasRef.current.height !== H) {
       tmpCanvasRef.current.width = W
@@ -178,7 +175,7 @@ export function PixelCanvas() {
       if (selection.floating) {
         const bw = selection.bounds.right - selection.bounds.left + 1
         const bh = selection.bounds.bottom - selection.bounds.top + 1
-        if (!floatCanvasRef.current) floatCanvasRef.current = document.createElement('canvas')
+        if (!floatCanvasRef.current) floatCanvasRef.current = new OffscreenCanvas(bw, bh)
         if (floatCanvasRef.current.width !== bw || floatCanvasRef.current.height !== bh) {
           floatCanvasRef.current.width = bw
           floatCanvasRef.current.height = bh
