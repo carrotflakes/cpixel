@@ -78,17 +78,16 @@ export function clearSelectedTruecolor(data: Uint32Array, mask: Uint8Array | und
   return out
 }
 
-export function extractFloatingIndexed(indices: Uint8Array, palette: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
+export function extractFloatingIndexed(indices: Uint8Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
   const bw = bounds.right - bounds.left + 1
   const bh = bounds.bottom - bounds.top + 1
-  const float = new Uint32Array(bw * bh)
+  const float = new Uint8Array(bw * bh)
   for (let y = bounds.top; y <= bounds.bottom; y++) {
     for (let x = bounds.left; x <= bounds.right; x++) {
       const i = y * W + x
       const fi = (y - bounds.top) * bw + (x - bounds.left)
-      if (mask && !mask[i]) { float[fi] = 0; continue }
-      const pi = indices[i] ?? transparentIndex
-      float[fi] = palette[pi] >>> 0
+      if (mask && !mask[i]) float[fi] = transparentIndex & 0xff
+      else float[fi] = indices[i]
     }
   }
   return float

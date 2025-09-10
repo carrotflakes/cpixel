@@ -666,32 +666,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const idx = layer.indices ?? new Uint8Array(W * (s.height))
       const pal = s.palette
       const ti = s.transparentIndex
-      // Build both RGBA (for rendering) and raw indices (for precise paste back)
-      const float = extractFloatingIndexed(idx, pal, sel.mask, sel.bounds, W, ti)
-      const bw = sel.bounds.right - sel.bounds.left + 1
-      const bh = sel.bounds.bottom - sel.bounds.top + 1
-      const floatIdx = new Uint8Array(bw * bh)
-      for (let y = 0; y < bh; y++) {
-        for (let x = 0; x < bw; x++) {
-          const fi = y * bw + x
-          const rgba = float[fi] >>> 0
-          // Transparent: alpha==0 -> transparentIndex
-          if ((rgba & 0xff) === 0) floatIdx[fi] = ti & 0xff
-          else {
-            // Find exact index if possible else nearest
-            // (Nearest: small cost; float array already materialized)
-            let best = ti, bestD = Infinity
-            const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
-            for (let k = 0; k < pal.length; k++) {
-              const c = pal[k] >>> 0
-              if (c === 0x00000000 && k === ti) continue
-              const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
-              const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
-              if (d < bestD) { bestD = d; best = k }
-            }
-            floatIdx[fi] = best & 0xff
-          }
-        }
+      const floatIdx = extractFloatingIndexed(idx, sel.mask, sel.bounds, W, ti)
+      const float = new Uint32Array(floatIdx.length)
+      for (let i = 0; i < floatIdx.length; i++) {
+        float[i] = pal[floatIdx[i]]
       }
       const out = clearSelectedIndexed(idx, sel.mask, sel.bounds, W, ti)
       const layers = s.layers.slice()
@@ -828,27 +806,15 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       const out = clearSelectedTruecolor(data, sel.mask, sel.bounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
-      return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: float, floatingIndices: undefined }, layers, clipboard: { kind: 'rgba', pixels: float.slice(0), width: bw, height: bh } }
+      return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'rgba', pixels: float.slice(0), width: bw, height: bh } }
     } else {
       const idx = layer.indices ?? new Uint8Array(W * H)
-      const pal = s.palette
       const ti = s.transparentIndex
-      const float = extractFloatingIndexed(idx, pal, sel.mask, sel.bounds, W, ti)
       const out = clearSelectedIndexed(idx, sel.mask, sel.bounds, W, ti)
       const layers = s.layers.slice()
       layers[li] = { ...layer, indices: out }
-      const outIdx = new Uint8Array(bw * bh)
-      const floatIdx = new Uint8Array(bw * bh)
-      for (let y = sel.bounds.top; y <= sel.bounds.bottom; y++) {
-        for (let x: number = sel.bounds.left; x <= sel.bounds.right; x++) {
-          const i = y * W + x
-          const fi = (y - sel.bounds.top) * bw + (x - sel.bounds.left)
-          const v = (!sel.mask || sel.mask[i]) ? (idx[i] ?? ti) : (ti & 0xff)
-          outIdx[fi] = v
-          floatIdx[fi] = v
-        }
-      }
-      return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: float, floatingIndices: floatIdx }, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
+      const outIdx = extractFloatingIndexed(idx, sel.mask, sel.bounds, W, ti)
+      return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
     }
   }),
   pasteClipboard: () => set((s) => {
