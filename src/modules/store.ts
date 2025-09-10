@@ -98,7 +98,6 @@ export type PixelState = {
   redo: () => void
   canUndo?: boolean
   canRedo?: boolean
-  // private/internal fields (optional to satisfy TS when mutating with set)
   _undo?: Snapshot[]
   _redo?: Snapshot[]
   _stroking?: boolean
@@ -118,7 +117,7 @@ type Snapshot = {
   width: number
   height: number
   mode: 'truecolor' | 'indexed'
-  layers: Array<{ id: string; visible: boolean; locked: boolean; data?: Uint32Array | undefined; indices?: Uint8Array | undefined }>
+  layers: Layer[]
   activeLayerId: string
   palette: Uint32Array
   transparentIndex: number
@@ -825,22 +824,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
   beginStroke: () => set((s) => {
     if (s._stroking) return {}
-    // snapshot full state as JSON-serializable object of typed array buffers
-    const snap = {
-      width: s.width,
-      height: s.height,
-      mode: s.mode,
-      layers: s.layers.map((l: Layer) => ({
-        id: l.id,
-        visible: l.visible,
-        locked: l.locked,
-        data: l.data ? l.data.slice(0) : undefined,
-        indices: l.indices ? l.indices.slice(0) : undefined,
-      })),
-      activeLayerId: s.activeLayerId,
-      palette: s.palette.slice(0),
-      transparentIndex: s.transparentIndex,
-    }
+    const snap = createSnapshot(s)
     const undo = s._undo ? [...s._undo, snap] : [snap]
     return { _undo: undo, _redo: [], _stroking: true, canUndo: true, canRedo: false }
   }),
@@ -849,22 +833,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     if (!s._undo || s._undo.length === 0) return {}
     const prev = s._undo[s._undo.length - 1]
     const undo = s._undo.slice(0, -1)
-    const curSnap = {
-      width: s.width,
-      height: s.height,
-      mode: s.mode,
-      layers: s.layers.map((l: Layer) => ({
-        id: l.id,
-        visible: l.visible,
-        locked: l.locked,
-        data: l.data ? l.data.slice(0) : undefined,
-        indices: l.indices ? l.indices.slice(0) : undefined,
-      })),
-      activeLayerId: s.activeLayerId,
-      palette: s.palette.slice(0),
-      transparentIndex: s.transparentIndex,
-    }
-    const redo = (s._redo || []).concat([curSnap])
+    const snap = createSnapshot(s)
+    const redo = (s._redo || []).concat([snap])
     return {
       width: prev.width,
       height: prev.height,
@@ -890,22 +860,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     if (!s._redo || s._redo.length === 0) return {}
     const next = s._redo[s._redo.length - 1]
     const redo = s._redo.slice(0, -1)
-    const curSnap = {
-      width: s.width,
-      height: s.height,
-      mode: s.mode,
-      layers: s.layers.map((l: Layer) => ({
-        id: l.id,
-        visible: l.visible,
-        locked: l.locked,
-        data: l.data ? l.data.slice(0) : undefined,
-        indices: l.indices ? l.indices.slice(0) : undefined,
-      })),
-      activeLayerId: s.activeLayerId,
-      palette: s.palette.slice(0),
-      transparentIndex: s.transparentIndex,
-    }
-    const undo = (s._undo || []).concat([curSnap])
+    const snap = createSnapshot(s)
+    const undo = (s._undo || []).concat([snap])
     return {
       width: next.width,
       height: next.height,
@@ -929,22 +885,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   }),
   clear: () => set((s) => {
     const W = s.width, H = s.height
-    const curSnap = {
-      width: s.width,
-      height: s.height,
-      mode: s.mode,
-      layers: s.layers.map((l: Layer) => ({
-        id: l.id,
-        visible: l.visible,
-        locked: l.locked,
-        data: l.data ? l.data.slice(0) : undefined,
-        indices: l.indices ? l.indices.slice(0) : undefined,
-      })),
-      activeLayerId: s.activeLayerId,
-      palette: s.palette.slice(0),
-      transparentIndex: s.transparentIndex,
-    }
-    const undo = (s._undo || []).concat([curSnap])
+    const snap = createSnapshot(s)
+    const undo = (s._undo || []).concat([snap])
     const li = s.layers.findIndex((l: Layer) => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layers = s.layers.slice()
@@ -1140,3 +1082,21 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     }
   },
 }))
+
+function createSnapshot(state: PixelState): Snapshot {
+  return {
+    width: state.width,
+    height: state.height,
+    mode: state.mode,
+    layers: state.layers.map((l: Layer) => ({
+      id: l.id,
+      visible: l.visible,
+      locked: l.locked,
+      data: l.data ? l.data.slice(0) : undefined,
+      indices: l.indices ? l.indices.slice(0) : undefined,
+    })),
+    activeLayerId: state.activeLayerId,
+    palette: state.palette.slice(0),
+    transparentIndex: state.transparentIndex,
+  }
+}
