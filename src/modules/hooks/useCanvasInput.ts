@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { usePixelStore, MIN_SIZE, MAX_SIZE } from '../store'
+import { usePixelStore, MIN_SCALE, MAX_SCALE } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel, findTopPaletteIndex, LayerLike } from '../utils/composite'
@@ -346,8 +346,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
                 touchState.current.lastCenter = { x: cx, y: cy }
               } else {
                 const k = dist / (touchState.current.lastDist ?? dist)
-                const nextSize = clamp(view.scale * k, MIN_SIZE, MAX_SIZE)
-                const ratio = nextSize / view.scale
+                const nextScale = clamp(view.scale * k, MIN_SCALE, MAX_SCALE)
+                const ratio = nextScale / view.scale
                 const lastC = touchState.current.lastCenter ?? { x: cx, y: cy }
                 const moveCx = cx - lastC.x
                 const moveCy = cy - lastC.y
@@ -357,8 +357,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
                 const nvy = view.y + moveCy
                 const newVX = nvx - (Cx - nvx) * (ratio - 1)
                 const newVY = nvy - (Cy - nvy) * (ratio - 1)
-                const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextSize, H * nextSize)
-                setView(Math.round(cvx), Math.round(cvy), nextSize)
+                const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextScale, H * nextScale)
+                setView(Math.round(cvx), Math.round(cvy), nextScale)
                 touchState.current.lastDist = dist
                 touchState.current.lastCenter = { x: cx, y: cy }
               }

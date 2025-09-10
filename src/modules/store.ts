@@ -10,10 +10,10 @@ import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexe
 import { resizeLayers } from './utils/resize'
 import { compositeImageData } from './utils/composite'
 
-export const WIDTH = 64
-export const HEIGHT = 64
-export const MIN_SIZE = 1
-export const MAX_SIZE = 40
+const WIDTH = 64
+const HEIGHT = 64
+export const MIN_SCALE = 1
+export const MAX_SCALE = 40
 
 type Layer = {
   id: string
@@ -323,6 +323,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     return patch
   }),
   applyPalettePreset: (colors, ti = 0) => set((s) => {
+    if (s.mode === 'truecolor')
+      throw new Error('applyPalettePreset should not be called in truecolor mode')
+
     // Limit to 256 colors
     const limited = colors.length > 256 ? colors.slice(0, 256) : colors
     const palette = new Uint32Array(limited)
@@ -330,63 +333,34 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const transparentIndex = Math.max(0, Math.min(ti | 0, Math.max(0, palette.length - 1)))
     palette[transparentIndex] = 0x00000000
 
-    if (s.mode === 'indexed') {
-      // Remap indices by nearest color in the new palette
-      const layers = s.layers.map(l => {
-        const src = l.indices ?? new Uint8Array(WIDTH * HEIGHT)
-        const dst = new Uint8Array(src.length)
-        for (let i = 0; i < src.length; i++) {
-          const pi = src[i] ?? s.transparentIndex
-          const rgba = s.palette[pi] ?? 0x00000000
-          if ((rgba >>> 0) === 0x00000000) { dst[i] = transparentIndex; continue }
-          // nearest in new palette
-          let best = transparentIndex, bestD = Infinity
-          const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
-          for (let k = 0; k < palette.length; k++) {
-            const c = palette[k] >>> 0
-            if (c === 0x00000000 && k === transparentIndex) continue // prefer non-transparent unless exact
-            const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
-            const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
-            if (d < bestD) { bestD = d; best = k }
-          }
-          dst[i] = best & 0xff
+    // Remap indices by nearest color in the new palette
+    const layers = s.layers.map(l => {
+      const src = l.indices!
+      const dst = new Uint8Array(src.length)
+      for (let i = 0; i < src.length; i++) {
+        const pi = src[i]
+        const rgba = s.palette[pi] ?? 0x00000000
+        if ((rgba >>> 0) === 0x00000000) { dst[i] = transparentIndex; continue }
+        // nearest in new palette
+        let best = transparentIndex, bestD = Infinity
+        const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
+        for (let k = 0; k < palette.length; k++) {
+          const c = palette[k] >>> 0
+          if (c === 0x00000000 && k === transparentIndex) continue // prefer non-transparent unless exact
+          const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
+          const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
+          if (d < bestD) { bestD = d; best = k }
         }
-        return { ...l, indices: dst }
-      })
-      // choose current index nearest to previous selected color
-      const prevRGBA = s.palette[s.currentPaletteIndex ?? s.transparentIndex] ?? 0x00000000
-      let curIdx = transparentIndex
-      if ((prevRGBA >>> 0) !== 0x00000000) curIdx = nearestIndexInPalette(palette, prevRGBA, transparentIndex)
-      const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
-      return { palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex }
-    } else {
-      // Truecolor -> convert layers to indices under new palette and switch mode
-      const layers = s.layers.map(l => {
-        const src = l.data ?? new Uint32Array(WIDTH * HEIGHT)
-        const idx = new Uint8Array(WIDTH * HEIGHT)
-        for (let i = 0; i < idx.length; i++) {
-          const rgba = src[i] >>> 0
-          if (rgba === 0x00000000) { idx[i] = transparentIndex; continue }
-          // nearest color search
-          let best = transparentIndex, bestD = Infinity
-          const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
-          for (let k = 0; k < palette.length; k++) {
-            const c = palette[k] >>> 0
-            if (c === 0x00000000 && k === transparentIndex) continue
-            const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
-            const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
-            if (d < bestD) { bestD = d; best = k }
-          }
-          idx[i] = best & 0xff
-        }
-        return { id: l.id, visible: l.visible, locked: l.locked, indices: idx }
-      })
-      // choose current index nearest to existing color
-      const prevRGBA = parseCSSColor(s.color)
-      const curIdx = (prevRGBA >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(palette, prevRGBA, transparentIndex)
-      const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
-      return { mode: 'indexed', palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex }
-    }
+        dst[i] = best & 0xff
+      }
+      return { ...l, indices: dst }
+    })
+    // choose current index nearest to previous selected color
+    const prevRGBA = s.palette[s.currentPaletteIndex ?? s.transparentIndex] ?? 0x00000000
+    let curIdx = transparentIndex
+    if ((prevRGBA >>> 0) !== 0x00000000) curIdx = nearestIndexInPalette(palette, prevRGBA, transparentIndex)
+    const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
+    return { palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex }
   }),
   addPaletteColor: (rgba) => {
     const s = get()
@@ -408,7 +382,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const clamped = Math.max(0, Math.min(idx | 0, Math.max(0, s.palette.length - 1)))
     return { transparentIndex: clamped }
   }),
-  setView: (x, y, scale) => set(() => ({ view: { x, y, scale: clamp(scale, MIN_SIZE, MAX_SIZE) } })),
+  setView: (x, y, scale) => set(() => ({ view: { x, y, scale: clamp(scale, MIN_SCALE, MAX_SCALE) } })),
   setAt: (x, y, rgbaOrIndex) => {
     set((s) => {
       const W = s.width, H = s.height
