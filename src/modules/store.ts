@@ -15,6 +15,16 @@ const HEIGHT = 64
 export const MIN_SCALE = 1
 export const MAX_SCALE = 40
 
+export type FileMeta = {
+  name?: string
+  source?: {
+    type: "local"
+  } | {
+    type: "google-drive"
+    fileId: string
+  }
+}
+
 type Layer = {
   id: string
   visible: boolean
@@ -108,10 +118,12 @@ export type PixelState = {
   exportPNG: () => void
   exportJSON: () => void
   exportAse: () => Promise<void>
-  importJSON: (data: unknown) => void
-  importPNGFromImageData: (img: ImageData) => void
+  importJSON: (data: unknown, meta?: FileMeta) => void
+  importPNGFromImageData: (img: ImageData, meta?: FileMeta) => void
+  importAse: (buffer: ArrayBuffer, meta?: FileMeta) => Promise<void>
   resizeCanvas: (w: number, h: number) => void
-  importAse: (buffer: ArrayBuffer) => Promise<void>
+  fileMeta?: FileMeta
+  setFileMeta: (fileMeta: FileMeta | undefined) => void
 }
 
 type Snapshot = {
@@ -155,6 +167,9 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   _stroking: false,
   selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
   clipboard: undefined,
+  // file metadata
+  fileMeta: undefined,
+  setFileMeta: (fileMeta) => set(() => ({ fileMeta })),
   addLayer: () => set((s) => {
     const id = 'L' + (s.layers.length + 1)
     const layer: Layer = s.mode === 'truecolor'
@@ -907,10 +922,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const ctx = cvs.getContext('2d')!
     const img = compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data, indices: l.indices })), mode, palette, transparentIndex, ctx, W, H)
     ctx.putImageData(img, 0, 0)
+
     const a = document.createElement('a')
     a.href = cvs.toDataURL('image/png')
     a.download = 'cpixel.png'
     a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   },
   exportJSON: () => {
     const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = get()
@@ -924,17 +941,18 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         id: l.id,
         visible: l.visible,
         locked: l.locked,
-        data: l.data,
-        indices: l.indices,
+        data: l.data ? Array.from(l.data) : undefined,
+        indices: l.indices ? Array.from(l.indices) : undefined,
       })),
       activeLayerId,
-      palette,
+      palette: Array.from(palette),
       transparentIndex,
       color,
       recentColorsTruecolor,
       recentColorsIndexed,
     }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
+
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = 'cpixel.json'
@@ -954,16 +972,17 @@ export const usePixelStore = create<PixelState>((set, get) => ({
         transparentIndex,
       })
       const blob = new Blob([buffer], { type: 'application/octet-stream' })
+
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
       a.download = 'cpixel.aseprite'
       a.click()
-      setTimeout(() => URL.revokeObjectURL(a.href), 1500)
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000)
     } catch (e) {
       console.error('Ase export failed', e)
     }
   },
-  importJSON: (data: unknown) => {
+  importJSON: (data: unknown, fileMeta?: FileMeta) => {
     const current = get()
     const normalized = normalizeImportedJSON(data, {
       palette: current.palette,
@@ -978,9 +997,10 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       _redo: [],
       canUndo: false,
       canRedo: false,
+      fileMeta,
     })
   },
-  importPNGFromImageData: (img: ImageData) => {
+  importPNGFromImageData: (img: ImageData, fileMeta?: FileMeta) => {
     const W = img.width | 0
     const H = img.height | 0
     if (W <= 0 || H <= 0) return
@@ -1004,7 +1024,41 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       _redo: [],
       canUndo: false,
       canRedo: false,
+      fileMeta,
     })
+  },
+  importAse: async (buffer: ArrayBuffer, fileMeta?: FileMeta) => {
+    try {
+      const { decodeAseprite, aseToCpixel } = await import('./utils/aseprite.ts')
+      const parsed = await decodeAseprite(buffer, { preserveIndexed: true })
+      if (!parsed) return
+      const converted = aseToCpixel(parsed)
+      const layersBottomFirst = converted.layers
+      const statePatch: Partial<PixelState> = {
+        width: converted.width,
+        height: converted.height,
+        layers: layersBottomFirst.length > 0 ? layersBottomFirst : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(converted.width * converted.height) }],
+        activeLayerId: layersBottomFirst[layersBottomFirst.length - 1]?.id || 'L1', // top-most
+        _undo: [],
+        _redo: [],
+        canUndo: false,
+        canRedo: false,
+        selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+        fileMeta,
+      }
+      if (converted.mode === 'indexed') {
+        statePatch.mode = 'indexed'
+        statePatch.palette = converted.palette
+        statePatch.transparentIndex = converted.transparentIndex ?? 0
+        statePatch.currentPaletteIndex = converted.transparentIndex ?? 0
+        statePatch.color = '#000000'
+      } else {
+        statePatch.mode = 'truecolor'
+      }
+      set(statePatch)
+    } catch (e) {
+      console.error('Ase import failed', e)
+    }
   },
   resizeCanvas: (w, h) => set((s) => {
     let newW = Math.max(1, Math.floor(w))
@@ -1043,38 +1097,6 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
   }),
-  importAse: async (buffer: ArrayBuffer) => {
-    try {
-      const { decodeAseprite, aseToCpixel } = await import('./utils/aseprite.ts')
-      const parsed = await decodeAseprite(buffer, { preserveIndexed: true })
-      if (!parsed) return
-      const converted = aseToCpixel(parsed)
-      const layersBottomFirst = converted.layers
-      const statePatch: Partial<PixelState> = {
-        width: converted.width,
-        height: converted.height,
-        layers: layersBottomFirst.length > 0 ? layersBottomFirst : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(converted.width * converted.height) }],
-        activeLayerId: layersBottomFirst[layersBottomFirst.length - 1]?.id || 'L1', // top-most
-        _undo: [],
-        _redo: [],
-        canUndo: false,
-        canRedo: false,
-        selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
-      }
-      if (converted.mode === 'indexed') {
-        statePatch.mode = 'indexed'
-        statePatch.palette = converted.palette
-        statePatch.transparentIndex = converted.transparentIndex ?? 0
-        statePatch.currentPaletteIndex = converted.transparentIndex ?? 0
-        statePatch.color = '#000000'
-      } else {
-        statePatch.mode = 'truecolor'
-      }
-      set(statePatch)
-    } catch (e) {
-      console.error('Ase import failed', e)
-    }
-  },
 }))
 
 function createSnapshot(state: PixelState): Snapshot {

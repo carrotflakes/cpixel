@@ -1,4 +1,4 @@
-import { usePixelStore } from './store'
+import { FileMeta, usePixelStore } from './store'
 
 // Simple localStorage autosave / restore
 // - Periodic save (every 10s)
@@ -24,6 +24,7 @@ type PersistPayload = {
   color: string
   recentColorsTruecolor: string[]
   recentColorsIndexed: number[]
+  fileMeta?: FileMeta
 }
 
 function buildPayload(): PersistPayload {
@@ -47,6 +48,7 @@ function buildPayload(): PersistPayload {
     color: s.color,
     recentColorsTruecolor: s.recentColorsTruecolor ?? [],
     recentColorsIndexed: s.recentColorsIndexed ?? [],
+    fileMeta: s.fileMeta,
   }
 }
 
@@ -68,8 +70,7 @@ function restore() {
     if (!raw) return
     const data = JSON.parse(raw)
     if (data && data.app === 'cpixel') {
-      // Reuse existing import path for validation / normalization
-      usePixelStore.getState().importJSON(data)
+      usePixelStore.getState().importJSON(data, data.fileMeta)
     }
   } catch {
     // ignore corrupt

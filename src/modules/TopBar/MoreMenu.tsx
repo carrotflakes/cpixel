@@ -14,12 +14,10 @@ export function MoreMenu() {
   const exportPNG = usePixelStore(s => s.exportPNG)
   const exportJSON = usePixelStore(s => s.exportJSON)
   const exportAse = usePixelStore(s => s.exportAse)
-  const importJSON = usePixelStore(s => s.importJSON)
-  const importPNGFromImageData = usePixelStore(s => s.importPNGFromImageData)
-  const importAse = usePixelStore(s => s.importAse)
   const resizeCanvas = usePixelStore(s => s.resizeCanvas)
   const curW = usePixelStore(s => s.width)
   const curH = usePixelStore(s => s.height)
+  const fileMeta = usePixelStore(s => s.fileMeta)
 
   const [open, setOpen] = useState(false)
   const [sizeOpen, setSizeOpen] = useState(false)
@@ -32,8 +30,6 @@ export function MoreMenu() {
   const [driveFiles, setDriveFiles] = useState<{ id: string; name: string; modifiedTime?: string }[]>([])
   const [driveBusy, setDriveBusy] = useState(false)
   const [driveError, setDriveError] = useState<string | null>(null)
-  const [driveFilename, setDriveFilename] = useState<string>('cpixel.json')
-  const [driveFileId, setDriveFileId] = useState<string | undefined>(undefined)
   const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (window as any).VITE_GOOGLE_CLIENT_ID
 
   useEffect(() => { GoogleDrive.init(clientId).catch(() => { }) }, [clientId])
@@ -90,6 +86,26 @@ export function MoreMenu() {
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content className={contentCls} align="end" sideOffset={6}>
+            {/* File submenu */}
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className={itemCls}>
+                <span>File</span>
+                <LuChevronRight className="ml-auto" aria-hidden />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                {fileMeta ? (
+                  <div className="p-1">
+                    <div className="px-3 py-2 text-sm">Name: {fileMeta.name ?? 'Untitled'}</div>
+                    <div className="px-3 py-2 text-sm">Source: {fileMeta.source?.type ?? 'local'}</div>
+                    {fileMeta.source && (fileMeta as any).source.type === 'google-drive' && (
+                      <div className="px-3 py-2 text-xs text-muted">File ID: {(fileMeta as any).source.fileId}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="px-3 py-2 text-sm text-muted">No file metadata</div>
+                )}
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
             {/* Edit submenu */}
             <DropdownMenu.Sub>
               <DropdownMenu.SubTrigger className={itemCls}>
@@ -135,9 +151,9 @@ export function MoreMenu() {
                 <LuChevronRight className="ml-auto" aria-hidden />
               </DropdownMenu.SubTrigger>
               <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportPNG(importPNGFromImageData); setOpen(false) }}>PNG…</DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { importProjectJSON(importJSON); setOpen(false) }}>Project JSON…</DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportAse(importAse); setOpen(false) }}>Aseprite (.ase/.aseprite)…</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportPNG(); setOpen(false) }}>PNG…</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { importProjectJSON(); setOpen(false) }}>Project JSON…</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportAse(); setOpen(false) }}>Aseprite (.ase/.aseprite)…</DropdownMenu.Item>
               </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
             {/* Export submenu */}
@@ -171,8 +187,12 @@ export function MoreMenu() {
                 <DropdownMenu.Item className={itemCls} onSelect={async () => { await handleDriveSignIn(setDriveError, setDriveOpen); setOpen(false) }}>
                   {GoogleDrive.isSignedIn() ? 'Signed in' : 'Sign in'}
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { openDriveOpen(setDriveOpen, setDriveBusy, setDriveError, setDriveFiles); setOpen(false) }}>Open from Drive…</DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { setDriveOpen('save'); setDriveFilename('cpixel.json'); setDriveFileId(undefined); setOpen(false) }}>Save to Drive…</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { openDriveOpen(setDriveOpen, setDriveBusy, setDriveError, setDriveFiles); setOpen(false) }}>
+                  Open from Drive…
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { setDriveOpen('save'); setOpen(false) }}>
+                  Save As…
+                </DropdownMenu.Item>
                 {driveError && <div className="px-3 py-2 text-xs text-red-600 max-w-56">{driveError}</div>}
               </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
@@ -184,14 +204,9 @@ export function MoreMenu() {
             <DropdownMenu.Item className={itemCls} onSelect={async () => {
               try {
                 if (!isFullscreen) {
-                  const el = document.documentElement
-                  if (el.requestFullscreen) await el.requestFullscreen()
-                  else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen()
-                  else if ((el as any).msRequestFullscreen) await (el as any).msRequestFullscreen()
+                  await document.documentElement.requestFullscreen()
                 } else {
-                  if (document.exitFullscreen) await document.exitFullscreen()
-                  else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen()
-                  else if ((document as any).msExitFullscreen) await (document as any).msExitFullscreen()
+                  await document.exitFullscreen()
                 }
               } catch (e) {
                 console.error('Fullscreen toggle failed', e)
@@ -221,12 +236,12 @@ export function MoreMenu() {
           error={driveError}
           onClose={() => setDriveOpen(null)}
           onReload={async () => { await openDriveOpen(setDriveOpen, setDriveBusy, setDriveError, setDriveFiles) }}
-          onOpen={async (id) => {
+          onOpen={async (name, id) => {
             setDriveBusy(true)
             setDriveError(null)
             try {
               const obj = await GoogleDrive.openFile(id)
-              importJSON(obj)
+              usePixelStore.getState().importJSON(obj, { name, source: { type: 'google-drive', fileId: id } })
               setDriveOpen(null); setOpen(false)
             } catch (e: any) {
               setDriveError(e?.message || 'Failed to open file')
@@ -239,14 +254,15 @@ export function MoreMenu() {
       {driveOpen === 'save' && (
         <DriveSaveDialog
           busy={driveBusy}
-          filename={driveFilename}
-          setFilename={setDriveFilename}
           error={driveError}
           onClose={() => setDriveOpen(null)}
-          onSave={async () => {
+          onSave={async (filename) => {
             setDriveBusy(true); setDriveError(null)
             try {
-              await saveProjectToGoogleDrive(driveFilename, driveFileId)
+              const res = await saveProjectToGoogleDrive(filename, undefined)
+              if (res) {
+                usePixelStore.getState().setFileMeta({ name: res.name, source: { type: 'google-drive', fileId: res.id } })
+              }
               setDriveOpen(null); setOpen(false)
             } catch (e: any) { setDriveError(e?.message || 'Failed to save') }
             finally { setDriveBusy(false) }
@@ -258,19 +274,24 @@ export function MoreMenu() {
 }
 
 // ---------- Small helper components & fns ----------
-function importProjectJSON(importJSON: (data: unknown) => void) {
+function importProjectJSON() {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'application/json,.json'
   input.onchange = async () => {
     const f = input.files?.[0]
     if (!f) return
-    try { const text = await f.text(); importJSON(JSON.parse(text)) } catch (e) { console.error('Import JSON failed', e) }
+    try {
+      const text = await f.text();
+      usePixelStore.getState().importJSON(JSON.parse(text), { name: f.name, source: { type: 'local' } })
+    } catch (e) {
+      console.error('Import JSON failed', e)
+    }
   }
   input.click()
 }
 
-function pickAndImportPNG(onComplete: (img: ImageData) => void) {
+function pickAndImportPNG() {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/png,.png,image/*'
@@ -291,7 +312,7 @@ function pickAndImportPNG(onComplete: (img: ImageData) => void) {
           const ctx = cvs.getContext('2d')!
           ctx.drawImage(img, 0, 0)
           const imageData = ctx.getImageData(0, 0, w, h)
-          onComplete(imageData)
+          usePixelStore.getState().importPNGFromImageData(imageData, { name: f.name, source: { type: 'local' } })
         } finally { URL.revokeObjectURL(url) }
       }
       img.onerror = () => { URL.revokeObjectURL(url); console.error('Failed to load image') }
@@ -301,7 +322,7 @@ function pickAndImportPNG(onComplete: (img: ImageData) => void) {
   input.click()
 }
 
-function pickAndImportAse(onComplete: (buffer: ArrayBuffer) => Promise<void>) {
+function pickAndImportAse() {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.ase,.aseprite,application/octet-stream'
@@ -310,13 +331,13 @@ function pickAndImportAse(onComplete: (buffer: ArrayBuffer) => Promise<void>) {
     if (!f) return
     try {
       const buf = await f.arrayBuffer()
-      await onComplete(buf)
+      await usePixelStore.getState().importAse(buf, { name: f.name, source: { type: 'local' } })
     } catch (e) { console.error('Import Aseprite failed', e) }
   }
   input.click()
 }
 
-async function saveProjectToGoogleDrive(filename: string, fileId?: string) {
+async function saveProjectToGoogleDrive(filename: string, fileId?: string): Promise<{ id: string; name: string } | void> {
   const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = usePixelStore.getState()
   const payload = {
     app: 'cpixel' as const,
@@ -333,7 +354,7 @@ async function saveProjectToGoogleDrive(filename: string, fileId?: string) {
     recentColorsIndexed: recentColorsIndexed ?? [],
   }
   const name = filename && /\.json$/i.test(filename) ? filename : `${filename || 'cpixel'}.json`
-  await GoogleDrive.saveJSON(name, payload, fileId)
+  return await GoogleDrive.saveJSON(name, payload, fileId)
 }
 
 async function handleDriveSignIn(setDriveError: (s: string | null) => void, setDriveOpen: (s: any) => void) {
@@ -354,7 +375,7 @@ async function openDriveOpen(
 }
 
 // Dialog components
-function DriveOpenDialog(props: { busy: boolean; files: { id: string; name: string; modifiedTime?: string }[]; error: string | null; onClose: () => void; onReload: () => void; onOpen: (id: string) => void }) {
+function DriveOpenDialog(props: { busy: boolean; files: { id: string; name: string; modifiedTime?: string }[]; error: string | null; onClose: () => void; onReload: () => void; onOpen: (name: string, id: string) => void }) {
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40" role="dialog" aria-label="Open from Google Drive">
       <div className="min-w-80 max-w-[90vw] max-h-[80vh] overflow-auto rounded-md border border-border bg-elevated shadow-lg">
@@ -372,7 +393,7 @@ function DriveOpenDialog(props: { busy: boolean; files: { id: string; name: stri
             <ul className="divide-y divide-border">
               {props.files.map(f => (
                 <li key={f.id}>
-                  <button className="w-full text-left px-2 py-2 hover:bg-surface-muted" onClick={() => props.onOpen(f.id)}>
+                  <button className="w-full text-left px-2 py-2 hover:bg-surface-muted" onClick={() => props.onOpen(f.name, f.id)}>
                     <div className="text-sm">{f.name}</div>
                     {f.modifiedTime && <div className="text-xs text-muted">{new Date(f.modifiedTime).toLocaleString()}</div>}
                   </button>
@@ -387,7 +408,8 @@ function DriveOpenDialog(props: { busy: boolean; files: { id: string; name: stri
   )
 }
 
-function DriveSaveDialog(props: { busy: boolean; filename: string; setFilename: (v: string) => void; error: string | null; onClose: () => void; onSave: () => void }) {
+function DriveSaveDialog(props: { busy: boolean; error: string | null; onClose: () => void; onSave: (filename: string) => void }) {
+  const [filename, setFilename] = useState('cpixel.json')
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40" role="dialog" aria-label="Save to Google Drive">
       <div className="min-w-80 max-w-[90vw] rounded-md border border-border bg-elevated shadow-lg">
@@ -399,13 +421,13 @@ function DriveSaveDialog(props: { busy: boolean; filename: string; setFilename: 
           <div className="text-sm">Filename</div>
           <input
             className="w-full px-2 py-1 border border-border rounded bg-surface"
-            value={props.filename}
-            onChange={(e) => props.setFilename(e.target.value)}
+            value={filename}
+            onChange={(e) => setFilename(e.target.value)}
             placeholder="cpixel.json"
           />
           <div className="flex gap-2 justify-end">
             <button className="px-3 py-1 border border-border rounded" onClick={props.onClose}>Cancel</button>
-            <button className="px-3 py-1 border border-border rounded bg-surface-muted" onClick={props.onSave}>
+            <button className="px-3 py-1 border border-border rounded bg-surface-muted" onClick={() => props.onSave(filename)}>
               {props.busy ? 'Saving…' : 'Save'}
             </button>
           </div>
