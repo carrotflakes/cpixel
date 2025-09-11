@@ -190,6 +190,13 @@ export function MoreMenu() {
                 <DropdownMenu.Item className={itemCls} onSelect={() => { openDriveOpen(setDriveOpen, setDriveBusy, setDriveError, setDriveFiles); setOpen(false) }}>
                   Open from Drive…
                 </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} disabled={fileMeta?.source.type !== 'google-drive'} onSelect={() => {
+                  if (fileMeta?.source.type === 'google-drive')
+                    saveProjectToGoogleDrive(fileMeta.name, fileMeta.source.fileId)
+                  setOpen(false)
+                }}>
+                  Save
+                </DropdownMenu.Item>
                 <DropdownMenu.Item className={itemCls} onSelect={() => { setDriveOpen('save'); setOpen(false) }}>
                   Save As…
                 </DropdownMenu.Item>

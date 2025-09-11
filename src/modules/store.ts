@@ -16,8 +16,8 @@ export const MIN_SCALE = 1
 export const MAX_SCALE = 40
 
 export type FileMeta = {
-  name?: string
-  source?: {
+  name: string
+  source: {
     type: "local"
   } | {
     type: "google-drive"
