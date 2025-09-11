@@ -69,7 +69,7 @@ export function ToolSelector() {
                   {PRESET_SIZES.map(sz => (
                     <button
                       key={sz}
-                      onClick={() => { setBrushSize(sz); setBrushOpen(false) }}
+                      onClick={() => { setBrushSize(sz) }}
                       className={`px-2 py-1 rounded border text-xs ${brushSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
                     >{sz}</button>
                   ))}
