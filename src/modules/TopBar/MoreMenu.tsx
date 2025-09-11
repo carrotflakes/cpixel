@@ -86,26 +86,6 @@ export function MoreMenu() {
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content className={contentCls} align="end" sideOffset={6}>
-            {/* File submenu */}
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger className={itemCls}>
-                <span>File</span>
-                <LuChevronRight className="ml-auto" aria-hidden />
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                {fileMeta ? (
-                  <div className="p-1">
-                    <div className="px-3 py-2 text-sm">Name: {fileMeta.name ?? 'Untitled'}</div>
-                    <div className="px-3 py-2 text-sm">Source: {fileMeta.source?.type ?? 'local'}</div>
-                    {fileMeta.source && (fileMeta as any).source.type === 'google-drive' && (
-                      <div className="px-3 py-2 text-xs text-muted">File ID: {(fileMeta as any).source.fileId}</div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="px-3 py-2 text-sm text-muted">No file metadata</div>
-                )}
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Sub>
             {/* Edit submenu */}
             <DropdownMenu.Sub>
               <DropdownMenu.SubTrigger className={itemCls}>
@@ -222,6 +202,27 @@ export function MoreMenu() {
               <LuMaximize aria-hidden />
               <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
             </DropdownMenu.Item>
+            <DropdownMenu.Separator className={separatorCls} />
+            {/* Debug submenu */}
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className={itemCls}>
+                <span>Debug</span>
+                <LuChevronRight className="ml-auto" aria-hidden />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                {fileMeta ? (
+                  <div className="p-1">
+                    <div className="px-3 py-2 text-sm">Name: {fileMeta.name ?? 'Untitled'}</div>
+                    <div className="px-3 py-2 text-sm">Source: {fileMeta.source?.type ?? 'local'}</div>
+                    {fileMeta.source && (fileMeta as any).source.type === 'google-drive' && (
+                      <div className="px-3 py-2 text-xs text-muted">File ID: {(fileMeta as any).source.fileId}</div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="px-3 py-2 text-sm text-muted">No file metadata</div>
+                )}
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
