@@ -2,7 +2,18 @@
 
 Simple pixel-art editor.
 
-Dev
+## Features
+
+- Drawing tools: Brush, Eraser, Fill (Bucket), Eyedropper, Line, Rectangle, Selection (Rect/Lasso/Magic Wand)
+- Color modes: Indexed (palette, max 256) and Truecolor
+- Multiple Layers Support
+- Undo / Redo (Stroke-by-Stroke)
+- Import/Export: PNG (composited) / Aseprite (partial)
+- Google Drive Integration Saving/Loading
+- Platform: supports PC, tablet, and smartphone
+
+## Development
+
 - Vite + React + TypeScript + Tailwind CSS
 
 Run
@@ -13,7 +24,7 @@ Run
 3. Build
    pnpm build
 
-## Google Drive integration (optional)
+### Google Drive integration (optional)
 
 To enable saving/loading JSON to Google Drive:
 
