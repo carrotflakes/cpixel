@@ -44,7 +44,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const TOUCH_MOVE_DIST_THRESHOLD = 5 * window.devicePixelRatio
 
-  const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null)
   const [shapePreview, setShapePreview] = useState<ShapePreview>({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
 
   const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
@@ -91,8 +90,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const isEyedropperTool = () => tool === 'eyedropper'
   const updateHover = (x: number, y: number) => {
     if (touchState.current.multiGesture) return
-    if (!inBounds(x, y)) { setHoverCell(null); setHoverInfo(undefined); return }
-    setHoverCell({ x, y })
+    if (!inBounds(x, y)) { setHoverInfo(undefined); return }
     const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
     const idx = mode === 'indexed' ? findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
     setHoverInfo({ x, y, rgba: hov, index: idx })
@@ -114,8 +112,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
   const updateShapeTo = (x: number, y: number) => {
     setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
-    // force re-render via hover change to show dashed preview
-    setHoverCell((h) => (h ? { ...h } : { x: -1, y: -1 }))
   }
   const commitShape = (erase = false) => {
     const s = shapePreview
@@ -544,12 +540,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
   }
 
-  const onPointerLeave = () => { setHoverCell(null); setHoverInfo(undefined) }
+  const onPointerLeave = () => { setHoverInfo(undefined) }
 
   const interactionActive = state.current !== null;
 
   return {
-    hoverCell,
     shapePreview,
     onPointerDown,
     onPointerMove,

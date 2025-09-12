@@ -10,7 +10,8 @@ const GRID_THRESHOLD = 8
 
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const { hoverCell, shapePreview, interactionActive, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave } = useCanvasInput(canvasRef)
+  const { shapePreview, interactionActive, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave } = useCanvasInput(canvasRef)
+  const hover = usePixelStore(s => s.hover)
   const view = usePixelStore(s => s.view)
   const W = usePixelStore(s => s.width)
   const H = usePixelStore(s => s.height)
@@ -140,8 +141,8 @@ export function PixelCanvas() {
       drawGrid(ctx, W, H, view.scale)
     }
     // hover highlight
-    if (hoverCell && hoverCell.x >= 0 && hoverCell.y >= 0 && hoverCell.x < W && hoverCell.y < H) {
-      drawHoverCell(ctx, hoverCell.x, hoverCell.y, view.scale, brushSize)
+    if (hover && hover.x >= 0 && hover.y >= 0 && hover.x < W && hover.y < H) {
+      drawHoverCell(ctx, hover.x, hover.y, view.scale, brushSize)
     }
     // shape preview overlay
     if (shapePreview.kind) {
@@ -194,7 +195,7 @@ export function PixelCanvas() {
         ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selection.bounds.left + dx) * s, (selection.bounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, view, hoverCell?.x, hoverCell?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
+  }, [layers, palette, mode, transparentIndex, view, hover?.x, hover?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
 
   const overlay = (() => {
     if (parallaxActive) return null // hide selection UI in parallax mode
