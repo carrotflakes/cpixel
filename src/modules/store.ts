@@ -1072,21 +1072,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const oldW = s.width, oldH = s.height
     if (newW === oldW && newH === oldH) return {}
 
-    const snap = {
-      width: s.width,
-      height: s.height,
-      mode: s.mode,
-      layers: s.layers.map((l: Layer) => ({
-        id: l.id,
-        visible: l.visible,
-        locked: l.locked,
-        data: l.data ? l.data.slice(0) : undefined,
-        indices: l.indices ? l.indices.slice(0) : undefined,
-      })),
-      activeLayerId: s.activeLayerId,
-      palette: s.palette.slice(0),
-      transparentIndex: s.transparentIndex,
-    }
+    const snap = createSnapshot(s)
     const layers = resizeLayers(s.layers, s.mode, oldW, oldH, newW, newH)
     const undo = (s._undo || []).concat([snap])
     return {
