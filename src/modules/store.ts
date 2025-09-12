@@ -598,12 +598,12 @@ export const usePixelStore = create<PixelState>((set, get) => ({
           }
           idx[i] = best & 0xff
         }
-        return { id: l.id, visible: l.visible, locked: l.locked, indices: idx } as Layer
+        return { id: l.id, visible: l.visible, locked: l.locked, indices: idx }
       })
       // Sync current palette index nearest to current color
       const rgba = parseCSSColor(s.color)
       const curIdx = (rgba >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(autoPalette, rgba, transparentIndex)
-      return { mode: 'indexed', layers, currentPaletteIndex: curIdx, color: rgbaToCSSHex(autoPalette[curIdx] ?? 0), palette: autoPalette, transparentIndex }
+      return { mode: 'indexed', layers, currentPaletteIndex: curIdx, color: rgbaToCSSHex(autoPalette[curIdx] ?? 0), palette: autoPalette, transparentIndex, recentColorsIndexed: [] }
     } else {
       // convert all layers: indices -> truecolor
       const layers = s.layers.map(l => {
@@ -613,7 +613,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
           const pi = src[i] ?? s.transparentIndex
           data[i] = s.palette[pi] ?? 0x00000000
         }
-        return { id: l.id, visible: l.visible, locked: l.locked, data } as Layer
+        return { id: l.id, visible: l.visible, locked: l.locked, data }
       })
       return { mode: 'truecolor', layers }
     }
