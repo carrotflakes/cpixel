@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FaEllipsisV, FaEraser } from 'react-icons/fa'
-import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings } from 'react-icons/lu'
+import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings, LuFlipHorizontal, LuFlipVertical } from 'react-icons/lu'
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
 import { SettingsDialog } from '../SettingsDialog'
 import { usePixelStore } from '../store'
@@ -14,6 +14,8 @@ export function MoreMenu() {
   const exportPNG = usePixelStore(s => s.exportPNG)
   const exportJSON = usePixelStore(s => s.exportJSON)
   const exportAse = usePixelStore(s => s.exportAse)
+  const flipHorizontal = usePixelStore(s => s.flipHorizontal)
+  const flipVertical = usePixelStore(s => s.flipVertical)
   const resizeCanvas = usePixelStore(s => s.resizeCanvas)
   const curW = usePixelStore(s => s.width)
   const curH = usePixelStore(s => s.height)
@@ -121,6 +123,15 @@ export function MoreMenu() {
                 <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().clearLayer(); setOpen(false) }}>
                   <FaEraser aria-hidden />
                   <span>Clear layer</span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator className={separatorCls} />
+                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().beginStroke(); flipHorizontal(); usePixelStore.getState().endStroke(); setOpen(false) }}>
+                  <LuFlipHorizontal aria-hidden />
+                  <span>Flip horizontal</span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().beginStroke(); flipVertical(); usePixelStore.getState().endStroke(); setOpen(false) }}>
+                  <LuFlipVertical aria-hidden />
+                  <span>Flip vertical</span>
                 </DropdownMenu.Item>
               </DropdownMenu.SubContent>
             </DropdownMenu.Sub>

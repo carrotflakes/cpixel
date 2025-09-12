@@ -8,6 +8,7 @@ import { equalU32, equalU8 } from './utils/arrays'
 import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed, drawEllipseOutlineTruecolor, drawEllipseOutlineIndexed, drawEllipseFilledTruecolor, drawEllipseFilledIndexed } from './utils/paint'
 import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard } from './utils/selection'
 import { resizeLayers } from './utils/resize'
+import { flipLayersHorizontal, flipLayersVertical } from './utils/flip'
 import { compositeImageData } from './utils/composite'
 
 const WIDTH = 64
@@ -122,6 +123,8 @@ export type PixelState = {
   importPNGFromImageData: (img: ImageData, meta?: FileMeta) => void
   importAse: (buffer: ArrayBuffer, meta?: FileMeta) => Promise<void>
   resizeCanvas: (w: number, h: number) => void
+  flipHorizontal: () => void
+  flipVertical: () => void
   fileMeta?: FileMeta
   setFileMeta: (fileMeta: FileMeta | undefined) => void
 }
@@ -1094,6 +1097,34 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       _redo: [],
       canUndo: true,
       canRedo: false,
+      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+    }
+  }),
+  flipHorizontal: () => set((s) => {
+    const snap = createSnapshot(s)
+    const layers = flipLayersHorizontal(s.layers, s.mode, s.width, s.height)
+    const undo = (s._undo || []).concat([snap])
+    return {
+      layers,
+      _undo: undo,
+      _redo: [],
+      canUndo: true,
+      canRedo: false,
+      dirty: true,
+      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+    }
+  }),
+  flipVertical: () => set((s) => {
+    const snap = createSnapshot(s)
+    const layers = flipLayersVertical(s.layers, s.mode, s.width, s.height)
+    const undo = (s._undo || []).concat([snap])
+    return {
+      layers,
+      _undo: undo,
+      _redo: [],
+      canUndo: true,
+      canRedo: false,
+      dirty: true,
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
   }),
