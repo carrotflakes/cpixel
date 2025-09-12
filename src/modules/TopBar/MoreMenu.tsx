@@ -89,8 +89,8 @@ export function MoreMenu() {
                 <LuChevronRight className="ml-auto" aria-hidden />
               </DropdownMenu.SubTrigger>
               <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item disabled={!canUndo} className={itemCls} onSelect={() => { if (!canUndo) return; undo(); setOpen(false) }}>Undo</DropdownMenu.Item>
-                <DropdownMenu.Item disabled={!canRedo} className={itemCls} onSelect={() => { if (!canRedo) return; redo(); setOpen(false) }}>Redo</DropdownMenu.Item>
+                <DropdownMenu.Item disabled={!canUndo} className={itemCls} onSelect={() => { if (!canUndo) return; undo(); setOpen(false) }}>Undo{navigator.maxTouchPoints > 2 ? ' (2 finger tap)' : ''}</DropdownMenu.Item>
+                <DropdownMenu.Item disabled={!canRedo} className={itemCls} onSelect={() => { if (!canRedo) return; redo(); setOpen(false) }}>Redo{navigator.maxTouchPoints > 3 ? ' (3 finger tap)' : ''}</DropdownMenu.Item>
                 <DropdownMenu.Separator className={separatorCls} />
                 <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; copySelection(); setOpen(false) }}>Copy</DropdownMenu.Item>
                 <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; usePixelStore.getState().beginStroke(); cutSelection(); usePixelStore.getState().endStroke(); setOpen(false) }}>Cut</DropdownMenu.Item>
