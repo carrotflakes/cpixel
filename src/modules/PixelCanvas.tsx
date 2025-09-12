@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCanvasInput } from './hooks/useCanvasInput'
 import { useTilt } from './hooks/useTilt'
 import { useSettingsStore } from './settingsStore'
@@ -25,9 +25,7 @@ export function PixelCanvas() {
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
   const tiltAmount = useSettingsStore(s => s.tiltParallaxAmount)
   const tiltAlpha = useSettingsStore(s => s.tiltParallaxAlpha)
-  const setView = usePixelStore(s => s.setView)
   const selection = usePixelStore(s => s.selection)
-  const clearSelection = usePixelStore(s => s.clearSelection)
   const shapeFill = usePixelStore(s => s.shapeFill)
 
   const { rotationRate, rotationRateRef, motionPermission, requestMotionPermission } = useTilt({ enabled: tiltEnabled })
@@ -36,7 +34,7 @@ export function PixelCanvas() {
   const scaledW = W * view.scale
   const scaledH = H * view.scale
   // cache small helper canvases
-  const checkerTileRef = useRef<OffscreenCanvas | null>(null)
+  const checkerTile = useMemo(() => getCheckerCanvas(checkerSize, W, H), [checkerSize, W, H])
   const tmpCanvasRef = useRef<OffscreenCanvas | null>(null)
   const floatCanvasRef = useRef<OffscreenCanvas | null>(null)
   const [antsPhase, setAntsPhase] = useState(0)
@@ -56,13 +54,9 @@ export function PixelCanvas() {
     const ch = H * view.scale
     const cx = Math.round((vw - cw) / 2)
     const cy = Math.round((vh - ch) / 2)
-    setView(cx, cy, view.scale)
+    usePixelStore.getState().setView(cx, cy, view.scale)
     inited.current = true
-  }, [view.scale, setView])
-
-  useEffect(() => {
-    checkerTileRef.current = getCheckerCanvas(checkerSize, W, H)
-  }, [checkerSize, W, H])
+  }, [view.scale])
 
   // Animate marching ants
   useEffect(() => {
@@ -92,7 +86,7 @@ export function PixelCanvas() {
 
     ctx.translate(vx, vy)
 
-    checkerTileRef.current && ctx.drawImage(checkerTileRef.current, 0, 0, W, H, 0, 0, scaledW, scaledH)
+    ctx.drawImage(checkerTile, 0, 0, W, H, 0, 0, scaledW, scaledH)
 
     // If in shift mode, render each layer with offset, suppress overlays
     if (parallaxActive) {
@@ -203,7 +197,7 @@ export function PixelCanvas() {
     return (
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
         <button
-          onClick={clearSelection}
+          onClick={() => usePixelStore.getState().clearSelection()}
           className="pointer-events-auto absolute z-20 px-2 py-1 text-xs sm:text-sm bg-surface border border-border rounded shadow hover:bg-surface-muted"
           style={{ left: '50%', top: 12, transform: 'translateX(-50%)' }}
           title="Clear selection"
