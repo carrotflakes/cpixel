@@ -9,7 +9,7 @@ export function StatusBar() {
   const palette = usePixelStore(s => s.palette)
 
   return (
-    <div className="text-xs flex items-center gap-4 px-3 py-1 border-t border-border bg-surface/70 backdrop-blur">
+    <div className="text-xs flex items-center gap-4 px-3 py-1 border-t border-border bg-surface/70 backdrop-blur overflow-x-auto [&>span]:whitespace-nowrap">
       <span>Zoom: {Math.round(size * 100) / 100}x</span>
       <span className="text-muted">Mode: {mode}{mode === 'indexed' ? ` (${palette.length})` : ''}</span>
       {hover ? (
