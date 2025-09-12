@@ -14,10 +14,13 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const setTiltAmount = useSettingsStore(s => s.setTiltParallaxAmount)
   const tiltAlpha = useSettingsStore(s => s.tiltParallaxAlpha)
   const setTiltAlpha = useSettingsStore(s => s.setTiltParallaxAlpha)
+  const rightClickTool = useSettingsStore(s => s.rightClickTool)
+  const setRightClickTool = useSettingsStore(s => s.setRightClickTool)
   const [checkerStr, setCheckerStr] = useState(String(checkerSize))
   const [tiltTriggerStr, setTiltTriggerStr] = useState(String(tiltTrigger))
   const [tiltAmountStr, setTiltAmountStr] = useState(String(tiltAmount))
   const [tiltAlphaStr, setTiltAlphaStr] = useState(String(tiltAlpha))
+  const [rightClickToolLocal, setRightClickToolLocal] = useState(rightClickTool)
   const [tiltEnabledLocal, setTiltEnabledLocal] = useState<boolean>(tiltEnabled)
   const firstRef = useRef<HTMLInputElement | null>(null)
 
@@ -28,9 +31,10 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     setTiltEnabledLocal(tiltEnabled)
     setTiltAmountStr(String(tiltAmount))
     setTiltAlphaStr(String(tiltAlpha))
+    setRightClickToolLocal(rightClickTool)
     const t = setTimeout(() => firstRef.current?.focus(), 0)
     return () => clearTimeout(t)
-  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount, tiltAlpha])
+  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount, tiltAlpha, rightClickTool])
 
   useEffect(() => {
     if (!open) return
@@ -64,6 +68,7 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
       setTiltAlpha(normAl)
     }
     setTiltEnabled(tiltEnabledLocal)
+    setRightClickTool(rightClickToolLocal)
     onClose()
   }
 
@@ -88,6 +93,22 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
                 value={checkerStr}
                 onChange={(e) => setCheckerStr(e.target.value)}
               />
+            </label>
+          </div>
+          <div className="flex flex-col gap-4">
+            <label className="flex flex-col gap-1 max-w-52">
+              <span className="text-sm text-muted">Right click tool</span>
+              <select
+                className="rounded border border-border bg-surface p-1"
+                value={rightClickToolLocal}
+                onChange={(e) => setRightClickToolLocal(e.target.value as typeof rightClickToolLocal)}
+              >
+                <option value="brush">brush</option>
+                <option value="eraser">eraser</option>
+                <option value="eyedropper">eyedropper</option>
+                <option value="bucket">bucket</option>
+                <option value="pan">pan</option>
+              </select>
             </label>
           </div>
           <fieldset className="flex flex-col gap-3 border border-border rounded p-3 max-w-[26rem]">

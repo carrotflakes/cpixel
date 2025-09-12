@@ -3,7 +3,6 @@ import { usePixelStore } from '../store'
 
 export function useKeyboardShortcuts(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  clearSelection: () => void,
 ) {
   const undo = usePixelStore(s => s.undo)
   const redo = usePixelStore(s => s.redo)
@@ -13,7 +12,7 @@ export function useKeyboardShortcuts(
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        clearSelection()
+        usePixelStore.getState().clearSelection()
         e.preventDefault()
       }
     }
@@ -21,7 +20,7 @@ export function useKeyboardShortcuts(
     return () => {
       window.removeEventListener('keydown', onKeyDown, { capture: true })
     }
-  }, [canvasRef, clearSelection])
+  }, [canvasRef])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

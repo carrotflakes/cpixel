@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import type { ToolType } from './store'
 
 export type SettingsState = {
   checkerSize: number
@@ -12,6 +13,8 @@ export type SettingsState = {
   setTiltParallaxAmount: (n: number) => void
   tiltParallaxAlpha: number
   setTiltParallaxAlpha: (n: number) => void
+  rightClickTool: ToolType
+  setRightClickTool: (t: ToolType) => void
 }
 
 const KEY = 'cpixel.settings.v1'
@@ -41,10 +44,12 @@ export const useSettingsStore = create<SettingsState>()(
         const v = Math.max(0.05, Math.min(1, Number(n)))
         set({ tiltParallaxAlpha: v })
       },
+      rightClickTool: 'eraser',
+      setRightClickTool: (t) => set({ rightClickTool: t }),
     }),
     {
       name: KEY,
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         checkerSize: s.checkerSize,
@@ -52,15 +57,17 @@ export const useSettingsStore = create<SettingsState>()(
         tiltParallaxTrigger: s.tiltParallaxTrigger,
         tiltParallaxAmount: s.tiltParallaxAmount,
         tiltParallaxAlpha: s.tiltParallaxAlpha,
+        rightClickTool: s.rightClickTool,
       }),
       migrate: (persisted: any, _fromVersion) => {
-        const state = { checkerSize: 4, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5, tiltParallaxAlpha: 0.9 }
+        const state = { checkerSize: 4, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5, tiltParallaxAlpha: 0.9, rightClickTool: 'eraser' }
         if (!persisted || typeof persisted !== 'object') return state
         if (typeof persisted.checkerSize === 'number') state.checkerSize = persisted.checkerSize
         if (typeof persisted.tiltParallaxEnabled === 'boolean') state.tiltParallaxEnabled = persisted.tiltParallaxEnabled
         if (typeof persisted.tiltParallaxTrigger === 'number') state.tiltParallaxTrigger = persisted.tiltParallaxTrigger
         if (typeof persisted.tiltParallaxAmount === 'number') state.tiltParallaxAmount = persisted.tiltParallaxAmount
         if (typeof persisted.tiltParallaxAlpha === 'number') state.tiltParallaxAlpha = persisted.tiltParallaxAlpha
+        if (typeof persisted.rightClickTool === 'string') state.rightClickTool = persisted.rightClickTool
         return state
       },
     }

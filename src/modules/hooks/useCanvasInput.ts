@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react'
-import { usePixelStore, MIN_SCALE, MAX_SCALE } from '../store'
+import { usePixelStore, MIN_SCALE, MAX_SCALE, ToolType } from '../store'
 import { clamp, clampViewToBounds } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel, findTopPaletteIndex, LayerLike } from '../utils/composite'
 import { isPointInMask, polygonToMask, magicWandMask } from '../utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
+import { useSettingsStore } from '../settingsStore'
 
 export type ShapePreview = {
-  kind: 'line' | 'rect' | 'ellipse' | null
+  kind: 'line' | 'rect' | 'ellipse'
   startX: number
   startY: number
   curX: number
@@ -29,13 +30,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const palette = usePixelStore(s => s.palette)
   const transparentIndex = usePixelStore(s => s.transparentIndex)
   const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
-  const tool = usePixelStore(s => s.tool)
   const setView = usePixelStore(s => s.setView)
   const setHoverInfo = usePixelStore(s => s.setHoverInfo)
   const selectionMask = usePixelStore(s => s.selection?.mask)
   const setSelectionRect = usePixelStore(s => s.setSelectionRect)
   const setSelectionMask = usePixelStore(s => s.setSelectionMask)
-  const clearSelection = usePixelStore(s => s.clearSelection)
   const beginSelectionDrag = usePixelStore(s => s.beginSelectionDrag)
   const setSelectionOffset = usePixelStore(s => s.setSelectionOffset)
   const commitSelectionMove = usePixelStore(s => s.commitSelectionMove)
@@ -44,9 +43,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
   const TOUCH_MOVE_DIST_THRESHOLD = 5 * window.devicePixelRatio
 
-  const [shapePreview, setShapePreview] = useState<ShapePreview>({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
+  const [shapePreview, setShapePreview] = useState<ShapePreview | null>(null)
 
-  const dragState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
+  const panState = useRef<{ lastX: number; lastY: number; panning: boolean }>({ lastX: 0, lastY: 0, panning: false })
   const touchState = useRef<{
     pointers: { id: number; startX: number; startY: number }[]
     lastDist?: number
@@ -66,8 +65,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const state = useRef<null | "firstTouch" | "pinch" | "tool">(null)
   const firstTouch = useRef<{ x: number; y: number; clientX: number; clientY: number; button: number; shiftKey: boolean; ctrlKey: boolean } | null>(null)
   const toolPointerId = useRef<number | null>(null)
+  const curTool = useRef<ToolType>('brush')
 
-  useKeyboardShortcuts(canvasRef, clearSelection)
+  useKeyboardShortcuts(canvasRef)
   useCanvasPanZoom(canvasRef, view, setView, W, H)
 
   // Helpers
@@ -83,11 +83,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       ? (erase ? transparentIndex : currentPaletteIndex) ?? 0
       : erase ? 0x00000000 : parseCSSColor(color)
   )
-  const isShapeTool = () => tool === 'line' || tool === 'rect' || tool === 'ellipse'
-  const isSelectionTool = () => tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand'
-  const isBrushishTool = () => tool === 'brush' || tool === 'eraser'
-  const isBucketTool = () => tool === 'bucket'
-  const isEyedropperTool = () => tool === 'eyedropper'
+  const isShapeTool = () => curTool.current === 'line' || curTool.current === 'rect' || curTool.current === 'ellipse'
+  const isSelectionTool = () => curTool.current === 'select-rect' || curTool.current === 'select-lasso' || curTool.current === 'select-wand'
+  const isBrushishTool = () => curTool.current === 'brush' || curTool.current === 'eraser'
+  const isBucketTool = () => curTool.current === 'bucket'
+  const isEyedropperTool = () => curTool.current === 'eyedropper'
   const updateHover = (x: number, y: number) => {
     if (touchState.current.multiGesture) return
     if (!inBounds(x, y)) { setHoverInfo(undefined); return }
@@ -107,20 +107,20 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
   const pointInSelection = (x: number, y: number) => isPointInMask(selectionMask, W, H, x, y)
   const startShapeAt = (x: number, y: number) => {
-    setShapePreview({ kind: tool as 'line' | 'rect' | 'ellipse', startX: x, startY: y, curX: x, curY: y })
+    setShapePreview({ kind: curTool.current as 'line' | 'rect' | 'ellipse', startX: x, startY: y, curX: x, curY: y })
     beginStroke()
   }
   const updateShapeTo = (x: number, y: number) => {
-    setShapePreview((s) => ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
+    setShapePreview((s) => s && ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
   }
   const commitShape = (erase = false) => {
     const s = shapePreview
-    if (!s.kind) return
+    if (!s) return
     const rgba = paintFor(erase)
     if (s.kind === 'line') usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
     else if (s.kind === 'rect') usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
     else if (s.kind === 'ellipse') usePixelStore.getState().drawEllipse(s.startX, s.startY, s.curX, s.curY, rgba)
-    setShapePreview({ kind: null, startX: 0, startY: 0, curX: 0, curY: 0 })
+    setShapePreview(null)
     endStroke()
   }
   const startBrushAt = (x: number, y: number, erase: boolean) => {
@@ -136,6 +136,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
 
   const startTool = (x: number, y: number, e: { button: number, shiftKey: boolean }) => {
+    if (isEyedropperTool()) { pickColorAt(x, y); return true }
+
     if (!inBounds(x, y)) return false
 
     // If a selection mask exists and pointer is outside, block starting paint / shape tools (selection tools still allowed)
@@ -149,16 +151,16 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         selectionDrag.current = { active: true, startX: x, startY: y }
         return true
       }
-      if (tool === 'select-rect') {
+      if (curTool.current === 'select-rect') {
         rectSelecting.current = { active: true, startX: x, startY: y }
         setSelectionRect(x, y, x, y)
         return true
-      } else if (tool === 'select-lasso') {
+      } else if (curTool.current === 'select-lasso') {
         lassoPath.current = [{ x, y }]
         const { mask, bounds } = polygonToMask(W, H, lassoPath.current)
         setSelectionMask(mask, bounds)
         return true
-      } else if (tool === 'select-wand') {
+      } else if (curTool.current === 'select-wand') {
         const contiguous = !e.shiftKey
         const colorGetter = (px: number, py: number) => {
           if (mode === 'truecolor') {
@@ -180,7 +182,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     if (e.button === -1 || e.button === 0 || e.button === 2) {
       beginStroke()
-      const erase = e.button === -1 || e.button === 0 ? tool === 'eraser' : true
+      const erase = curTool.current === 'eraser'
       const contiguous = !e.shiftKey
       if (isBucketTool()) {
         fillBucket(x, y, paintFor(erase), contiguous)
@@ -195,14 +197,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     const { x, y } = pickPoint(e.clientX, e.clientY)
 
-    // Selection tools: only hover/update, do not paint via move
     if (isSelectionTool()) return
-    if (isEyedropperTool()) { if (e.buttons & 1) pickColorAt(x, y); return }
-    if (e.altKey) {
-      pickColorAt(x, y)
-      e.preventDefault();
-      return
-    }
+    if (isEyedropperTool()) { pickColorAt(x, y); return }
     if (isBucketTool()) return
 
     if (mouseStroke.current.active) {
@@ -237,16 +233,17 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         } else {
           state.current = 'tool'
           toolPointerId.current = e.pointerId
+          curTool.current = e.button === 2 ? useSettingsStore.getState().rightClickTool : usePixelStore.getState().tool
+          if (e.altKey) curTool.current = 'eyedropper'
+          if (e.button === 1 || (e.button === 0 && e.ctrlKey)) curTool.current = 'pan'
 
-          const wantPan = e.button === 1 || (e.button === 0 && e.ctrlKey)
-          if (wantPan) {
-            dragState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
+          if (curTool.current === 'pan') {
+            panState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
             if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
             e.preventDefault()
             return
           }
 
-          if (isEyedropperTool()) { pickColorAt(x, y); e.preventDefault(); return }
           if (startTool(x, y, e)) {
             e.preventDefault()
             return
@@ -302,16 +299,17 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           firstTouch.current = null
           state.current = 'tool'
           toolPointerId.current = e.pointerId
+          curTool.current = f.button === 2 ? useSettingsStore.getState().rightClickTool : usePixelStore.getState().tool
+          if (e.altKey) curTool.current = 'eyedropper'
+          if (f.button === 1 || (f.button === 0 && f.ctrlKey)) curTool.current = 'pan'
 
-          const wantPan = f.button === 1 || (f.button === 0 && f.ctrlKey)
-          if (wantPan) {
-            dragState.current = { lastX: f.clientX, lastY: f.clientY, panning: true }
+          if (curTool.current === 'pan') {
+            panState.current = { lastX: f.clientX, lastY: f.clientY, panning: true }
             if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
             e.preventDefault()
             return
           }
 
-          if (isEyedropperTool()) { pickColorAt(f.x, f.y); e.preventDefault(); return }
           if (startTool(f.x, f.y, e)) {
             e.preventDefault()
             return
@@ -387,11 +385,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           e.preventDefault()
           return
         }
-        if (dragState.current.panning) {
-          const dx = e.clientX - dragState.current.lastX
-          const dy = e.clientY - dragState.current.lastY
-          dragState.current.lastX = e.clientX
-          dragState.current.lastY = e.clientY
+        if (panState.current.panning) {
+          const dx = e.clientX - panState.current.lastX
+          const dy = e.clientY - panState.current.lastY
+          panState.current.lastX = e.clientX
+          panState.current.lastY = e.clientY
           const rect = canvasRef.current!.getBoundingClientRect()
           const vw = rect.width
           const vh = rect.height
@@ -404,7 +402,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           e.preventDefault()
           return
         }
-        if (shapePreview.kind) {
+        if (shapePreview) {
           updateShapeTo(x, y)
           return
         }
@@ -414,7 +412,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
 
   const endTool = () => {
-    dragState.current.panning = false
+    panState.current.panning = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
     if (selectionDrag.current.active) {
       commitSelectionMove()
@@ -433,7 +431,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       lassoPath.current = null
       return
     }
-    if (shapePreview.kind) {
+    if (shapePreview) {
       commitShape()
       return
     }
@@ -467,15 +465,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (f) {
           firstTouch.current = null
 
-          const wantPan = f.button === 1 || (f.button === 0 && f.ctrlKey)
-          if (wantPan) {
-            dragState.current = { lastX: f.clientX, lastY: f.clientY, panning: true }
-            if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
-            e.preventDefault()
-            return
-          }
-
-          if (isEyedropperTool()) { pickColorAt(f.x, f.y); e.preventDefault(); return }
           if (startTool(f.x, f.y, e)) {
             e.preventDefault()
             return

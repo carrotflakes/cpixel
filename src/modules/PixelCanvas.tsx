@@ -139,7 +139,7 @@ export function PixelCanvas() {
       drawHoverCell(ctx, hover.x, hover.y, view.scale, brushSize)
     }
     // shape preview overlay
-    if (shapePreview.kind) {
+    if (shapePreview) {
       drawShapePreview(
         ctx,
         shapePreview.kind,
@@ -189,7 +189,7 @@ export function PixelCanvas() {
         ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selection.bounds.left + dx) * s, (selection.bounds.top + dy) * s, bw * s, bh * s)
       }
     }
-  }, [layers, palette, mode, transparentIndex, view, hover?.x, hover?.y, shapePreview.kind, shapePreview.curX, shapePreview.curY, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
+  }, [layers, palette, mode, transparentIndex, view, hover?.x, hover?.y, shapePreview, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
 
   const overlay = (() => {
     if (parallaxActive) return null // hide selection UI in parallax mode
