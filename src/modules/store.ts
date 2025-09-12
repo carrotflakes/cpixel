@@ -174,7 +174,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   fileMeta: undefined,
   setFileMeta: (fileMeta) => set(() => ({ fileMeta })),
   addLayer: () => set((s) => {
-    const id = 'L' + (s.layers.length + 1)
+    const id = newLayerId(s.layers)
     const layer: Layer = s.mode === 'truecolor'
       ? { id, visible: true, locked: false, data: new Uint32Array(s.width * s.height) }
       : { id, visible: true, locked: false, indices: new Uint8Array(s.width * s.height) }
@@ -192,7 +192,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const i = s.layers.findIndex(l => l.id === id)
     if (i < 0) return {}
     const src = s.layers[i]
-    const nid = 'L' + (s.layers.length + 1)
+    const nid = newLayerId(s.layers)
     const dup: Layer = s.mode === 'truecolor'
       ? { id: nid, visible: true, locked: false, data: new Uint32Array(src.data ?? new Uint32Array(s.width * s.height)) }
       : { id: nid, visible: true, locked: false, indices: new Uint8Array(src.indices ?? new Uint8Array(s.width * s.height)) }
@@ -1132,4 +1132,15 @@ function createSnapshot(state: PixelState): Snapshot {
     palette: state.palette.slice(0),
     transparentIndex: state.transparentIndex,
   }
+}
+
+function newLayerId(layers: Layer[]): string {
+  let maxId = 0
+  for (const l of layers) {
+    if (l.id.startsWith('L')) {
+      const n = parseInt(l.id.slice(1))
+      if (!isNaN(n) && n > maxId) maxId = n
+    }
+  }
+  return 'L' + (maxId + 1)
 }
