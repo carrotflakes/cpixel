@@ -11,12 +11,6 @@ export function MoreMenu() {
   // store selectors
   const mode = usePixelStore(s => s.mode)
   const setMode = usePixelStore(s => s.setMode)
-  const exportPNG = usePixelStore(s => s.exportPNG)
-  const exportJSON = usePixelStore(s => s.exportJSON)
-  const exportAse = usePixelStore(s => s.exportAse)
-  const flipHorizontal = usePixelStore(s => s.flipHorizontal)
-  const flipVertical = usePixelStore(s => s.flipVertical)
-  const resizeCanvas = usePixelStore(s => s.resizeCanvas)
   const curW = usePixelStore(s => s.width)
   const curH = usePixelStore(s => s.height)
   const fileMeta = usePixelStore(s => s.fileMeta)
@@ -125,11 +119,11 @@ export function MoreMenu() {
                   <span>Clear layer</span>
                 </DropdownMenu.Item>
                 <DropdownMenu.Separator className={separatorCls} />
-                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().beginStroke(); flipHorizontal(); usePixelStore.getState().endStroke(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().beginStroke(); usePixelStore.getState().flipHorizontal(); usePixelStore.getState().endStroke(); setOpen(false) }}>
                   <LuFlipHorizontal aria-hidden />
                   <span>Flip horizontal</span>
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().beginStroke(); flipVertical(); usePixelStore.getState().endStroke(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().beginStroke(); usePixelStore.getState().flipVertical(); usePixelStore.getState().endStroke(); setOpen(false) }}>
                   <LuFlipVertical aria-hidden />
                   <span>Flip vertical</span>
                 </DropdownMenu.Item>
@@ -154,15 +148,15 @@ export function MoreMenu() {
                 <LuChevronRight className="ml-auto" aria-hidden />
               </DropdownMenu.SubTrigger>
               <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { exportPNG(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().exportPNG(); setOpen(false) }}>
                   <LuDownload aria-hidden />
                   <span>PNG</span>
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { exportJSON(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().exportJSON(); setOpen(false) }}>
                   <LuDownload aria-hidden />
                   <span>Project JSON</span>
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { exportAse(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().exportAse(); setOpen(false) }}>
                   <LuDownload aria-hidden />
                   <span>Aseprite (.aseprite)</span>
                 </DropdownMenu.Item>
@@ -243,7 +237,7 @@ export function MoreMenu() {
         initialWidth={curW}
         initialHeight={curH}
         onCancel={() => setSizeOpen(false)}
-        onSubmit={(w, h) => { resizeCanvas(w, h); setSizeOpen(false) }}
+        onSubmit={(w, h) => { usePixelStore.getState().resizeCanvas(w, h); setSizeOpen(false) }}
       />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
