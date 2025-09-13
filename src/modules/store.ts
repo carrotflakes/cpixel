@@ -55,8 +55,8 @@ export type AppState = {
   shapeTool: 'rect' | 'ellipse'
   selectTool: 'select-rect' | 'select-lasso' | 'select-wand'
   setColor: (c: string) => void
-  pushRecentColor: () => void
   setColorIndex: (i: number) => void
+  pushRecentColor: () => void
   setPaletteColor: (index: number, rgba: number) => void
   // layer ops
   addLayer: () => void
@@ -236,6 +236,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return { color: c }
   }),
+  setColorIndex: (i) => set((s) => {
+    const idx = Math.max(0, Math.min(i | 0, Math.max(0, s.palette.length - 1)))
+    const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
+    return { currentPaletteIndex: idx, color: hex }
+  }),
   pushRecentColor: () => set((s) => {
     if (s.mode === 'indexed') {
       // store palette index; if no currentPaletteIndex, derive nearest
@@ -255,11 +260,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       const next = [c, ...existing.filter(v => norm(v) !== norm(c))].slice(0, 10)
       return { recentColorsTruecolor: next }
     }
-  }),
-  setColorIndex: (i) => set((s) => {
-    const idx = Math.max(0, Math.min(i | 0, Math.max(0, s.palette.length - 1)))
-    const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
-    return { currentPaletteIndex: idx, color: hex }
   }),
   setPaletteColor: (index, rgba) => set((s) => {
     const i = index | 0

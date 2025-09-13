@@ -23,14 +23,7 @@ export function ColorSection() {
         <label className="hidden sm:inline text-sm text-muted">Color</label>
         <ColorButton
           color={color}
-          onLive={(hex) => {
-            if (mode === 'indexed' && currentPaletteIndex !== undefined) {
-              setPaletteColor(currentPaletteIndex, parseCSSColor(hex))
-            } else {
-              setColor(hex)
-            }
-          }}
-          onDone={(hex) => {
+          onChange={(hex) => {
             if (mode === 'indexed' && currentPaletteIndex !== undefined) {
               setPaletteColor(currentPaletteIndex, parseCSSColor(hex))
             } else {
@@ -64,7 +57,7 @@ export function ColorSection() {
   )
 }
 
-function ColorButton({ color, onLive, onDone }: { color: string; onLive: (c: string) => void; onDone: (c: string) => void }) {
+function ColorButton({ color, onChange }: { color: string; onChange: (c: string) => void }) {
   const { open, anchor, btnRef, toggle, close } = useColorPopover()
   return (
     <>
@@ -84,8 +77,8 @@ function ColorButton({ color, onLive, onDone }: { color: string; onLive: (c: str
         open={open}
         anchor={anchor}
         onClose={close}
-        onChangeLive={onLive}
-        onChangeDone={(c) => { onDone(c); close() }}
+        onChangeLive={onChange}
+        onChangeDone={(c) => { onChange(c); close() }}
         showAlpha={true}
       />
     </>
