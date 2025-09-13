@@ -1,18 +1,18 @@
 import { useEffect } from 'react'
-import { usePixelStore } from '../store'
+import { useAppStore } from '../store'
 
 export function useKeyboardShortcuts(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
 ) {
-  const undo = usePixelStore(s => s.undo)
-  const redo = usePixelStore(s => s.redo)
-  const selectionBounds = usePixelStore(s => s.selection.bounds)
+  const undo = useAppStore(s => s.undo)
+  const redo = useAppStore(s => s.redo)
+  const selectionBounds = useAppStore(s => s.selection.bounds)
 
   // beginStroke/endStroke and selectionBounds are referenced via getState when needed
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        usePixelStore.getState().clearSelection()
+        useAppStore.getState().clearSelection()
         e.preventDefault()
       }
     }
@@ -36,22 +36,22 @@ export function useKeyboardShortcuts(
       // Copy / Cut / Paste for selections
       if (k === 'c') {
         if (selectionBounds) {
-          usePixelStore.getState().copySelection();
+          useAppStore.getState().copySelection();
           e.preventDefault()
         }
         return
       }
       if (k === 'x') {
         if (selectionBounds) {
-          usePixelStore.getState().beginStroke()
-          usePixelStore.getState().cutSelection();
-          usePixelStore.getState().endStroke()
+          useAppStore.getState().beginStroke()
+          useAppStore.getState().cutSelection();
+          useAppStore.getState().endStroke()
           e.preventDefault()
         }
         return
       }
       if (k === 'v') {
-        usePixelStore.getState().pasteClipboard();
+        useAppStore.getState().pasteClipboard();
         e.preventDefault()
         return
       }

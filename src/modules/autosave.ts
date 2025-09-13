@@ -1,4 +1,4 @@
-import { FileMeta, usePixelStore } from './store'
+import { FileMeta, useAppStore } from './store'
 
 // Simple localStorage autosave / restore
 // - Periodic save (every 10s)
@@ -28,7 +28,7 @@ type PersistPayload = {
 }
 
 function buildPayload(): PersistPayload {
-  const s = usePixelStore.getState()
+  const s = useAppStore.getState()
   return {
     app: 'cpixel',
     version: 1,
@@ -54,7 +54,7 @@ function buildPayload(): PersistPayload {
 
 function saveNow() {
   try {
-    const s = usePixelStore.getState()
+    const s = useAppStore.getState()
     // Avoid saving mid-stroke to prevent excessive snapshots
     if ((s as any)._stroking) return
     const payload = buildPayload()
@@ -70,7 +70,7 @@ function restore() {
     if (!raw) return
     const data = JSON.parse(raw)
     if (data && data.app === 'cpixel') {
-      usePixelStore.getState().importJSON(data, data.fileMeta)
+      useAppStore.getState().importJSON(data, data.fileMeta)
     }
   } catch {
     // ignore corrupt
@@ -85,7 +85,7 @@ export function initAutosave() {
 
   // Debounced change save
   let timeout: number | undefined
-  usePixelStore.subscribe(() => {
+  useAppStore.subscribe(() => {
     if (timeout) window.clearTimeout(timeout)
     timeout = window.setTimeout(saveNow, 1000)
   })

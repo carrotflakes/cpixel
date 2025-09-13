@@ -36,7 +36,7 @@ type Layer = {
 
 export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand' | 'pan'
 
-export type PixelState = {
+export type AppState = {
   width: number
   height: number
   layers: Layer[]
@@ -139,7 +139,7 @@ type Snapshot = {
   transparentIndex: number
 }
 
-export const usePixelStore = create<PixelState>((set, get) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   width: WIDTH,
   height: HEIGHT,
   layers: [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
@@ -215,7 +215,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   toggleVisible: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l) })),
   toggleLocked: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l) })),
   setTool: (t) => set(() => {
-    const patch: Partial<PixelState> = { tool: t }
+    const patch: Partial<AppState> = { tool: t }
     if (t === 'rect' || t === 'ellipse') patch.shapeTool = t
     if (t === 'select-rect' || t === 'select-lasso' || t === 'select-wand') patch.selectTool = t
     return patch
@@ -269,7 +269,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     pal[i] = (i === s.transparentIndex) ? 0x00000000 : (rgba >>> 0)
     if (equalU32(pal, s.palette)) return {}
     // If editing currently selected index, also sync visible color string
-    const patch: Partial<PixelState> = { palette: pal }
+    const patch: Partial<AppState> = { palette: pal }
     if (s.currentPaletteIndex === i) patch.color = rgbaToCSSHex(pal[i] >>> 0)
     return patch
   }),
@@ -337,7 +337,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     const ti = map[s.transparentIndex]
     // remap current palette index
     const ci = s.currentPaletteIndex !== undefined ? map[s.currentPaletteIndex] : undefined
-    const patch: Partial<PixelState> = { palette: pal, layers, transparentIndex: ti }
+    const patch: Partial<AppState> = { palette: pal, layers, transparentIndex: ti }
     if (ci !== undefined) { patch.currentPaletteIndex = ci; patch.color = rgbaToCSSHex(pal[ci] ?? 0) }
     return patch
   }),
@@ -1032,7 +1032,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       if (!parsed) return
       const converted = aseToCpixel(parsed)
       const layersBottomFirst = converted.layers
-      const statePatch: Partial<PixelState> = {
+      const statePatch: Partial<AppState> = {
         width: converted.width,
         height: converted.height,
         layers: layersBottomFirst.length > 0 ? layersBottomFirst : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(converted.width * converted.height) }],
@@ -1111,7 +1111,7 @@ export const usePixelStore = create<PixelState>((set, get) => ({
   }),
 }))
 
-function createSnapshot(state: PixelState): Snapshot {
+function createSnapshot(state: AppState): Snapshot {
   return {
     width: state.width,
     height: state.height,

@@ -1,18 +1,18 @@
-import { usePixelStore } from '../store'
+import { useAppStore } from '../store'
 import { ColorPicker, useColorPopover } from '../ColorPicker'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { ColorBoxInner, COLOR_BOX_STYLE } from '../ColorBox'
 
 export function ColorSection() {
-  const color = usePixelStore(s => s.color)
-  const setColor = usePixelStore(s => s.setColor)
-  const setColorIndex = usePixelStore(s => s.setColorIndex)
-  const setPaletteColor = usePixelStore(s => s.setPaletteColor)
-  const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
-  const mode = usePixelStore(s => s.mode)
-  const recentIndexed = usePixelStore(s => s.recentColorsIndexed)
-  const recentTrue = usePixelStore(s => s.recentColorsTruecolor)
-  const palette = usePixelStore(s => s.palette)
+  const color = useAppStore(s => s.color)
+  const setColor = useAppStore(s => s.setColor)
+  const setColorIndex = useAppStore(s => s.setColorIndex)
+  const setPaletteColor = useAppStore(s => s.setPaletteColor)
+  const currentPaletteIndex = useAppStore(s => s.currentPaletteIndex)
+  const mode = useAppStore(s => s.mode)
+  const recentIndexed = useAppStore(s => s.recentColorsIndexed)
+  const recentTrue = useAppStore(s => s.recentColorsTruecolor)
+  const palette = useAppStore(s => s.palette)
   const recentColors = mode === 'indexed'
     ? recentIndexed.map(i => rgbaToCSSHex((palette[i] ?? 0x00000000)))
     : recentTrue

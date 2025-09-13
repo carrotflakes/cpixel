@@ -3,13 +3,13 @@ import { TopBar } from "./TopBar/index";
 import { StatusBar } from "./StatusBar";
 import { PalettePanel } from "./PalettePanel";
 import { LayersPanel } from "./LayersPanel";
-import { usePixelStore } from "./store";
+import { useAppStore } from "./store";
 import { useEffect } from "react";
 
 export function App() {
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (usePixelStore.getState().dirty)
+      if (useAppStore.getState().dirty)
         e.preventDefault();
     };
 

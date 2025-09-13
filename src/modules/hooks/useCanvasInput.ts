@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { usePixelStore, MIN_SCALE, MAX_SCALE, ToolType } from '../store'
+import { useAppStore, MIN_SCALE, MAX_SCALE, ToolType } from '../store'
 import { clamp, clampView } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel, findTopPaletteIndex, LayerLike } from '../utils/composite'
@@ -17,27 +17,27 @@ export type ShapePreview = {
 }
 
 export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
-  const view = usePixelStore(s => s.view)
-  const color = usePixelStore(s => s.color)
-  const setColor = usePixelStore(s => s.setColor)
-  const setColorIndex = usePixelStore(s => s.setColorIndex)
-  const beginStroke = usePixelStore(s => s.beginStroke)
-  const endStroke = usePixelStore(s => s.endStroke)
-  const layers = usePixelStore(s => s.layers)
-  const mode = usePixelStore(s => s.mode)
-  const palette = usePixelStore(s => s.palette)
-  const transparentIndex = usePixelStore(s => s.transparentIndex)
-  const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
-  const setView = usePixelStore(s => s.setView)
-  const setHoverInfo = usePixelStore(s => s.setHoverInfo)
-  const selectionMask = usePixelStore(s => s.selection?.mask)
-  const setSelectionRect = usePixelStore(s => s.setSelectionRect)
-  const setSelectionMask = usePixelStore(s => s.setSelectionMask)
-  const beginSelectionDrag = usePixelStore(s => s.beginSelectionDrag)
-  const setSelectionOffset = usePixelStore(s => s.setSelectionOffset)
-  const commitSelectionMove = usePixelStore(s => s.commitSelectionMove)
-  const W = usePixelStore(s => s.width)
-  const H = usePixelStore(s => s.height)
+  const view = useAppStore(s => s.view)
+  const color = useAppStore(s => s.color)
+  const setColor = useAppStore(s => s.setColor)
+  const setColorIndex = useAppStore(s => s.setColorIndex)
+  const beginStroke = useAppStore(s => s.beginStroke)
+  const endStroke = useAppStore(s => s.endStroke)
+  const layers = useAppStore(s => s.layers)
+  const mode = useAppStore(s => s.mode)
+  const palette = useAppStore(s => s.palette)
+  const transparentIndex = useAppStore(s => s.transparentIndex)
+  const currentPaletteIndex = useAppStore(s => s.currentPaletteIndex)
+  const setView = useAppStore(s => s.setView)
+  const setHoverInfo = useAppStore(s => s.setHoverInfo)
+  const selectionMask = useAppStore(s => s.selection?.mask)
+  const setSelectionRect = useAppStore(s => s.setSelectionRect)
+  const setSelectionMask = useAppStore(s => s.setSelectionMask)
+  const beginSelectionDrag = useAppStore(s => s.beginSelectionDrag)
+  const setSelectionOffset = useAppStore(s => s.setSelectionOffset)
+  const commitSelectionMove = useAppStore(s => s.commitSelectionMove)
+  const W = useAppStore(s => s.width)
+  const H = useAppStore(s => s.height)
 
   const TOUCH_MOVE_DIST_THRESHOLD = 5 * window.devicePixelRatio
 
@@ -169,11 +169,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       beginStroke()
       const contiguous = !e.shiftKey
       if (isBucketTool()) {
-        usePixelStore.getState().fillBucket(x, y, paintFor(false), contiguous)
+        useAppStore.getState().fillBucket(x, y, paintFor(false), contiguous)
       } else if (isBrushishTool()) {
         const erase = curTool.current === 'eraser'
         mouseStroke.current = { active: true, erase, lastX: x, lastY: y }
-        usePixelStore.getState().setAt(x, y, paintFor(erase))
+        useAppStore.getState().setAt(x, y, paintFor(erase))
       }
     }
   }
@@ -189,7 +189,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     if (mouseStroke.current.active && mouseStroke.current.lastX !== undefined && mouseStroke.current.lastY !== undefined) {
       const rgba = paintFor(mouseStroke.current.erase)
-      usePixelStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, rgba)
+      useAppStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, rgba)
       mouseStroke.current.lastX = x
       mouseStroke.current.lastY = y
     }
@@ -206,7 +206,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     switch (state.current) {
       case null:
-        curTool.current = e.button === 2 ? useSettingsStore.getState().rightClickTool : usePixelStore.getState().tool
+        curTool.current = e.button === 2 ? useSettingsStore.getState().rightClickTool : useAppStore.getState().tool
         if (e.altKey) curTool.current = 'eyedropper'
         if (e.button === 1 || (e.button === 0 && e.ctrlKey)) curTool.current = 'pan'
 
@@ -410,9 +410,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const s = shapePreview
       if (s) {
         const rgba = paintFor(false)
-        if (s.kind === 'line') usePixelStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
-        else if (s.kind === 'rect') usePixelStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
-        else if (s.kind === 'ellipse') usePixelStore.getState().drawEllipse(s.startX, s.startY, s.curX, s.curY, rgba)
+        if (s.kind === 'line') useAppStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
+        else if (s.kind === 'rect') useAppStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
+        else if (s.kind === 'ellipse') useAppStore.getState().drawEllipse(s.startX, s.startY, s.curX, s.curY, rgba)
         setShapePreview(null)
         endStroke()
       }
@@ -464,9 +464,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           if (!touchState.current.gestureMoved && duration < 200) {
             const fingers = touchState.current.maxPointers
             if (fingers === 2) {
-              usePixelStore.getState().undo()
+              useAppStore.getState().undo()
             } else if (fingers === 3) {
-              usePixelStore.getState().redo()
+              useAppStore.getState().redo()
             }
           }
           state.current = null

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCanvasInput } from './hooks/useCanvasInput'
 import { useTilt } from './hooks/useTilt'
 import { useSettingsStore } from './settingsStore'
-import { usePixelStore } from './store'
+import { useAppStore } from './store'
 import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas } from './utils/canvasDraw'
 import { compositeImageData } from './utils/composite'
 
@@ -11,22 +11,22 @@ const GRID_THRESHOLD = 8
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const { shapePreview, interactionActive, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave } = useCanvasInput(canvasRef)
-  const hover = usePixelStore(s => s.hover)
-  const view = usePixelStore(s => s.view)
-  const W = usePixelStore(s => s.width)
-  const H = usePixelStore(s => s.height)
-  const layers = usePixelStore(s => s.layers)
-  const mode = usePixelStore(s => s.mode)
-  const palette = usePixelStore(s => s.palette)
-  const transparentIndex = usePixelStore(s => s.transparentIndex)
-  const brushSize = usePixelStore(s => s.brushSize)
+  const hover = useAppStore(s => s.hover)
+  const view = useAppStore(s => s.view)
+  const W = useAppStore(s => s.width)
+  const H = useAppStore(s => s.height)
+  const layers = useAppStore(s => s.layers)
+  const mode = useAppStore(s => s.mode)
+  const palette = useAppStore(s => s.palette)
+  const transparentIndex = useAppStore(s => s.transparentIndex)
+  const brushSize = useAppStore(s => s.brushSize)
   const checkerSize = useSettingsStore(s => s.checkerSize)
   const tiltEnabled = useSettingsStore(s => s.tiltParallaxEnabled)
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
   const tiltAmount = useSettingsStore(s => s.tiltParallaxAmount)
   const tiltAlpha = useSettingsStore(s => s.tiltParallaxAlpha)
-  const selection = usePixelStore(s => s.selection)
-  const shapeFill = usePixelStore(s => s.shapeFill)
+  const selection = useAppStore(s => s.selection)
+  const shapeFill = useAppStore(s => s.shapeFill)
 
   const { rotationRate, rotationRateRef, motionPermission, requestMotionPermission } = useTilt({ enabled: tiltEnabled })
   const { active: parallaxActive, shiftOffsetRef, shiftTick } = useTiltParallax(rotationRate, rotationRateRef, { trigger: tiltTrigger, amount: tiltAmount, enabled: tiltEnabled && !interactionActive })
@@ -164,7 +164,7 @@ export function PixelCanvas() {
     return (
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
         <button
-          onClick={() => usePixelStore.getState().clearSelection()}
+          onClick={() => useAppStore.getState().clearSelection()}
           className="pointer-events-auto absolute z-20 px-2 py-1 text-xs sm:text-sm bg-surface border border-border rounded shadow hover:bg-surface-muted"
           style={{ left: '50%', top: 12, transform: 'translateX(-50%)' }}
           title="Clear selection"

@@ -1,18 +1,18 @@
-import { usePixelStore } from './store'
+import { useAppStore } from './store'
 import { LuEye, LuEyeOff, LuArrowUp, LuArrowDown, LuPlus, LuTrash2, LuCopy } from 'react-icons/lu'
 import { FaLock, FaLockOpen } from 'react-icons/fa'
 import { useState } from 'react'
 
 export function LayersPanel() {
-  const layers = usePixelStore(s => s.layers)
-  const active = usePixelStore(s => s.activeLayerId)
-  const addLayer = usePixelStore(s => s.addLayer)
-  const removeLayer = usePixelStore(s => s.removeLayer)
-  const duplicateLayer = usePixelStore(s => s.duplicateLayer)
-  const moveLayer = usePixelStore(s => s.moveLayer)
-  const setActive = usePixelStore(s => s.setActiveLayer)
-  const toggleVisible = usePixelStore(s => s.toggleVisible)
-  const toggleLocked = usePixelStore(s => s.toggleLocked)
+  const layers = useAppStore(s => s.layers)
+  const active = useAppStore(s => s.activeLayerId)
+  const addLayer = useAppStore(s => s.addLayer)
+  const removeLayer = useAppStore(s => s.removeLayer)
+  const duplicateLayer = useAppStore(s => s.duplicateLayer)
+  const moveLayer = useAppStore(s => s.moveLayer)
+  const setActive = useAppStore(s => s.setActiveLayer)
+  const toggleVisible = useAppStore(s => s.toggleVisible)
+  const toggleLocked = useAppStore(s => s.toggleLocked)
 
   const [collapsed, setCollapsed] = useState(false)
 

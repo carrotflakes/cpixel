@@ -1,15 +1,15 @@
 import { FaEraser } from 'react-icons/fa'
 import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette, LuCheck, LuCircle } from 'react-icons/lu'
 import { PiLasso, PiRectangleDashed, PiMagicWand } from 'react-icons/pi'
-import { usePixelStore } from '../store'
+import { useAppStore } from '../store'
 import { useState } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
 export function ToolSelector() {
-  const tool = usePixelStore(s => s.tool)
-  const setTool = usePixelStore(s => s.setTool)
-  const shapeTool = usePixelStore(s => s.shapeTool)
-  const selectTool = usePixelStore(s => s.selectTool)
+  const tool = useAppStore(s => s.tool)
+  const setTool = useAppStore(s => s.setTool)
+  const shapeTool = useAppStore(s => s.shapeTool)
+  const selectTool = useAppStore(s => s.selectTool)
   const [selOpen, setSelOpen] = useState(false)
 
   const shapeToolObj = SHAPE_TOOLS.find(s => s.id === shapeTool) ?? SHAPE_TOOLS[0]
@@ -19,13 +19,13 @@ export function ToolSelector() {
 
   // Brush size menu
   const [brushOpen, setBrushOpen] = useState(false)
-  const brushSize = usePixelStore(s => s.brushSize)
-  const setBrushSize = usePixelStore(s => s.setBrushSize)
-  const W = usePixelStore(s => s.width)
-  const H = usePixelStore(s => s.height)
+  const brushSize = useAppStore(s => s.brushSize)
+  const setBrushSize = useAppStore(s => s.setBrushSize)
+  const W = useAppStore(s => s.width)
+  const H = useAppStore(s => s.height)
   const maxDim = Math.max(W, H)
-  const shapeFill = usePixelStore(s => s.shapeFill)
-  const toggleShapeFill = usePixelStore(s => s.toggleShapeFill)
+  const shapeFill = useAppStore(s => s.shapeFill)
+  const toggleShapeFill = useAppStore(s => s.toggleShapeFill)
 
   // Shape options menu
   const [shapeOpen, setShapeOpen] = useState(false)

@@ -1,12 +1,12 @@
 import { rgbaToCSSHex } from './utils/color'
-import { usePixelStore } from './store'
+import { useAppStore } from './store'
 import { ColorBox } from './ColorBox'
 
 export function StatusBar() {
-  const size = usePixelStore(s => s.view.scale)
-  const hover = usePixelStore(s => s.hover)
-  const mode = usePixelStore(s => s.mode)
-  const palette = usePixelStore(s => s.palette)
+  const size = useAppStore(s => s.view.scale)
+  const hover = useAppStore(s => s.hover)
+  const mode = useAppStore(s => s.mode)
+  const palette = useAppStore(s => s.palette)
 
   return (
     <div className="text-xs flex items-center gap-4 px-3 py-1 border-t border-border bg-surface/70 backdrop-blur overflow-x-auto [&>span]:whitespace-nowrap">

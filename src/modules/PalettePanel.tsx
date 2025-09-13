@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { rgbaToCSSHex, parseCSSColor } from './utils/color'
-import { usePixelStore } from './store'
+import { useAppStore } from './store'
 import { LuPin, LuArrowUp, LuArrowDown, LuTrash2, LuChevronDown, LuChevronUp } from 'react-icons/lu'
 import { ColorPicker } from './ColorPicker'
 import { RCMenuRoot, RCMenuTrigger, RCMenuContent, RCMenuItem, RCMenuSeparator } from './ui/RadixContextMenu'
@@ -8,17 +8,17 @@ import { PalettePresetsDialog } from './PalettePresetsDialog'
 import { COLOR_BOX_STYLE, ColorBoxInner } from './ColorBox'
 
 export function PalettePanel() {
-  const mode = usePixelStore(s => s.mode)
-  const palette = usePixelStore(s => s.palette)
-  const transparentIndex = usePixelStore(s => s.transparentIndex)
-  const addPaletteColor = usePixelStore(s => s.addPaletteColor)
-  const setTransparentIndex = usePixelStore(s => s.setTransparentIndex)
-  const removePaletteIndex = usePixelStore(s => s.removePaletteIndex)
-  const movePaletteIndex = usePixelStore(s => s.movePaletteIndex)
-  const applyPalettePreset = usePixelStore(s => s.applyPalettePreset)
-  const setPaletteColor = usePixelStore(s => s.setPaletteColor)
-  const setColorIndex = usePixelStore(s => s.setColorIndex)
-  const currentPaletteIndex = usePixelStore(s => s.currentPaletteIndex)
+  const mode = useAppStore(s => s.mode)
+  const palette = useAppStore(s => s.palette)
+  const transparentIndex = useAppStore(s => s.transparentIndex)
+  const addPaletteColor = useAppStore(s => s.addPaletteColor)
+  const setTransparentIndex = useAppStore(s => s.setTransparentIndex)
+  const removePaletteIndex = useAppStore(s => s.removePaletteIndex)
+  const movePaletteIndex = useAppStore(s => s.movePaletteIndex)
+  const applyPalettePreset = useAppStore(s => s.applyPalettePreset)
+  const setPaletteColor = useAppStore(s => s.setPaletteColor)
+  const setColorIndex = useAppStore(s => s.setColorIndex)
+  const currentPaletteIndex = useAppStore(s => s.currentPaletteIndex)
 
   const panelRef = useRef<HTMLDivElement | null>(null)
   const [presetsOpen, setPresetsOpen] = useState(false)

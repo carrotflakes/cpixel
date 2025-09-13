@@ -3,17 +3,17 @@ import { FaEllipsisV, FaEraser } from 'react-icons/fa'
 import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings, LuFlipHorizontal, LuFlipVertical } from 'react-icons/lu'
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
 import { SettingsDialog } from '../SettingsDialog'
-import { usePixelStore } from '../store'
+import { useAppStore } from '../store'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { GoogleDrive } from '../utils/googleDrive'
 
 export function MoreMenu() {
   // store selectors
-  const mode = usePixelStore(s => s.mode)
-  const setMode = usePixelStore(s => s.setMode)
-  const curW = usePixelStore(s => s.width)
-  const curH = usePixelStore(s => s.height)
-  const fileMeta = usePixelStore(s => s.fileMeta)
+  const mode = useAppStore(s => s.mode)
+  const setMode = useAppStore(s => s.setMode)
+  const curW = useAppStore(s => s.width)
+  const curH = useAppStore(s => s.height)
+  const fileMeta = useAppStore(s => s.fileMeta)
 
   const [open, setOpen] = useState(false)
   const [sizeOpen, setSizeOpen] = useState(false)
@@ -50,15 +50,15 @@ export function MoreMenu() {
   }, [])
 
   // edit actions / state
-  const undo = usePixelStore(s => s.undo)
-  const redo = usePixelStore(s => s.redo)
-  const cutSelection = usePixelStore(s => s.cutSelection)
-  const copySelection = usePixelStore(s => s.copySelection)
-  const pasteClipboard = usePixelStore(s => s.pasteClipboard)
-  const canUndo = usePixelStore(s => s.canUndo)
-  const canRedo = usePixelStore(s => s.canRedo)
-  const hasSelection = usePixelStore(s => !!s.selection?.bounds)
-  const hasClipboard = usePixelStore(s => !!s.clipboard)
+  const undo = useAppStore(s => s.undo)
+  const redo = useAppStore(s => s.redo)
+  const cutSelection = useAppStore(s => s.cutSelection)
+  const copySelection = useAppStore(s => s.copySelection)
+  const pasteClipboard = useAppStore(s => s.pasteClipboard)
+  const canUndo = useAppStore(s => s.canUndo)
+  const canRedo = useAppStore(s => s.canRedo)
+  const hasSelection = useAppStore(s => !!s.selection?.bounds)
+  const hasClipboard = useAppStore(s => !!s.clipboard)
 
   const itemCls = 'px-3 py-2 rounded-sm text-sm flex items-center gap-2 cursor-pointer select-none outline-none focus:bg-surface-muted data-[disabled]:opacity-50 data-[disabled]:cursor-default'
   const contentCls = 'z-1000 p-1 border border-border bg-elevated rounded-md shadow-lg'
@@ -93,7 +93,7 @@ export function MoreMenu() {
                 <DropdownMenu.Item disabled={!canRedo} className={itemCls} onSelect={() => { if (!canRedo) return; redo(); setOpen(false) }}>Redo{navigator.maxTouchPoints > 3 ? ' (3 finger tap)' : ''}</DropdownMenu.Item>
                 <DropdownMenu.Separator className={separatorCls} />
                 <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; copySelection(); setOpen(false) }}>Copy</DropdownMenu.Item>
-                <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; usePixelStore.getState().beginStroke(); cutSelection(); usePixelStore.getState().endStroke(); setOpen(false) }}>Cut</DropdownMenu.Item>
+                <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; useAppStore.getState().beginStroke(); cutSelection(); useAppStore.getState().endStroke(); setOpen(false) }}>Cut</DropdownMenu.Item>
                 <DropdownMenu.Item disabled={!hasClipboard} className={itemCls} onSelect={() => { if (!hasClipboard) return; pasteClipboard(); setOpen(false) }}>Paste</DropdownMenu.Item>
                 <DropdownMenu.Separator className={separatorCls} />
                 <DropdownMenu.Item className={itemCls} onSelect={() => { setSizeOpen(true); setOpen(false) }}>Canvas size…</DropdownMenu.Item>
@@ -114,16 +114,16 @@ export function MoreMenu() {
                     </DropdownMenu.Item>
                   </DropdownMenu.SubContent>
                 </DropdownMenu.Sub>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().clearLayer(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().clearLayer(); setOpen(false) }}>
                   <FaEraser aria-hidden />
                   <span>Clear layer</span>
                 </DropdownMenu.Item>
                 <DropdownMenu.Separator className={separatorCls} />
-                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().beginStroke(); usePixelStore.getState().flipHorizontal(); usePixelStore.getState().endStroke(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().beginStroke(); useAppStore.getState().flipHorizontal(); useAppStore.getState().endStroke(); setOpen(false) }}>
                   <LuFlipHorizontal aria-hidden />
                   <span>Flip horizontal</span>
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().beginStroke(); usePixelStore.getState().flipVertical(); usePixelStore.getState().endStroke(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().beginStroke(); useAppStore.getState().flipVertical(); useAppStore.getState().endStroke(); setOpen(false) }}>
                   <LuFlipVertical aria-hidden />
                   <span>Flip vertical</span>
                 </DropdownMenu.Item>
@@ -148,15 +148,15 @@ export function MoreMenu() {
                 <LuChevronRight className="ml-auto" aria-hidden />
               </DropdownMenu.SubTrigger>
               <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().exportPNG(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().exportPNG(); setOpen(false) }}>
                   <LuDownload aria-hidden />
                   <span>PNG</span>
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().exportJSON(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().exportJSON(); setOpen(false) }}>
                   <LuDownload aria-hidden />
                   <span>Project JSON</span>
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { usePixelStore.getState().exportAse(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().exportAse(); setOpen(false) }}>
                   <LuDownload aria-hidden />
                   <span>Aseprite (.aseprite)</span>
                 </DropdownMenu.Item>
@@ -237,7 +237,7 @@ export function MoreMenu() {
         initialWidth={curW}
         initialHeight={curH}
         onCancel={() => setSizeOpen(false)}
-        onSubmit={(w, h) => { usePixelStore.getState().resizeCanvas(w, h); setSizeOpen(false) }}
+        onSubmit={(w, h) => { useAppStore.getState().resizeCanvas(w, h); setSizeOpen(false) }}
       />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
@@ -254,7 +254,7 @@ export function MoreMenu() {
             setDriveError(null)
             try {
               const obj = await GoogleDrive.openFile(id)
-              usePixelStore.getState().importJSON(obj, { name, source: { type: 'google-drive', fileId: id } })
+              useAppStore.getState().importJSON(obj, { name, source: { type: 'google-drive', fileId: id } })
               setDriveOpen(null); setOpen(false)
             } catch (e: any) {
               setDriveError(e?.message || 'Failed to open file')
@@ -274,7 +274,7 @@ export function MoreMenu() {
             try {
               const res = await saveProjectToGoogleDrive(filename, undefined)
               if (res) {
-                usePixelStore.getState().setFileMeta({ name: res.name, source: { type: 'google-drive', fileId: res.id } })
+                useAppStore.getState().setFileMeta({ name: res.name, source: { type: 'google-drive', fileId: res.id } })
               }
               setDriveOpen(null); setOpen(false)
             } catch (e: any) { setDriveError(e?.message || 'Failed to save') }
@@ -296,7 +296,7 @@ function importProjectJSON() {
     if (!f) return
     try {
       const text = await f.text();
-      usePixelStore.getState().importJSON(JSON.parse(text), { name: f.name, source: { type: 'local' } })
+      useAppStore.getState().importJSON(JSON.parse(text), { name: f.name, source: { type: 'local' } })
     } catch (e) {
       console.error('Import JSON failed', e)
     }
@@ -325,7 +325,7 @@ function pickAndImportPNG() {
           const ctx = cvs.getContext('2d')!
           ctx.drawImage(img, 0, 0)
           const imageData = ctx.getImageData(0, 0, w, h)
-          usePixelStore.getState().importPNGFromImageData(imageData, { name: f.name, source: { type: 'local' } })
+          useAppStore.getState().importPNGFromImageData(imageData, { name: f.name, source: { type: 'local' } })
         } finally { URL.revokeObjectURL(url) }
       }
       img.onerror = () => { URL.revokeObjectURL(url); console.error('Failed to load image') }
@@ -344,14 +344,14 @@ function pickAndImportAse() {
     if (!f) return
     try {
       const buf = await f.arrayBuffer()
-      await usePixelStore.getState().importAse(buf, { name: f.name, source: { type: 'local' } })
+      await useAppStore.getState().importAse(buf, { name: f.name, source: { type: 'local' } })
     } catch (e) { console.error('Import Aseprite failed', e) }
   }
   input.click()
 }
 
 async function saveProjectToGoogleDrive(filename: string, fileId?: string): Promise<{ id: string; name: string } | void> {
-  const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = usePixelStore.getState()
+  const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = useAppStore.getState()
   const payload = {
     app: 'cpixel' as const,
     version: 1 as const,
