@@ -75,23 +75,11 @@ export function PalettePanel() {
         </button>
         <span className="text-sm text-muted">Palette ({palette.length})</span>
         {!collapsed && (
-          <>
-            <button
-              className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted"
-              onClick={() => setPresetsOpen(true)}
-              aria-expanded={presetsOpen}
-            >Presets</button>
-            <label className="text-sm ml-3 text-muted">Transparent</label>
-            <select
-              value={transparentIndex}
-              onChange={(e) => setTransparentIndex(parseInt(e.target.value, 10))}
-              className="px-2 py-1 rounded border border-border bg-surface text-sm"
-            >
-              {Array.from({ length: palette.length }).map((_, i) => (
-                <option key={i} value={i}>{i}</option>
-              ))}
-            </select>
-          </>
+          <button
+            className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted"
+            onClick={() => setPresetsOpen(true)}
+            aria-expanded={presetsOpen}
+          >Presets</button>
         )}
       </div>
 

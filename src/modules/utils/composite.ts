@@ -40,7 +40,7 @@ export function compositePixel(
     if (!layer.visible) continue
     const src = mode === 'truecolor'
       ? layer.data?.[i] ?? 0x00000000
-      : palette[layer.indices?.[i] ?? transparentIndex] ?? 0x00000000
+      : layer.indices?.[i] === transparentIndex ? 0x00000000 : palette[layer.indices?.[i] ?? 0] ?? 0x00000000
     out = over(src, out)
   }
   return out >>> 0

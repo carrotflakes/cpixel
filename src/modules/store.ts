@@ -346,40 +346,34 @@ export const usePixelStore = create<PixelState>((set, get) => ({
       throw new Error('applyPalettePreset should not be called in truecolor mode')
 
     // Limit to 256 colors
-    const limited = colors.length > 256 ? colors.slice(0, 256) : colors
+    const limited = colors.slice(0, 256)
+    if (limited.length === 0) limited[0] = 0x00000000
     const palette = new Uint32Array(limited)
-    // Ensure transparentIndex is in bounds and explicitly transparent
-    const transparentIndex = Math.max(0, Math.min(ti | 0, Math.max(0, palette.length - 1)))
-    palette[transparentIndex] = 0x00000000
+    const transparentIndex = Math.max(0, Math.min(ti | 0, palette.length - 1))
+
 
     // Remap indices by nearest color in the new palette
+    const remap = s.palette.map((c, i) => i === s.transparentIndex ? ti : nearestIndexInPalette(palette, c, transparentIndex))
     const layers = s.layers.map(l => {
-      const src = l.indices!
+      if (!l.indices) return l
+      const src = l.indices
       const dst = new Uint8Array(src.length)
-      for (let i = 0; i < src.length; i++) {
-        const pi = src[i]
-        const rgba = s.palette[pi] ?? 0x00000000
-        if ((rgba >>> 0) === 0x00000000) { dst[i] = transparentIndex; continue }
-        // nearest in new palette
-        let best = transparentIndex, bestD = Infinity
-        const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
-        for (let k = 0; k < palette.length; k++) {
-          const c = palette[k] >>> 0
-          if (c === 0x00000000 && k === transparentIndex) continue // prefer non-transparent unless exact
-          const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
-          const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
-          if (d < bestD) { bestD = d; best = k }
-        }
-        dst[i] = best & 0xff
+      for (const i in src) {
+        dst[i] = remap[src[i]]
       }
       return { ...l, indices: dst }
     })
+
     // choose current index nearest to previous selected color
     const prevRGBA = s.palette[s.currentPaletteIndex ?? s.transparentIndex] ?? 0x00000000
-    let curIdx = transparentIndex
-    if ((prevRGBA >>> 0) !== 0x00000000) curIdx = nearestIndexInPalette(palette, prevRGBA, transparentIndex)
+    const curIdx = s.currentPaletteIndex === s.transparentIndex ? ti : nearestIndexInPalette(palette, prevRGBA, transparentIndex)
     const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
-    return { palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex }
+
+    const recentColorsIndexed = s.recentColorsIndexed
+      .map(i => (i === s.transparentIndex ? ti : nearestIndexInPalette(palette, s.palette[i] ?? 0x00000000, transparentIndex)))
+      .filter((v, i, a) => a.indexOf(v) === i) // dedupe
+
+    return { palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex, recentColorsIndexed }
   }),
   addPaletteColor: (rgba) => {
     const s = get()

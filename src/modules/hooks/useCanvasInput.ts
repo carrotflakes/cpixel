@@ -96,11 +96,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
   const pickColorAt = (x: number, y: number) => {
     if (!inBounds(x, y)) return
-    const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
     if (mode === 'indexed') {
       const idx = findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex
       setColorIndex(idx)
     } else {
+      const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
       setColor(rgbaToCSSHex(rgba))
     }
   }
