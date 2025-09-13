@@ -72,11 +72,10 @@ export function compositeImageData(
   mode: 'truecolor' | 'indexed',
   palette: Uint32Array,
   transparentIndex: number,
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  width = 64,
-  height = 64,
-): ImageData {
-  const img = ctx.createImageData(width, height)
+  img: ImageData,
+) {
+  const width = img.width
+  const height = img.height
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const out = compositePixel(layers, x, y, mode, palette, transparentIndex, width, height)
@@ -87,5 +86,4 @@ export function compositeImageData(
       img.data[i + 3] = (out >>> 0) & 0xff
     }
   }
-  return img
 }

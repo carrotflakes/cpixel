@@ -35,7 +35,8 @@ export function PixelCanvas() {
   const scaledH = H * view.scale
   // cache small helper canvases
   const checkerTile = useMemo(() => getCheckerCanvas(checkerSize, W, H), [checkerSize, W, H])
-  const tmpCanvasRef = useRef<OffscreenCanvas | null>(null)
+  const tmpImage = useMemo(() => new ImageData(W, H), [W, H])
+  const tmpCanvas = useMemo(() => new OffscreenCanvas(W, H), [W, H])
   const floatCanvasRef = useRef<OffscreenCanvas | null>(null)
   const [antsPhase, setAntsPhase] = useState(0)
   const resizeTick = useWindowResizeRedraw(canvasRef)
@@ -70,44 +71,30 @@ export function PixelCanvas() {
 
     // If in shift mode, render each layer with offset, suppress overlays
     if (parallaxActive) {
-      if (!tmpCanvasRef.current) {
-        const t = new OffscreenCanvas(W, H)
-        tmpCanvasRef.current = t
-      } else if (tmpCanvasRef.current.width !== W || tmpCanvasRef.current.height !== H) {
-        tmpCanvasRef.current.width = W
-        tmpCanvasRef.current.height = H
-      }
-      const layerCvs = tmpCanvasRef.current
-      const lctx = layerCvs.getContext('2d')!
+      drawBorder(ctx, scaledW, scaledH)
+      const tctx = tmpCanvas.getContext('2d', { willReadFrequently: true })!
       for (let li = 0; li < layers.length; li++) {
         const layer = layers[li]
         if (!layer.visible) continue
-        const single = compositeImageData([layer], mode, palette, transparentIndex, lctx, W, H)
-        lctx.putImageData(single, 0, 0)
+        compositeImageData([layer], mode, palette, transparentIndex, tmpImage)
+        tctx.putImageData(tmpImage, 0, 0)
         const depth = li + 1
         const dx = -shiftOffsetRef.current.dx * depth / layers.length
         const dy = -shiftOffsetRef.current.dy * depth / layers.length
         const s = view.scale
         ctx.save()
         ctx.globalAlpha = tiltAlpha
-        ctx.drawImage(layerCvs, 0, 0, W, H, dx * s, dy * s, scaledW, scaledH)
+        ctx.drawImage(tmpCanvas, 0, 0, W, H, dx * s, dy * s, scaledW, scaledH)
         ctx.restore()
       }
-      drawBorder(ctx, scaledW, scaledH)
       return
     }
 
     // Normal composited rendering
-    const img = compositeImageData(layers, mode, palette, transparentIndex, ctx, W, H)
-    if (!tmpCanvasRef.current) {
-      const t = new OffscreenCanvas(W, H)
-      tmpCanvasRef.current = t
-    } else if (tmpCanvasRef.current.width !== W || tmpCanvasRef.current.height !== H) {
-      tmpCanvasRef.current.width = W
-      tmpCanvasRef.current.height = H
-    }
-    tmpCanvasRef.current.getContext('2d')!.putImageData(img, 0, 0)
-    ctx.drawImage(tmpCanvasRef.current, 0, 0, W, H, 0, 0, scaledW, scaledH)
+    const tctx = tmpCanvas.getContext('2d', { willReadFrequently: true })!
+    compositeImageData(layers, mode, palette, transparentIndex, tmpImage)
+    tctx.putImageData(tmpImage, 0, 0)
+    ctx.drawImage(tmpCanvas, 0, 0, W, H, 0, 0, scaledW, scaledH)
 
     // border and grid
     drawBorder(ctx, scaledW, scaledH)
@@ -155,7 +142,7 @@ export function PixelCanvas() {
           floatCanvasRef.current.width = bw
           floatCanvasRef.current.height = bh
         }
-        const fctx = floatCanvasRef.current.getContext('2d')!
+        const fctx = floatCanvasRef.current.getContext('2d', { willReadFrequently: true })!
         const img = fctx.createImageData(bw, bh)
         const src = selection.floating
         for (let i = 0, p = 0; i < src.length; i++, p += 4) {

@@ -923,7 +923,8 @@ export const usePixelStore = create<PixelState>((set, get) => ({
     cvs.width = W
     cvs.height = H
     const ctx = cvs.getContext('2d')!
-    const img = compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data, indices: l.indices })), mode, palette, transparentIndex, ctx, W, H)
+    const img = new ImageData(W, H)
+    compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data, indices: l.indices })), mode, palette, transparentIndex, img)
     ctx.putImageData(img, 0, 0)
 
     const a = document.createElement('a')
