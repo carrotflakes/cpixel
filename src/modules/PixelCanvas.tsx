@@ -40,24 +40,6 @@ export function PixelCanvas() {
   const [antsPhase, setAntsPhase] = useState(0)
   const resizeTick = useWindowResizeRedraw(canvasRef)
 
-  // One-time init: restore previous view/zoom or center initially
-  const inited = useRef(false)
-  useEffect(() => {
-    if (inited.current) return
-    const cvs = canvasRef.current
-    if (!cvs) return
-
-    const rect = cvs.getBoundingClientRect()
-    const vw = rect.width
-    const vh = rect.height
-    const cw = W * view.scale
-    const ch = H * view.scale
-    const cx = Math.round((vw - cw) / 2)
-    const cy = Math.round((vh - ch) / 2)
-    usePixelStore.getState().setView(cx, cy, view.scale)
-    inited.current = true
-  }, [view.scale])
-
   // Animate marching ants
   useEffect(() => {
     if (!selection.mask || !selection.bounds) {
@@ -80,11 +62,9 @@ export function PixelCanvas() {
     if (!cvs) return
     const ctx = cvs.getContext('2d')!
     ensureHiDPICanvas(cvs, ctx)
-    // translate to current view (rounded for crisper grid in CSS px space)
-    const vx = Math.round(view.x)
-    const vy = Math.round(view.y)
 
-    ctx.translate(vx, vy)
+    const rect = cvs.getBoundingClientRect()
+    ctx.translate(Math.round(view.x + (rect.width - scaledW) / 2), Math.round(view.y + (rect.height - scaledH) / 2))
 
     ctx.drawImage(checkerTile, 0, 0, W, H, 0, 0, scaledW, scaledH)
 

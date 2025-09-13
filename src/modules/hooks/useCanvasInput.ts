@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { usePixelStore, MIN_SCALE, MAX_SCALE, ToolType } from '../store'
-import { clamp, clampViewToBounds } from '../utils/view'
+import { clamp, clampView } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel, findTopPaletteIndex, LayerLike } from '../utils/composite'
 import { isPointInMask, polygonToMask, magicWandMask } from '../utils/selection'
@@ -70,8 +70,10 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   // Helpers
   const pickPoint = (clientX: number, clientY: number) => {
     const rect = canvasRef.current!.getBoundingClientRect()
-    const x = Math.floor((clientX - rect.left - view.x) / view.scale)
-    const y = Math.floor((clientY - rect.top - view.y) / view.scale)
+    const vx = view.x + (rect.width - W * view.scale) / 2
+    const vy = view.y + (rect.height - H * view.scale) / 2
+    const x = Math.floor((clientX - rect.left - vx) / view.scale)
+    const y = Math.floor((clientY - rect.top - vy) / view.scale)
     return { x, y }
   }
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
@@ -322,16 +324,20 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
                 const nextScale = clamp(view.scale * k, MIN_SCALE, MAX_SCALE)
                 const ratio = nextScale / view.scale
                 const lastC = touchState.current.lastCenter ?? { x: cx, y: cy }
-                const moveCx = cx - lastC.x
-                const moveCy = cy - lastC.y
+                const dcx = cx - lastC.x
+                const dcy = cy - lastC.y
+                const vw = rect.width, vh = rect.height
+
+                const curContentW = W * view.scale, curContentH = H * view.scale
+                const curVX = view.x + (vw - curContentW) / 2, curVY = view.y + (vh - curContentH) / 2
                 const Cx = cx - rect.left
                 const Cy = cy - rect.top
-                const nvx = view.x + moveCx
-                const nvy = view.y + moveCy
-                const newVX = nvx - (Cx - nvx) * (ratio - 1)
-                const newVY = nvy - (Cy - nvy) * (ratio - 1)
-                const { vx: cvx, vy: cvy } = clampViewToBounds(newVX, newVY, rect.width, rect.height, W * nextScale, H * nextScale)
-                setView(Math.round(cvx), Math.round(cvy), nextScale)
+                const newVX = (curVX + dcx) - (Cx - (curVX + dcx)) * (ratio - 1)
+                const newVY = (curVY + dcy) - (Cy - (curVY + dcy)) * (ratio - 1)
+                const nextContentW = W * nextScale, nextContentH = H * nextScale
+                const cxRaw = newVX - (vw - nextContentW) / 2, cyRaw = newVY - (vh - nextContentH) / 2
+                const { cx: ccx, cy: ccy } = clampView(cxRaw, cyRaw, nextContentW, nextContentH)
+                setView(ccx, ccy, nextScale)
                 touchState.current.lastDist = dist
                 touchState.current.lastCenter = { x: cx, y: cy }
               }
@@ -365,15 +371,10 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           const dy = e.clientY - panState.current.lastY
           panState.current.lastX = e.clientX
           panState.current.lastY = e.clientY
-          const rect = canvasRef.current!.getBoundingClientRect()
-          const vw = rect.width
-          const vh = rect.height
           const cw = W * view.scale
           const ch = H * view.scale
-          const nvx = view.x + dx
-          const nvy = view.y + dy
-          const clamped = clampViewToBounds(nvx, nvy, vw, vh, cw, ch)
-          setView(Math.round(clamped.vx), Math.round(clamped.vy), view.scale)
+          const { cx, cy } = clampView(view.x + dx, view.y + dy, cw, ch)
+          setView(cx, cy, view.scale)
           return
         }
         if (shapePreview) {

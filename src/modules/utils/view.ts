@@ -1,21 +1,15 @@
 // View math helpers
 export const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
 
-// Clamp view so content stays within or is centered if smaller than viewport
-export function clampViewToBounds(
-  vx: number,
-  vy: number,
-  vw: number,
-  vh: number,
+export function clampView(
+  cx: number,
+  cy: number,
   cw: number,
   ch: number,
-): { vx: number; vy: number } {
-  const clampAxis = (v: number, vSize: number, cSize: number) => {
-    const margin = vSize / 2;
-    const min = vSize - cSize - margin
-    const max = margin
-    if (max < min) return (vSize - cSize) * 0.5 // center
-    return Math.max(min, Math.min(max, v))
+): { cx: number; cy: number } {
+  const clampAxis = (c: number, cSize: number) => {
+    const margin = cSize / 2
+    return Math.max(-margin, Math.min(margin, c))
   }
-  return { vx: clampAxis(vx, vw, cw), vy: clampAxis(vy, vh, ch) }
+  return { cx: clampAxis(cx, cw), cy: clampAxis(cy, ch) }
 }
