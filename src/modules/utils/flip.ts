@@ -2,8 +2,7 @@ export type LayerLike = {
   id: string
   visible: boolean
   locked: boolean
-  data?: Uint32Array
-  indices?: Uint8Array
+  data: Uint32Array | Uint8Array
 }
 
 /**
@@ -17,7 +16,7 @@ export function flipLayersHorizontal(
 ) {
   return layers.map((layer) => {
     if (mode === 'truecolor') {
-      const src = layer.data ?? new Uint32Array(width * height)
+      const src = layer.data instanceof Uint32Array ? layer.data : new Uint32Array(width * height)
       const dst = new Uint32Array(width * height)
       
       for (let y = 0; y < height; y++) {
@@ -28,9 +27,9 @@ export function flipLayersHorizontal(
         }
       }
       
-      return { ...layer, data: dst, indices: undefined }
+      return { ...layer, data: dst }
     } else {
-      const src = layer.indices ?? new Uint8Array(width * height)
+      const src = layer.data instanceof Uint8Array ? layer.data : new Uint8Array(width * height)
       const dst = new Uint8Array(width * height)
       
       for (let y = 0; y < height; y++) {
@@ -40,8 +39,8 @@ export function flipLayersHorizontal(
           dst[dstIndex] = src[srcIndex]
         }
       }
-      
-      return { ...layer, indices: dst, data: undefined }
+
+      return { ...layer, data: dst }
     }
   })
 }
@@ -57,7 +56,7 @@ export function flipLayersVertical(
 ) {
   return layers.map((layer) => {
     if (mode === 'truecolor') {
-      const src = layer.data ?? new Uint32Array(width * height)
+      const src = layer.data instanceof Uint32Array ? layer.data : new Uint32Array(width * height)
       const dst = new Uint32Array(width * height)
       
       for (let y = 0; y < height; y++) {
@@ -67,10 +66,10 @@ export function flipLayersVertical(
           dst[dstIndex] = src[srcIndex]
         }
       }
-      
-      return { ...layer, data: dst, indices: undefined }
+
+      return { ...layer, data: dst }
     } else {
-      const src = layer.indices ?? new Uint8Array(width * height)
+      const src = layer.data instanceof Uint8Array ? layer.data : new Uint8Array(width * height)
       const dst = new Uint8Array(width * height)
       
       for (let y = 0; y < height; y++) {
@@ -80,8 +79,8 @@ export function flipLayersVertical(
           dst[dstIndex] = src[srcIndex]
         }
       }
-      
-      return { ...layer, indices: dst, data: undefined }
+
+      return { ...layer, data: dst }
     }
   })
 }

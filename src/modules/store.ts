@@ -30,8 +30,7 @@ type Layer = {
   id: string
   visible: boolean
   locked: boolean
-  data?: Uint32Array
-  indices?: Uint8Array
+  data: Uint32Array | Uint8Array
 }
 
 export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand' | 'pan'
@@ -177,7 +176,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const id = newLayerId(s.layers)
     const layer: Layer = s.mode === 'truecolor'
       ? { id, visible: true, locked: false, data: new Uint32Array(s.width * s.height) }
-      : { id, visible: true, locked: false, indices: new Uint8Array(s.width * s.height) }
+      : { id, visible: true, locked: false, data: new Uint8Array(s.width * s.height) }
     return { layers: [...s.layers, layer], activeLayerId: id }
   }),
   removeLayer: (id) => set((s) => {
@@ -194,8 +193,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const src = s.layers[i]
     const nid = newLayerId(s.layers)
     const dup: Layer = s.mode === 'truecolor'
-      ? { id: nid, visible: true, locked: false, data: new Uint32Array(src.data ?? new Uint32Array(s.width * s.height)) }
-      : { id: nid, visible: true, locked: false, indices: new Uint8Array(src.indices ?? new Uint8Array(s.width * s.height)) }
+      ? { id: nid, visible: true, locked: false, data: new Uint32Array(src.data) }
+      : { id: nid, visible: true, locked: false, data: new Uint8Array(src.data) }
     const next = s.layers.slice()
     next.splice(i + 1, 0, dup)
     return { layers: next, activeLayerId: nid }
@@ -289,8 +288,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     else if (ci > idx) ci = ci - 1
     // remap indices for all layers
     const layers = s.layers.map(l => {
-      if (!l.indices) return l
-      const src = l.indices
+      if (l.data instanceof Uint8Array) return l
+      const src = l.data
       const dst = new Uint8Array(src.length)
       for (let k = 0; k < src.length; k++) {
         const v = src[k]
@@ -298,7 +297,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         else if (v > idx) dst[k] = (v - 1) & 0xff
         else dst[k] = v
       }
-      return { ...l, indices: dst }
+      return { ...l, data: dst }
     })
     const colorHex = rgbaToCSSHex(pal[ci] ?? 0)
     return { palette: pal, transparentIndex: ti, layers, currentPaletteIndex: ci, color: colorHex }
@@ -327,11 +326,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     // remap indices for all layers
     const layers = s.layers.map(l => {
-      if (!l.indices) return l
-      const src = l.indices
+      if (l.data instanceof Uint8Array) return l
+      const src = l.data
       const dst = new Uint8Array(src.length)
       for (let k = 0; k < src.length; k++) dst[k] = map[src[k]]
-      return { ...l, indices: dst }
+      return { ...l, data: dst }
     })
     // remap transparent index
     const ti = map[s.transparentIndex]
@@ -355,13 +354,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Remap indices by nearest color in the new palette
     const remap = s.palette.map((c, i) => i === s.transparentIndex ? ti : nearestIndexInPalette(palette, c, transparentIndex))
     const layers = s.layers.map(l => {
-      if (!l.indices) return l
-      const src = l.indices
+      if (l.data instanceof Uint8Array) return l
+      const src = l.data
       const dst = new Uint8Array(src.length)
       for (const i in src) {
         dst[i] = remap[src[i]]
       }
-      return { ...l, indices: dst }
+      return { ...l, data: dst }
     })
 
     // choose current index nearest to previous selected color
@@ -416,16 +415,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       const layers = s.layers.slice()
       const size = Math.max(1, s.brushSize | 0)
       if (s.mode === 'truecolor') {
-        const src = layer.data ?? new Uint32Array(W * H)
-        const out = stampTruecolor(src, W, H, x, y, size, rgbaOrIndex >>> 0, s.selection?.mask)
-        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
+        if (!(layer.data instanceof Uint32Array)) return {}
+        const out = stampTruecolor(layer.data, W, H, x, y, size, rgbaOrIndex >>> 0, s.selection?.mask)
+        if (equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
-        const src = layer.indices ?? new Uint8Array(W * H)
-        const out = stampIndexed(src, W, H, x, y, size, rgbaOrIndex & 0xff, s.selection?.mask)
-        if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
-        layers[li] = { ...layer, indices: out }
+        if (!(layer.data instanceof Uint8Array)) return {}
+        const out = stampIndexed(layer.data, W, H, x, y, size, rgbaOrIndex & 0xff, s.selection?.mask)
+        if (equalU8(out, layer.data)) return {}
+        layers[li] = { ...layer, data: out }
         return { layers }
       }
     })
@@ -446,16 +445,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       const layers = s.layers.slice()
       const size = Math.max(1, s.brushSize | 0)
       if (s.mode === 'truecolor') {
-        const src = layer.data ?? new Uint32Array(W * H)
-        const out = drawLineBrushTruecolor(src, W, H, x0, y0, x1, y1, size, rgbaOrIndex >>> 0, s.selection?.mask)
-        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
+        if (!(layer.data instanceof Uint32Array)) return {}
+        const out = drawLineBrushTruecolor(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex >>> 0, s.selection?.mask)
+        if (equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
-        const src = layer.indices ?? new Uint8Array(W * H)
-        const out = drawLineBrushIndexed(src, W, H, x0, y0, x1, y1, size, rgbaOrIndex & 0xff, s.selection?.mask)
-        if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
-        layers[li] = { ...layer, indices: out }
+        if (!(layer.data instanceof Uint8Array)) return {}
+        const out = drawLineBrushIndexed(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex & 0xff, s.selection?.mask)
+        if (equalU8(out, layer.data)) return {}
+        layers[li] = { ...layer, data: out }
         return { layers }
       }
     })
@@ -477,20 +476,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (s.selection?.floating) return {}
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
-        const src = layer.data ?? new Uint32Array(W * H)
+        if (!(layer.data instanceof Uint32Array)) return {}
         const out = (s.shapeFill
-          ? drawRectFilledTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
-          : drawRectOutlineTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
-        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
+          ? drawRectFilledTruecolor(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
+          : drawRectOutlineTruecolor(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
+        if (equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
-        const src = layer.indices ?? new Uint8Array(W * H)
+        if (!(layer.data instanceof Uint8Array)) return {}
         const out = (s.shapeFill
-          ? drawRectFilledIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
-          : drawRectOutlineIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
-        if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
-        layers[li] = { ...layer, indices: out }
+          ? drawRectFilledIndexed(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
+          : drawRectOutlineIndexed(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
+        if (equalU8(out, layer.data)) return {}
+        layers[li] = { ...layer, data: out }
         return { layers }
       }
     })
@@ -508,20 +507,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (s.selection?.floating) return {}
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
-        const src = layer.data ?? new Uint32Array(W * H)
+        if (!(layer.data instanceof Uint32Array)) return {}
         const out = (s.shapeFill
-          ? drawEllipseFilledTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
-          : drawEllipseOutlineTruecolor(src, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
-        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
+          ? drawEllipseFilledTruecolor(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
+          : drawEllipseOutlineTruecolor(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
+        if (equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
-        const src = layer.indices ?? new Uint8Array(W * H)
+        if (!(layer.data instanceof Uint8Array)) return {}
         const out = (s.shapeFill
-          ? drawEllipseFilledIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
-          : drawEllipseOutlineIndexed(src, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
-        if (out === src || (layer.indices && equalU8(out, layer.indices))) return {}
-        layers[li] = { ...layer, indices: out }
+          ? drawEllipseFilledIndexed(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
+          : drawEllipseOutlineIndexed(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
+        if (equalU8(out, layer.data)) return {}
+        layers[li] = { ...layer, data: out }
         return { layers }
       }
     })
@@ -543,18 +542,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (layer.locked) return {}
       const layers = s.layers.slice()
       if (s.mode === 'truecolor') {
-        const src = layer.data ?? new Uint32Array(W * H)
-        const out = floodFillTruecolor(src, W, H, x, y, rgbaOrIndex, contiguous, mask)
-        if (out === src || (layer.data && equalU32(out, layer.data))) return {}
+        if (!(layer.data instanceof Uint32Array)) return {}
+        const out = floodFillTruecolor(layer.data, W, H, x, y, rgbaOrIndex, contiguous, mask)
+        if (equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
-        // indexed mode
-        const idxArr = layer.indices ?? new Uint8Array(W * H)
-        const replacementIdx = rgbaOrIndex
-        const out = floodFillIndexed(idxArr, W, H, x, y, replacementIdx, contiguous, s.transparentIndex, mask)
-        if (out === idxArr || equalU8(out, idxArr)) return {}
-        layers[li] = { ...layer, indices: out }
+        if (!(layer.data instanceof Uint8Array)) return {}
+        const out = floodFillIndexed(layer.data, W, H, x, y, rgbaOrIndex, contiguous, s.transparentIndex, mask)
+        if (out === layer.data || equalU8(out, layer.data)) return {}
+        layers[li] = { ...layer, data: out }
         return { layers }
       }
     })
@@ -565,7 +562,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (m === 'indexed') {
       // Auto-generate a palette from current composited image (transparent at index 0)
       const autoPalette = generatePaletteFromComposite(
-        s.layers.map(l => ({ visible: l.visible, data: l.data, indices: l.indices })),
+        s.layers.map(l => ({ visible: l.visible, data: l.data })),
         s.width,
         s.height,
         s.mode,
@@ -592,7 +589,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
           idx[i] = best & 0xff
         }
-        return { id: l.id, visible: l.visible, locked: l.locked, indices: idx }
+        return { id: l.id, visible: l.visible, locked: l.locked, data: idx }
       })
       // Sync current palette index nearest to current color
       const rgba = parseCSSColor(s.color)
@@ -601,7 +598,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       // convert all layers: indices -> truecolor
       const layers = s.layers.map(l => {
-        const src = l.indices ?? new Uint8Array(s.width * s.height)
+        const src = l.data ?? new Uint8Array(s.width * s.height)
         const data = new Uint32Array(s.width * s.height)
         for (let i = 0; i < data.length; i++) {
           const pi = src[i] ?? s.transparentIndex
@@ -643,24 +640,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (layer.locked) return {}
     // bounds width/height available via selectionBounds when needed
     if (s.mode === 'truecolor') {
-      const data = layer.data ?? new Uint32Array(W * (s.height))
-      const float = extractFloatingTruecolor(data, sel.mask, sel.bounds, W)
-      const out = clearSelectedTruecolor(data, sel.mask, sel.bounds, W)
+      if (!(layer.data instanceof Uint32Array)) return {}
+      const float = extractFloatingTruecolor(layer.data, sel.mask, sel.bounds, W)
+      const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       return { selection: { ...sel, floating: float, floatingIndices: undefined, offsetX: 0, offsetY: 0 }, layers }
     } else {
-      const idx = layer.indices ?? new Uint8Array(W * (s.height))
+      if (!(layer.data instanceof Uint8Array)) return {}
       const pal = s.palette
       const ti = s.transparentIndex
-      const floatIdx = extractFloatingIndexed(idx, sel.mask, sel.bounds, W, ti)
+      const floatIdx = extractFloatingIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       const float = new Uint32Array(floatIdx.length)
       for (let i = 0; i < floatIdx.length; i++) {
         float[i] = pal[floatIdx[i]]
       }
-      const out = clearSelectedIndexed(idx, sel.mask, sel.bounds, W, ti)
+      const out = clearSelectedIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       const layers = s.layers.slice()
-      layers[li] = { ...layer, indices: out }
+      layers[li] = { ...layer, data: out }
       return { selection: { ...sel, floating: float, floatingIndices: floatIdx, offsetX: 0, offsetY: 0 }, layers }
     }
   }),
@@ -680,17 +677,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     const dstLeft = sel.bounds.left + dx
     const dstTop = sel.bounds.top + dy
     if (s.mode === 'truecolor') {
-      const src = layer.data ?? new Uint32Array(W * H)
-      const out = applyFloatingToTruecolorLayer(src, sel.floating, dstLeft, dstTop, bw, bh, W, H)
+      if (!(layer.data instanceof Uint32Array)) return {}
+      const out = applyFloatingToTruecolorLayer(layer.data, sel.floating, dstLeft, dstTop, bw, bh, W, H)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       return { layers, selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
     } else {
-      const idx = layer.indices ?? new Uint8Array(W * H)
+      if (!(layer.data instanceof Uint8Array)) return {}
       let out: Uint8Array
       if (sel.floatingIndices) {
         // Direct indices path (exact copy)
-        out = new Uint8Array(idx)
+        out = new Uint8Array(layer.data)
         for (let y = 0; y < bh; y++) {
           for (let x = 0; x < bw; x++) {
             const pi = sel.floatingIndices[y * bw + x] & 0xff
@@ -703,10 +700,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       } else {
         // Fallback: derive indices from RGBA (legacy)
-        out = applyFloatingToIndexedLayer(idx, sel.floating, s.palette, s.transparentIndex, dstLeft, dstTop, bw, bh, W, H)
+        out = applyFloatingToIndexedLayer(layer.data, sel.floating, s.palette, s.transparentIndex, dstLeft, dstTop, bw, bh, W, H)
       }
       const layers = s.layers.slice()
-      layers[li] = { ...layer, indices: out }
+      layers[li] = { ...layer, data: out }
       return { layers, selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
     }
   }),
@@ -735,16 +732,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { clipboard: { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex } }
       }
     }
-    const W = s.width, H = s.height
+    const W = s.width
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
     if (s.mode === 'truecolor') {
-      const data = layer.data ?? new Uint32Array(W * H)
-      const float = extractFloatingTruecolor(data, sel.mask, sel.bounds, W)
+      if (!(layer.data instanceof Uint32Array)) return {}
+      const float = extractFloatingTruecolor(layer.data, sel.mask, sel.bounds, W)
       return { clipboard: { kind: 'rgba', pixels: float, width: bw, height: bh } }
     } else {
-      const idx = layer.indices ?? new Uint8Array(W * H)
+      if (!(layer.data instanceof Uint8Array)) return {}
       const ti = s.transparentIndex
       const outIdx = new Uint8Array(bw * bh)
       // build masked indices copy
@@ -752,7 +749,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         for (let x: number = sel.bounds.left; x <= sel.bounds.right; x++) {
           const i = y * W + x
           const fi = (y - sel.bounds.top) * bw + (x - sel.bounds.left)
-          outIdx[fi] = (!sel.mask || sel.mask[i]) ? (idx[i] ?? ti) : (ti & 0xff)
+          outIdx[fi] = (!sel.mask || sel.mask[i]) ? (layer.data[i] ?? ti) : (ti & 0xff)
         }
       }
       return { clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
@@ -782,25 +779,25 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { clipboard: { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }, selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
       }
     }
-    const W = s.width, H = s.height
+    const W = s.width
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
     if (s.mode === 'truecolor') {
-      const data = layer.data ?? new Uint32Array(W * H)
-      const float = extractFloatingTruecolor(data, sel.mask, sel.bounds, W)
-      const out = clearSelectedTruecolor(data, sel.mask, sel.bounds, W)
+      if (!(layer.data instanceof Uint32Array)) return {}
+      const float = extractFloatingTruecolor(layer.data, sel.mask, sel.bounds, W)
+      const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'rgba', pixels: float.slice(0), width: bw, height: bh } }
     } else {
-      const idx = layer.indices ?? new Uint8Array(W * H)
+      if (!(layer.data instanceof Uint8Array)) return {}
       const ti = s.transparentIndex
-      const out = clearSelectedIndexed(idx, sel.mask, sel.bounds, W, ti)
+      const out = clearSelectedIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       const layers = s.layers.slice()
-      layers[li] = { ...layer, indices: out }
-      const outIdx = extractFloatingIndexed(idx, sel.mask, sel.bounds, W, ti)
+      layers[li] = { ...layer, data: out }
+      const outIdx = extractFloatingIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
     }
   }),
@@ -838,7 +835,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
   beginStroke: () => set((s) => {
     if (s._stroking) return {}
-    return nextPartialState(s, {_stroking: true})
+    return nextPartialState(s, { _stroking: true })
   }),
   endStroke: () => set((s) => (s._stroking ? { _stroking: false } : {})),
   undo: () => set((s) => {
@@ -854,8 +851,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         id: l.id,
         visible: l.visible,
         locked: l.locked,
-        data: l.data ? new Uint32Array(l.data) : undefined,
-        indices: l.indices ? new Uint8Array(l.indices) : undefined,
+        data: l.data instanceof Uint32Array ? new Uint32Array(l.data) : new Uint8Array(l.data),
       })),
       activeLayerId: prev.activeLayerId,
       palette: new Uint32Array(prev.palette),
@@ -881,8 +877,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         id: l.id,
         visible: l.visible,
         locked: l.locked,
-        data: l.data ? new Uint32Array(l.data) : undefined,
-        indices: l.indices ? new Uint8Array(l.indices) : undefined,
+        data: l.data instanceof Uint32Array ? new Uint32Array(l.data) : new Uint8Array(l.data),
       })),
       activeLayerId: next.activeLayerId,
       palette: new Uint32Array(next.palette),
@@ -902,7 +897,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const layers = s.layers.slice()
     const layer = layers[li]
     if (s.mode === 'truecolor') layers[li] = { ...layer, data: new Uint32Array(W * H) }
-    else layers[li] = { ...layer, indices: new Uint8Array(W * H) }
+    else layers[li] = { ...layer, data: new Uint8Array(W * H) }
     return nextPartialState(s, { layers })
   }),
   exportPNG: () => {
@@ -912,7 +907,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     cvs.height = H
     const ctx = cvs.getContext('2d')!
     const img = new ImageData(W, H)
-    compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data, indices: l.indices })), mode, palette, transparentIndex, img)
+    compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data })), mode, palette, transparentIndex, img)
     ctx.putImageData(img, 0, 0)
 
     const a = document.createElement('a')
@@ -933,8 +928,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         id: l.id,
         visible: l.visible,
         locked: l.locked,
-        data: l.data ? Array.from(l.data) : undefined,
-        indices: l.indices ? Array.from(l.indices) : undefined,
+        data: Array.from(l.data),
       })),
       activeLayerId,
       palette: Array.from(palette),
@@ -1103,8 +1097,7 @@ function createSnapshot(state: AppState): Snapshot {
       id: l.id,
       visible: l.visible,
       locked: l.locked,
-      data: l.data ? l.data.slice(0) : undefined,
-      indices: l.indices ? l.indices.slice(0) : undefined,
+      data: l.data.slice(0),
     })),
     activeLayerId: state.activeLayerId,
     palette: state.palette.slice(0),

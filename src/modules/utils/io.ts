@@ -1,11 +1,8 @@
-import { nearestIndexInPalette } from './color'
-
 export type NormalizedLayer = {
   id: string
   visible: boolean
   locked: boolean
-  data?: Uint32Array
-  indices?: Uint8Array
+  data: Uint32Array | Uint8Array
 }
 
 export type NormalizedImport = {
@@ -58,37 +55,21 @@ export function normalizeImportedJSON(
     const locked = !!rec?.locked
     if (impMode === 'truecolor') {
       if (Array.isArray(rec?.data)) {
-        const dataArr: number[] = clampSize(rec.data as number[], 0)
+        const dataArr: number[] = clampSize(rec.data, 0)
         const data = new Uint32Array(dataArr.map(v => v >>> 0))
-        return { id, visible, locked, data }
-      } else if (Array.isArray(rec?.indices)) {
-        const idxArr: number[] = clampSize(rec.indices as number[], ti)
-        const data = new Uint32Array(targetSize)
-        for (let i = 0; i < targetSize; i++) {
-          const pi = (idxArr[i] | 0) & 0xff
-          data[i] = nextPalette[pi] ?? 0x00000000
-        }
         return { id, visible, locked, data }
       } else {
         const data = new Uint32Array(targetSize)
         return { id, visible, locked, data }
       }
     } else {
-      if (Array.isArray(rec?.indices)) {
-        const idxArr: number[] = clampSize(rec.indices as number[], ti)
-        const indices = new Uint8Array(idxArr.map(v => (v | 0) & 0xff))
-        return { id, visible, locked, indices }
-      } else if (Array.isArray(rec?.data)) {
-        const srcArr: number[] = clampSize(rec.data as number[], 0)
-        const indices = new Uint8Array(targetSize)
-        for (let i = 0; i < targetSize; i++) {
-          const rgba = (srcArr[i] >>> 0)
-          indices[i] = (rgba === 0x00000000) ? (ti & 0xff) : (nearestIndexInPalette(nextPalette, rgba, ti) & 0xff)
-        }
-        return { id, visible, locked, indices }
+      if (Array.isArray(rec?.data)) {
+        const idxArr: number[] = clampSize((rec.data) as number[], ti)
+        const data = new Uint8Array(idxArr.map(v => (v | 0) & 0xff))
+        return { id, visible, locked, data }
       } else {
-        const indices = new Uint8Array(new Array(targetSize).fill(ti & 0xff))
-        return { id, visible, locked, indices }
+        const data = new Uint8Array(new Array(targetSize).fill(ti & 0xff))
+        return { id, visible, locked, data }
       }
     }
   }) as NormalizedLayer[]

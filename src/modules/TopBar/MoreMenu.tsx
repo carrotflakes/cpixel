@@ -358,7 +358,7 @@ async function saveProjectToGoogleDrive(filename: string, fileId?: string): Prom
     width,
     height,
     mode,
-    layers: layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: l.data ? Array.from(l.data) : undefined, indices: l.indices ? Array.from(l.indices) : undefined })),
+    layers: layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: Array.from(l.data) })),
     activeLayerId,
     palette: Array.from(palette ?? new Uint32Array(0)),
     transparentIndex,

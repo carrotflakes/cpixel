@@ -16,7 +16,7 @@ type PersistPayload = {
   height: number
   mode: 'truecolor' | 'indexed'
   layers: Array<{
-    id: string; visible: boolean; locked: boolean; data?: number[]; indices?: number[]
+    id: string; visible: boolean; locked: boolean; data: number[];
   }>
   activeLayerId: string
   palette: number[]
@@ -39,8 +39,7 @@ function buildPayload(): PersistPayload {
       id: l.id,
       visible: l.visible,
       locked: l.locked,
-      data: l.data ? Array.from(l.data) : undefined,
-      indices: l.indices ? Array.from(l.indices) : undefined,
+      data: Array.from(l.data),
     })),
     activeLayerId: s.activeLayerId,
     palette: Array.from(s.palette ?? new Uint32Array(0)),

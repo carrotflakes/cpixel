@@ -78,7 +78,7 @@ export function clearSelectedTruecolor(data: Uint32Array, mask: Uint8Array | und
   return out
 }
 
-export function extractFloatingIndexed(indices: Uint8Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
+export function extractFloatingIndexed(data: Uint8Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
   const bw = bounds.right - bounds.left + 1
   const bh = bounds.bottom - bounds.top + 1
   const float = new Uint8Array(bw * bh)
@@ -87,14 +87,14 @@ export function extractFloatingIndexed(indices: Uint8Array, mask: Uint8Array | u
       const i = y * W + x
       const fi = (y - bounds.top) * bw + (x - bounds.left)
       if (mask && !mask[i]) float[fi] = transparentIndex & 0xff
-      else float[fi] = indices[i]
+      else float[fi] = data[i]
     }
   }
   return float
 }
 
-export function clearSelectedIndexed(indices: Uint8Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
-  const out = new Uint8Array(indices)
+export function clearSelectedIndexed(data: Uint8Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
+  const out = new Uint8Array(data)
   for (let y = bounds.top; y <= bounds.bottom; y++) {
     for (let x = bounds.left; x <= bounds.right; x++) {
       const i = y * W + x
@@ -165,7 +165,7 @@ export function applyFloatingIndicesToIndexedLayer(
 
 // extract floating indices sub-rectangle (masked) directly for indexed mode.
 export function extractFloatingSelectionIndices(
-  indices: Uint8Array,
+  data: Uint8Array,
   mask: Uint8Array | undefined,
   bounds: { left: number; top: number; right: number; bottom: number },
   W: number,
@@ -179,7 +179,7 @@ export function extractFloatingSelectionIndices(
       const i = y * W + x
       const fi = (y - bounds.top) * bw + (x - bounds.left)
       if (mask && !mask[i]) { floatIdx[fi] = transparentIndex & 0xff; continue }
-      floatIdx[fi] = indices[i] ?? (transparentIndex & 0xff)
+      floatIdx[fi] = data[i] ?? (transparentIndex & 0xff)
     }
   }
   return floatIdx

@@ -1,7 +1,6 @@
 export type LayerLike = {
   visible: boolean
-  data?: Uint32Array
-  indices?: Uint8Array
+  data: Uint32Array | Uint8Array
 }
 
 // Alpha-over compositing of a single source pixel over a destination pixel (both RGBA packed as 0xRRGGBBAA)
@@ -39,8 +38,8 @@ export function compositePixel(
   for (const layer of layers) {
     if (!layer.visible) continue
     const src = mode === 'truecolor'
-      ? layer.data?.[i] ?? 0x00000000
-      : layer.indices?.[i] === transparentIndex ? 0x00000000 : palette[layer.indices?.[i] ?? 0] ?? 0x00000000
+      ? layer.data[i] ?? 0x00000000
+      : layer.data[i] === transparentIndex ? 0x00000000 : palette[layer.data[i] ?? 0] ?? 0x00000000
     out = over(src, out)
   }
   return out >>> 0
@@ -59,7 +58,7 @@ export function findTopPaletteIndex(
   for (let li = layers.length - 1; li >= 0; li--) {
     const L = layers[li]
     if (!L.visible) continue
-    const pi = L.indices?.[y * width + x]
+    const pi = L.data[y * width + x]
     if (pi === undefined || pi === transparentIndex) continue
     return pi
   }

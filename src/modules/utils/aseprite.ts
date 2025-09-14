@@ -195,7 +195,7 @@ export async function decodeAseprite(buf: ArrayBuffer, opts?: { preserveIndexed?
 
 export function aseToCpixel(imported: AseImportResult) {
   if (imported.colorDepth === 8 && imported.layers.some(l => l.indices)) {
-    return { width: imported.width, height: imported.height, mode: 'indexed' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, indices: l.indices ?? new Uint8Array(imported.width * imported.height) })), palette: imported.palette ?? new Uint32Array([0x00000000]), transparentIndex: imported.transparentIndex ?? 0 }
+    return { width: imported.width, height: imported.height, mode: 'indexed' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.indices ?? new Uint8Array(imported.width * imported.height) })), palette: imported.palette ?? new Uint32Array([0x00000000]), transparentIndex: imported.transparentIndex ?? 0 }
   }
   return { width: imported.width, height: imported.height, mode: 'truecolor' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.pixels ?? new Uint32Array(imported.width * imported.height) })) }
 }
@@ -204,7 +204,7 @@ export function aseToCpixel(imported: AseImportResult) {
 
 type CpixelLikeState = Readonly<{
   width: number; height: number; mode: 'indexed' | 'truecolor';
-  layers: ReadonlyArray<{ id: string; visible: boolean; data?: Uint32Array; indices?: Uint8Array }>
+  layers: ReadonlyArray<{ id: string; visible: boolean; data: Uint32Array | Uint8Array }>
   palette: Uint32Array; transparentIndex: number;
 }>
 
@@ -279,10 +279,10 @@ export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
     const pixelsH = height
     let pixelData: Uint8Array
     if (mode === 'indexed') {
-      const src = layer.indices ?? new Uint8Array(width * height)
+      const src = layer.data instanceof Uint8Array ? layer.data : new Uint8Array(width * height)
       pixelData = src // already 1 byte per pixel
     } else {
-      const src = layer.data ?? new Uint32Array(width * height)
+      const src = layer.data instanceof Uint32Array ? layer.data : new Uint32Array(width * height)
       pixelData = new Uint8Array(width * height * 4)
       // Aseprite 32bpp raw stores RGBA bytes in order (decoder earlier assumed r,g,b,a)
       for (let i = 0, p = 0; i < src.length; i++) {
