@@ -68,11 +68,15 @@ export function extractFloatingTruecolor(data: Uint32Array, mask: Uint8Array | u
 }
 
 export function clearSelectedTruecolor(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number) {
+  return fillSelectedTruecolor(data, mask, bounds, W, 0x00000000)
+}
+
+export function fillSelectedTruecolor(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, color: number) {
   const out = new Uint32Array(data)
   for (let y = bounds.top; y <= bounds.bottom; y++) {
     for (let x = bounds.left; x <= bounds.right; x++) {
       const i = y * W + x
-      if (!mask || mask[i]) out[i] = 0
+      if (!mask || mask[i]) out[i] = color
     }
   }
   return out
@@ -94,11 +98,16 @@ export function extractFloatingIndexed(data: Uint8Array, mask: Uint8Array | unde
 }
 
 export function clearSelectedIndexed(data: Uint8Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, transparentIndex: number) {
+  return fillSelectedIndexed(data, mask, bounds, W, transparentIndex)
+}
+
+export function fillSelectedIndexed(data: Uint8Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, colorIndex: number) {
+  colorIndex &= 0xff
   const out = new Uint8Array(data)
   for (let y = bounds.top; y <= bounds.bottom; y++) {
     for (let x = bounds.left; x <= bounds.right; x++) {
       const i = y * W + x
-      if (!mask || mask[i]) out[i] = transparentIndex & 0xff
+      if (!mask || mask[i]) out[i] = colorIndex
     }
   }
   return out

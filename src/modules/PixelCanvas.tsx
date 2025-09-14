@@ -154,15 +154,41 @@ export function PixelCanvas() {
     if (!selection.mask || !selection.bounds) return null
     return (
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
-        <button
-          onClick={() => useAppStore.getState().clearSelection()}
-          className="pointer-events-auto absolute z-20 px-2 py-1 text-xs sm:text-sm bg-surface border border-border rounded shadow hover:bg-surface-muted"
-          style={{ left: '50%', top: 12, transform: 'translateX(-50%)' }}
-          title="Clear selection"
-          aria-label="Clear selection"
+        <div
+          className="pointer-events-auto absolute z-100 flex flex-wrap bg-surface border border-border rounded shadow text-xs sm:text-sm"
+          style={{ left: '50%', top: 8, transform: 'translateX(-50%)' }}
         >
-          Clear selection
-        </button>
+          <button
+            onClick={() => useAppStore.getState().cutSelection()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="Cut"
+          >Cut</button>
+          <button
+            onClick={() => useAppStore.getState().copySelection()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="Copy"
+          >Copy</button>
+          <button
+            onClick={() => useAppStore.getState().fillSelection()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="Fill"
+          >Fill</button>
+          <button
+            onClick={() => useAppStore.getState().eraseSelection()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="Erase"
+          >Erase</button>
+          <button
+            onClick={() => useAppStore.getState().invertSelection()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="Invert selection"
+          >Invert</button>
+          <button
+            onClick={() => useAppStore.getState().clearSelection()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="Clear selection"
+          >Deselect</button>
+        </div>
       </div>
     )
   })()

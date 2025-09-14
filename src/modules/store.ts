@@ -6,7 +6,7 @@ import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 import { equalU32, equalU8 } from './utils/arrays'
 import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed, drawEllipseOutlineTruecolor, drawEllipseOutlineIndexed, drawEllipseFilledTruecolor, drawEllipseFilledIndexed } from './utils/paint'
-import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard } from './utils/selection'
+import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard, fillSelectedTruecolor, fillSelectedIndexed } from './utils/selection'
 import { resizeLayers } from './utils/resize'
 import { flipLayersHorizontal, flipLayersVertical } from './utils/flip'
 import { compositeImageData } from './utils/composite'
@@ -101,6 +101,10 @@ export type AppState = {
   copySelection: () => void
   cutSelection: () => void
   pasteClipboard: () => void
+  // extra selection ops
+  invertSelection: () => void
+  fillSelection: () => void
+  eraseSelection: () => void
   // history
   beginStroke: () => void
   endStroke: () => void
@@ -789,7 +793,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
-      return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'rgba', pixels: float.slice(0), width: bw, height: bh } }
+      return nextPartialState(s, { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'rgba', pixels: float, width: bw, height: bh } })
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       const ti = s.transparentIndex
@@ -797,7 +801,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       const outIdx = extractFloatingIndexed(layer.data, sel.mask, sel.bounds, W, ti)
-      return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
+      return nextPartialState(s, { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } })
     }
   }),
   pasteClipboard: () => set((s) => {
@@ -830,6 +834,80 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     return { selection: { mask, bounds: { left, top, right, bottom }, offsetX: 0, offsetY: 0, floating: float, floatingIndices: floatIdx }, tool: 'select-rect' }
+  }),
+  invertSelection: () => set((s) => {
+    const sel = s.selection
+    if (!sel || !sel.bounds) return {}
+    const W = s.width, H = s.height
+    const size = W * H
+    let mask = sel.mask ? new Uint8Array(sel.mask) : new Uint8Array(size).fill(1)
+    for (let i = 0; i < size; i++) mask[i] = mask[i] ? 0 : 1
+    let left = W, right = -1, top = H, bottom = -1
+    for (let y = 0; y < H; y++) {
+      const row = y * W
+      for (let x = 0; x < W; x++) {
+        if (mask[row + x]) {
+          if (x < left) left = x
+          if (x > right) right = x
+          if (y < top) top = y
+          if (y > bottom) bottom = y
+        }
+      }
+    }
+    if (right < left || bottom < top) {
+      return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+    }
+    return { selection: { mask, bounds: { left, top, right, bottom }, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+  }),
+  fillSelection: () => set((s) => {
+    const sel = s.selection
+    if (!sel || !sel.bounds) return {}
+    if (sel.floating) return {}
+    const W = s.width
+    const li = s.layers.findIndex(l => l.id === s.activeLayerId)
+    if (li < 0) return {}
+    const layer = s.layers[li]
+    if (layer.locked) return {}
+    const layers = s.layers.slice()
+    if (s.mode === 'truecolor') {
+      if (!(layer.data instanceof Uint32Array)) return {}
+      const rgba = parseCSSColor(s.color)
+      const out = fillSelectedTruecolor(layer.data, sel.mask, sel.bounds, W, rgba >>> 0)
+      if (equalU32(out, layer.data)) return {}
+      layers[li] = { ...layer, data: out }
+      return nextPartialState(s, { layers })
+    } else {
+      if (!(layer.data instanceof Uint8Array)) return {}
+      const pi = (s.currentPaletteIndex ?? s.transparentIndex) & 0xff
+      const out = fillSelectedIndexed(layer.data, sel.mask, sel.bounds, W, pi)
+      if (equalU8(out, layer.data)) return {}
+      layers[li] = { ...layer, data: out }
+      return nextPartialState(s, { layers })
+    }
+  }),
+  eraseSelection: () => set((s) => {
+    const sel = s.selection
+    if (!sel || !sel.bounds) return {}
+    if (sel.floating) return {}
+    const W = s.width
+    const li = s.layers.findIndex(l => l.id === s.activeLayerId)
+    if (li < 0) return {}
+    const layer = s.layers[li]
+    if (layer.locked) return {}
+    const layers = s.layers.slice()
+    if (s.mode === 'truecolor') {
+      if (!(layer.data instanceof Uint32Array)) return {}
+      const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
+      if (equalU32(out, layer.data)) return {}
+      layers[li] = { ...layer, data: out }
+      return nextPartialState(s, { layers })
+    } else {
+      if (!(layer.data instanceof Uint8Array)) return {}
+      const out = clearSelectedIndexed(layer.data, sel.mask, sel.bounds, W, s.transparentIndex)
+      if (equalU8(out, layer.data)) return {}
+      layers[li] = { ...layer, data: out }
+      return nextPartialState(s, { layers })
+    }
   }),
   setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
   beginStroke: () => set((s) => {
