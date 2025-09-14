@@ -21,9 +21,11 @@ export function ToolSelector() {
   const [brushOpen, setBrushOpen] = useState(false)
   const brushSize = useAppStore(s => s.brushSize)
   const setBrushSize = useAppStore(s => s.setBrushSize)
+  const eraserSize = useAppStore(s => s.eraserSize)
+  const setEraserSize = useAppStore(s => s.setEraserSize)
   const W = useAppStore(s => s.width)
   const H = useAppStore(s => s.height)
-  const maxDim = Math.max(W, H)
+  const maxDim = Math.max(8, W, H) / 2 | 0
   const shapeFill = useAppStore(s => s.shapeFill)
   const toggleShapeFill = useAppStore(s => s.toggleShapeFill)
 
@@ -87,15 +89,49 @@ export function ToolSelector() {
           <LuPipette aria-hidden />
           <span className="hidden sm:inline">Eye</span>
         </button>
-        <button
-          className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'eraser' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-          onClick={() => setTool('eraser')}
-          aria-pressed={tool === 'eraser'}
-          title="Eraser"
-        >
-          <FaEraser aria-hidden />
-          <span className="hidden sm:inline">Eraser</span>
-        </button>
+        <DropdownMenu.Root modal={false} open={tool === 'eraser' && brushOpen === false && false}>
+          {/* Dummy root to satisfy structure (not using separate state) */}
+        </DropdownMenu.Root>
+        <DropdownMenu.Root modal={false}>
+          <DropdownMenu.Trigger asChild>
+            <button
+              onClick={() => setTool('eraser')}
+              className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'eraser' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+              aria-pressed={tool === 'eraser'}
+              aria-haspopup="menu"
+              title={`Eraser (size ${eraserSize})`}
+            >
+              <FaEraser aria-hidden />
+              <span className="hidden sm:inline">Eraser</span>
+            </button>
+          </DropdownMenu.Trigger>
+          {tool === 'eraser' && (
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content className={contentCls} sideOffset={6} align="start">
+                <div className="px-3 py-2 flex flex-col gap-2">
+                  <div className="flex gap-2 text-sm">Eraser Size: {eraserSize}</div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={maxDim}
+                    value={eraserSize}
+                    onChange={e => setEraserSize(Number(e.target.value))}
+                    aria-label="Eraser size"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {PRESET_SIZES.map(sz => (
+                      <button
+                        key={sz}
+                        onClick={() => { setEraserSize(sz) }}
+                        className={`px-2 py-1 rounded border text-xs ${eraserSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
+                      >{sz}</button>
+                    ))}
+                  </div>
+                </div>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          )}
+        </DropdownMenu.Root>
         <button
           className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'bucket' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
           onClick={() => setTool('bucket')}

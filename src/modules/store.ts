@@ -43,6 +43,7 @@ export type AppState = {
   view: { x: number; y: number; scale: number }
   color: string
   brushSize: number
+  eraserSize: number
   shapeFill: boolean
   currentPaletteIndex?: number
   recentColorsTruecolor: string[]
@@ -72,6 +73,7 @@ export type AppState = {
   applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
   setTool: (t: ToolType) => void
   setBrushSize: (n: number) => void
+  setEraserSize: (n: number) => void
   toggleShapeFill: () => void
   setView: (x: number, y: number, scale: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
@@ -150,6 +152,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   view: { x: 0, y: 0, scale: 5 },
   color: '#000000',
   brushSize: 1,
+  eraserSize: 1,
   shapeFill: false,
   currentPaletteIndex: 1,
   recentColorsTruecolor: ['#000000', '#ffffff'],
@@ -227,6 +230,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const maxDim = Math.max(s.width, s.height)
     const size = Math.max(1, Math.min(Math.floor(n), maxDim))
     return { brushSize: size }
+  }),
+  setEraserSize: (n) => set((s) => {
+    const maxDim = Math.max(s.width, s.height)
+    const size = Math.max(1, Math.min(Math.floor(n), maxDim))
+    return { eraserSize: size }
   }),
   toggleShapeFill: () => set((s) => ({ shapeFill: !s.shapeFill })),
   setColor: (c) => set((s) => {
@@ -416,7 +424,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const layer = s.layers[li]
       if (layer.locked) return {}
       const layers = s.layers.slice()
-      const size = Math.max(1, s.brushSize | 0)
+      const size = Math.max(1, (s.tool === 'eraser' ? s.eraserSize : s.brushSize) | 0)
       if (s.mode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
         const out = stampTruecolor(layer.data, W, H, x, y, size, rgbaOrIndex >>> 0, s.selection?.mask)
@@ -446,7 +454,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (s.selection?.floating) return {}
       if (!inBounds(x0, y0) && !inBounds(x1, y1)) return {}
       const layers = s.layers.slice()
-      const size = Math.max(1, s.brushSize | 0)
+      const size = Math.max(1, (s.tool === 'eraser' ? s.eraserSize : s.brushSize) | 0)
       if (s.mode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
         const out = drawLineBrushTruecolor(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex >>> 0, s.selection?.mask)

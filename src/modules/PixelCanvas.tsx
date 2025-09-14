@@ -20,6 +20,8 @@ export function PixelCanvas() {
   const palette = useAppStore(s => s.palette)
   const transparentIndex = useAppStore(s => s.transparentIndex)
   const brushSize = useAppStore(s => s.brushSize)
+  const eraserSize = useAppStore(s => s.eraserSize)
+  const tool = useAppStore(s => s.tool)
   const checkerSize = useSettingsStore(s => s.checkerSize)
   const tiltEnabled = useSettingsStore(s => s.tiltParallaxEnabled)
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
@@ -103,7 +105,8 @@ export function PixelCanvas() {
     }
     // hover highlight
     if (hover && hover.x >= 0 && hover.y >= 0 && hover.x < W && hover.y < H) {
-      drawHoverCell(ctx, hover.x, hover.y, view.scale, brushSize)
+      const size = tool === 'eraser' ? eraserSize : brushSize
+      drawHoverCell(ctx, hover.x, hover.y, view.scale, size)
     }
     // shape preview overlay
     if (shapePreview) {
