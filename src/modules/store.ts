@@ -107,11 +107,11 @@ export type AppState = {
   endStroke: () => void
   undo: () => void
   redo: () => void
-  canUndo?: boolean
-  canRedo?: boolean
-  _undo?: Snapshot[]
-  _redo?: Snapshot[]
-  _stroking?: boolean
+  canUndo: boolean
+  canRedo: boolean
+  _undo: Snapshot[]
+  _redo: Snapshot[]
+  _stroking: boolean
   dirty: boolean // TODO: need to update this
   hover?: { x: number; y: number; rgba?: number; index?: number }
   setHoverInfo: (h?: { x: number; y: number; rgba?: number; index?: number }) => void
@@ -838,9 +838,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
   beginStroke: () => set((s) => {
     if (s._stroking) return {}
-    const snap = createSnapshot(s)
-    const undo = s._undo ? [...s._undo, snap] : [snap]
-    return { _undo: undo, _redo: [], _stroking: true, canUndo: true, canRedo: false, dirty: true }
+    return nextPartialState(s, {_stroking: true})
   }),
   endStroke: () => set((s) => (s._stroking ? { _stroking: false } : {})),
   undo: () => set((s) => {
@@ -848,7 +846,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const prev = s._undo[s._undo.length - 1]
     const undo = s._undo.slice(0, -1)
     const snap = createSnapshot(s)
-    const redo = (s._redo || []).concat([snap])
     return {
       width: prev.width,
       height: prev.height,
@@ -864,7 +861,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       palette: new Uint32Array(prev.palette),
       transparentIndex: prev.transparentIndex,
       _undo: undo,
-      _redo: redo,
+      _redo: [...s._redo, snap],
       canUndo: undo.length > 0,
       canRedo: true,
       dirty: true,
@@ -876,7 +873,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = s._redo[s._redo.length - 1]
     const redo = s._redo.slice(0, -1)
     const snap = createSnapshot(s)
-    const undo = (s._undo || []).concat([snap])
     return {
       width: next.width,
       height: next.height,
@@ -891,7 +887,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeLayerId: next.activeLayerId,
       palette: new Uint32Array(next.palette),
       transparentIndex: next.transparentIndex,
-      _undo: undo,
+      _undo: [...s._undo, snap],
       _redo: redo,
       canUndo: true,
       canRedo: redo.length > 0,
@@ -901,15 +897,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   clearLayer: () => set((s) => {
     const W = s.width, H = s.height
-    const snap = createSnapshot(s)
-    const undo = (s._undo || []).concat([snap])
     const li = s.layers.findIndex((l: Layer) => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layers = s.layers.slice()
     const layer = layers[li]
     if (s.mode === 'truecolor') layers[li] = { ...layer, data: new Uint32Array(W * H) }
     else layers[li] = { ...layer, indices: new Uint8Array(W * H) }
-    return { layers, _undo: undo, _redo: [], canUndo: true, canRedo: false }
+    return nextPartialState(s, { layers })
   }),
   exportPNG: () => {
     const { mode, layers, palette, transparentIndex, width: W, height: H } = get()
@@ -1067,49 +1061,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     const oldW = s.width, oldH = s.height
     if (newW === oldW && newH === oldH) return {}
 
-    const snap = createSnapshot(s)
-    const layers = resizeLayers(s.layers, s.mode, oldW, oldH, newW, newH)
-    const undo = (s._undo || []).concat([snap])
-    return {
+    return nextPartialState(s, {
       width: newW,
       height: newH,
-      layers,
-      _undo: undo,
-      _redo: [],
-      canUndo: true,
-      canRedo: false,
+      layers: resizeLayers(s.layers, s.mode, oldW, oldH, newW, newH),
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
-    }
+    })
   }),
   flipHorizontal: () => set((s) => {
-    const snap = createSnapshot(s)
-    const layers = flipLayersHorizontal(s.layers, s.mode, s.width, s.height)
-    const undo = (s._undo || []).concat([snap])
-    return {
-      layers,
-      _undo: undo,
-      _redo: [],
-      canUndo: true,
-      canRedo: false,
-      dirty: true,
+    return nextPartialState(s, {
+      layers: flipLayersHorizontal(s.layers, s.mode, s.width, s.height),
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
-    }
+    })
   }),
   flipVertical: () => set((s) => {
-    const snap = createSnapshot(s)
-    const layers = flipLayersVertical(s.layers, s.mode, s.width, s.height)
-    const undo = (s._undo || []).concat([snap])
-    return {
-      layers,
-      _undo: undo,
-      _redo: [],
-      canUndo: true,
-      canRedo: false,
-      dirty: true,
+    return nextPartialState(s, {
+      layers: flipLayersVertical(s.layers, s.mode, s.width, s.height),
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
-    }
+    })
   }),
 }))
+
+function nextPartialState(curState: AppState, newState: Partial<AppState>): Partial<AppState> {
+  const snap = createSnapshot(curState)
+  return {
+    ...newState,
+    _undo: [...curState._undo, snap],
+    _redo: [],
+    canUndo: true,
+    canRedo: false,
+    dirty: true,
+  }
+}
 
 function createSnapshot(state: AppState): Snapshot {
   return {
