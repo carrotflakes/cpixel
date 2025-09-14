@@ -3,7 +3,7 @@ import { useCanvasInput } from './hooks/useCanvasInput'
 import { useTilt } from './hooks/useTilt'
 import { useSettingsStore } from './settingsStore'
 import { useAppStore } from './store'
-import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas } from './utils/canvasDraw'
+import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas, drawSelectionOutline } from './utils/canvasDraw'
 import { compositeImageData } from './utils/composite'
 
 const GRID_THRESHOLD = 8
@@ -121,19 +121,10 @@ export function PixelCanvas() {
     // selection overlay and floating
     if (selection.mask && selection.bounds) {
       drawSelectionOverlay(ctx, selection.mask, W, H, view.scale)
-      const dx = (selection.offsetX ?? 0)
-      const dy = (selection.offsetY ?? 0)
+      const dx = selection.offsetX
+      const dy = selection.offsetY
       const s = view.scale
-      const left = (selection.bounds.left + dx) * s + 0.5
-      const top = (selection.bounds.top + dy) * s + 0.5
-      const width = (selection.bounds.right - selection.bounds.left + 1) * s - 1
-      const height = (selection.bounds.bottom - selection.bounds.top + 1) * s - 1
-      ctx.save()
-      ctx.strokeStyle = '#000'
-      ctx.setLineDash([4, 3])
-      ctx.lineDashOffset = -antsPhase
-      ctx.strokeRect(left, top, width, height)
-      ctx.restore()
+      drawSelectionOutline(ctx, selection.mask, W, H, s, antsPhase, dx, dy)
       if (selection.floating) {
         const bw = selection.bounds.right - selection.bounds.left + 1
         const bh = selection.bounds.bottom - selection.bounds.top + 1

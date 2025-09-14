@@ -181,3 +181,60 @@ export function drawSelectionOverlay(
   }
   ctx.restore()
 }
+
+export function drawSelectionOutline(
+  ctx: CanvasRenderingContext2D,
+  mask: Uint8Array,
+  W: number,
+  H: number,
+  size: number,
+  phase: number = 0,
+  dx: number = 0,
+  dy: number = 0,
+) {
+  if (!mask) return
+  const s = size
+  ctx.save()
+  ctx.strokeStyle = '#000'
+  ctx.lineWidth = 1
+  ctx.setLineDash([4, 3])
+  ctx.lineDashOffset = -phase
+  ctx.beginPath()
+  // Horizontal edges: top edges where current pixel selected and y==0 or pixel above unselected
+  for (let y = 0; y < H; y++) {
+    const row = y * W
+    for (let x = 0; x < W; x++) {
+      if (!mask[row + x]) continue
+      // top edge
+      if (y === 0 || !mask[row - W + x]) {
+        const X = (x + dx) * s + 0.5
+        const Y = (y + dy) * s + 0.5
+        ctx.moveTo(X, Y)
+        ctx.lineTo(X + s, Y)
+      }
+      // bottom edge
+      if (y === H - 1 || !mask[row + W + x]) {
+        const X = (x + dx) * s + 0.5
+        const Y = (y + 1 + dy) * s - 0.5
+        ctx.moveTo(X, Y)
+        ctx.lineTo(X + s, Y)
+      }
+      // left edge
+      if (x === 0 || !mask[row + x - 1]) {
+        const X = (x + dx) * s + 0.5
+        const Y = (y + dy) * s + 0.5
+        ctx.moveTo(X, Y)
+        ctx.lineTo(X, Y + s)
+      }
+      // right edge
+      if (x === W - 1 || !mask[row + x + 1]) {
+        const X = (x + 1 + dx) * s - 0.5
+        const Y = (y + dy) * s + 0.5
+        ctx.moveTo(X, Y)
+        ctx.lineTo(X, Y + s)
+      }
+    }
+  }
+  ctx.stroke()
+  ctx.restore()
+}
