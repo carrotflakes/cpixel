@@ -37,7 +37,7 @@ export function ColorSection() {
           {recentColors.slice(0, 8).map((c, idx) => (
             <button
               key={mode === 'indexed' ? `${recentIndexed[idx]}` : c}
-              className="h-5 w-5 rounded border border-border/60 hover:border-border focus:outline-none"
+              className="h-5 w-5 rounded border border-border focus:outline-none"
               style={COLOR_BOX_STYLE}
               title={mode === 'indexed' ? `Palette index ${recentIndexed[idx]}` : c}
               onClick={() => {
