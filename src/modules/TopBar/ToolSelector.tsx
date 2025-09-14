@@ -1,5 +1,6 @@
 import { FaEraser } from 'react-icons/fa'
 import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette, LuCheck, LuCircle } from 'react-icons/lu'
+import { RiDragMove2Fill } from 'react-icons/ri'
 import { PiLasso, PiRectangleDashed, PiMagicWand } from 'react-icons/pi'
 import { useAppStore } from '../store'
 import { useState } from 'react'
@@ -216,6 +217,15 @@ export function ToolSelector() {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
+        <button
+          className={`px-2 py-1 text-sm inline-flex items-center gap-1 border-l border-border ${tool === 'move' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+          onClick={() => setTool('move')}
+          aria-pressed={tool === 'move'}
+          title="Move"
+        >
+          <RiDragMove2Fill aria-hidden />
+          <span className="hidden sm:inline">Move</span>
+        </button>
       </div>
     </div>
   )

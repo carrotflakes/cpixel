@@ -10,6 +10,7 @@ import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexe
 import { resizeLayers } from './utils/resize'
 import { flipLayersHorizontal, flipLayersVertical } from './utils/flip'
 import { compositeImageData } from './utils/composite'
+import { translateTruecolor, translateIndexed } from './utils/translate'
 
 const WIDTH = 64
 const HEIGHT = 64
@@ -33,7 +34,7 @@ type Layer = {
   data: Uint32Array | Uint8Array
 }
 
-export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand' | 'pan'
+export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand' | 'move' | 'pan'
 
 export type AppState = {
   width: number
@@ -82,6 +83,7 @@ export type AppState = {
   drawEllipse: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   fillBucket: (x: number, y: number, rgbaOrIndex: number, contiguous: boolean) => void
   setMode: (m: 'truecolor' | 'indexed') => void
+  translateAllLayers: (base: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[], dx: number, dy: number) => void
   selection: {
     mask?: Uint8Array
     bounds?: { left: number; top: number; right: number; bottom: number }
@@ -406,6 +408,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { transparentIndex: clamped }
   }),
   setView: (x, y, scale) => set(() => ({ view: { x, y, scale: clamp(scale, MIN_SCALE, MAX_SCALE) } })),
+  translateAllLayers: (base, dx, dy) => set((s) => {
+    dx |= 0; dy |= 0
+    if (dx === 0 && dy === 0) return {}
+    const W = s.width, H = s.height
+    const ti = s.transparentIndex
+    const layers = base.map(l => {
+      if (l.data instanceof Uint32Array) {
+        return { ...l, data: translateTruecolor(l.data, W, H, dx, dy) }
+      } else {
+        return { ...l, data: translateIndexed(l.data, W, H, dx, dy, ti) }
+      }
+    })
+    return { layers }
+  }),
   setAt: (x, y, rgbaOrIndex) => {
     set((s) => {
       const W = s.width, H = s.height

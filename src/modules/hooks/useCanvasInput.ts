@@ -57,6 +57,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }>({ pointers: [], multiGesture: false, maxPointers: 0, gestureStartTime: 0, gestureMoved: false })
   const mouseStroke = useRef<{ lastX?: number; lastY?: number; active: boolean; erase: boolean }>({ active: false, erase: false })
   const selectionDrag = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
+  const moveDrag = useRef<{ active: boolean; startX: number; startY: number; baseLayers: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[] } | null>(null)
   const rectSelecting = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
   const lassoPath = useRef<{ x: number; y: number }[] | null>(null)
   const state = useRef<null | "firstTouch" | "pinch" | "tool">(null)
@@ -84,6 +85,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   )
   const isShapeTool = () => curTool.current === 'line' || curTool.current === 'rect' || curTool.current === 'ellipse'
   const isSelectionTool = () => curTool.current === 'select-rect' || curTool.current === 'select-lasso' || curTool.current === 'select-wand'
+  const isMoveTool = () => curTool.current === 'move'
   const isBrushishTool = () => curTool.current === 'brush' || curTool.current === 'eraser'
   const isBucketTool = () => curTool.current === 'bucket'
   const isEyedropperTool = () => curTool.current === 'eyedropper'
@@ -128,6 +130,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     // If a selection mask exists and pointer is outside, block starting paint / shape tools (selection tools still allowed)
     if (!isSelectionTool() && selectionMask && !pointInSelection(x, y)) return false
 
+    if (isMoveTool()) {
+      beginStroke()
+      moveDrag.current = { active: true, startX: x, startY: y, baseLayers: layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: l.data instanceof Uint32Array ? new Uint32Array(l.data) : new Uint8Array(l.data) })) }
+      return true
+    }
     if (isSelectionTool()) {
       // drag move if inside selection, else start creating
       if (selectionMask && pointInSelection(x, y)) {
@@ -184,6 +191,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const { x, y } = pickPoint(e.clientX, e.clientY)
 
     if (isSelectionTool()) return
+    if (isMoveTool()) return
     if (isEyedropperTool()) { pickColorAt(x, y); return }
     if (isBucketTool()) return
 
@@ -348,6 +356,12 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       case "tool":
         if (e.pointerId !== toolPointerId.current) return
 
+        if (moveDrag.current?.active) {
+          const dx = x - moveDrag.current.startX
+          const dy = y - moveDrag.current.startY
+          useAppStore.getState().translateAllLayers(moveDrag.current.baseLayers, dx, dy)
+          return
+        }
         // Selection drag/create
         if (selectionDrag.current.active) {
           setSelectionOffset(x - selectionDrag.current.startX, y - selectionDrag.current.startY)
@@ -393,6 +407,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       commitSelectionMove()
       endStroke()
       selectionDrag.current.active = false
+      return
+    }
+    if (moveDrag.current?.active) {
+      moveDrag.current = null
+      endStroke()
       return
     }
     if (rectSelecting.current.active) {
