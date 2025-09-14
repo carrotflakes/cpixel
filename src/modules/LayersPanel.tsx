@@ -1,7 +1,8 @@
 import { useAppStore } from './store'
-import { LuEye, LuEyeOff, LuArrowUp, LuArrowDown, LuPlus, LuTrash2, LuCopy } from 'react-icons/lu'
+import { LuEye, LuEyeOff, LuArrowUp, LuArrowDown, LuPlus, LuTrash2, LuCopy, LuEraser } from 'react-icons/lu'
 import { FaLock, FaLockOpen } from 'react-icons/fa'
 import { useState } from 'react'
+import { RCMenuRoot, RCMenuTrigger, RCMenuContent, RCMenuItem, RCMenuSeparator } from './ui/RadixContextMenu'
 
 export function LayersPanel() {
   const layers = useAppStore(s => s.layers)
@@ -13,6 +14,7 @@ export function LayersPanel() {
   const setActive = useAppStore(s => s.setActiveLayer)
   const toggleVisible = useAppStore(s => s.toggleVisible)
   const toggleLocked = useAppStore(s => s.toggleLocked)
+  const clearLayer = useAppStore(s => s.clearLayer)
 
   const [collapsed, setCollapsed] = useState(false)
 
@@ -40,19 +42,38 @@ export function LayersPanel() {
         {layers.toReversed().map((l, i) => {
           const idx = layers.length - 1 - i
           return (
-            <div key={l.id} className={`flex items-center gap-2 px-2 py-1 text-sm cursor-pointer ${l.id === active ? 'bg-accent/10' : ''}`} onClick={() => setActive(l.id)}>
-              <button className="p-1 rounded" title={l.visible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); toggleVisible(l.id) }}>
-                {l.visible ? <LuEye /> : <LuEyeOff />}
-              </button>
-              <button className="p-1 rounded" title={l.locked ? 'Unlock' : 'Lock'} onClick={(e) => { e.stopPropagation(); toggleLocked(l.id) }}>
-                {l.locked ? <FaLock /> : <FaLockOpen />}
-              </button>
-              <div className="flex-1 truncate">{l.id}</div>
-              <div className="flex flex-col">
-                <button className="p-1 rounded disabled:opacity-50" title="Down" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.min(layers.length - 1, idx + 1)) }}><LuArrowUp /></button>
-                <button className="p-1 rounded disabled:opacity-50" title="Up" disabled={i === layers.length - 1} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.max(0, idx - 1)) }}><LuArrowDown /></button>
-              </div>
-            </div>
+            <RCMenuRoot key={l.id}>
+              <RCMenuTrigger asChild>
+                <div className={`flex items-center gap-2 px-2 py-1 text-sm cursor-pointer ${l.id === active ? 'bg-accent/10' : ''}`} onClick={() => setActive(l.id)}>
+                  <button className="p-1 rounded" title={l.visible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); toggleVisible(l.id) }}>
+                    {l.visible ? <LuEye /> : <LuEyeOff />}
+                  </button>
+                  <button className="p-1 rounded" title={l.locked ? 'Unlock' : 'Lock'} onClick={(e) => { e.stopPropagation(); toggleLocked(l.id) }}>
+                    {l.locked ? <FaLock /> : <FaLockOpen />}
+                  </button>
+                  <div className="flex-1 truncate">{l.id}</div>
+                  <div className="flex flex-col">
+                    <button className="p-1 rounded disabled:opacity-50" title="Down" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.min(layers.length - 1, idx + 1)) }}><LuArrowUp /></button>
+                    <button className="p-1 rounded disabled:opacity-50" title="Up" disabled={i === layers.length - 1} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.max(0, idx - 1)) }}><LuArrowDown /></button>
+                  </div>
+                </div>
+              </RCMenuTrigger>
+              <RCMenuContent>
+                <RCMenuItem onSelect={() => { if (active !== l.id) setActive(l.id); clearLayer() }}>
+                  <LuEraser aria-hidden />
+                  <span>Clear</span>
+                </RCMenuItem>
+                <RCMenuSeparator />
+                <RCMenuItem onSelect={() => duplicateLayer(l.id)}>
+                  <LuCopy aria-hidden />
+                  <span>Duplicate Layer</span>
+                </RCMenuItem>
+                <RCMenuItem danger disabled={layers.length <= 1} onSelect={() => { if (layers.length <= 1) return; removeLayer(l.id) }}>
+                  <LuTrash2 aria-hidden />
+                  <span>Delete Layer</span>
+                </RCMenuItem>
+              </RCMenuContent>
+            </RCMenuRoot>
           )
         })}
       </div>
