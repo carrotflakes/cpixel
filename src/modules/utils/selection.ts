@@ -128,7 +128,7 @@ export function applyFloatingToIndexedLayer(dst: Uint8Array, floating: Uint32Arr
       const X = dstLeft + x
       const Y = dstTop + y
       if (X < 0 || Y < 0 || X >= W || Y >= H) continue
-      const pi = nearestIndexInPalette(palette, pix, transparentIndex)
+      const pi = nearestIndexInPalette(palette, transparentIndex, pix)
       out[Y * W + X] = pi & 0xff
     }
   }

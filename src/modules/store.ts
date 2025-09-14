@@ -229,7 +229,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (s.mode === 'indexed') {
       // In indexed, pick nearest palette index and sync color/index
       const rgba = parseCSSColor(c)
-      const idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+      const idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
       const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
       return { color: hex, currentPaletteIndex: idx }
     }
@@ -246,7 +246,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       let idx = s.currentPaletteIndex
       if (idx === undefined) {
         const rgba = parseCSSColor(s.color)
-        idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+        idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
       }
       if (idx === undefined) return {}
       const existing = s.recentColorsIndexed ?? []
@@ -288,7 +288,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     else if (ci > idx) ci = ci - 1
     // remap indices for all layers
     const layers = s.layers.map(l => {
-      if (l.data instanceof Uint8Array) return l
+      if (!(l.data instanceof Uint8Array)) return l
       const src = l.data
       const dst = new Uint8Array(src.length)
       for (let k = 0; k < src.length; k++) {
@@ -326,7 +326,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     // remap indices for all layers
     const layers = s.layers.map(l => {
-      if (l.data instanceof Uint8Array) return l
+      if (!(l.data instanceof Uint8Array)) return l
       const src = l.data
       const dst = new Uint8Array(src.length)
       for (let k = 0; k < src.length; k++) dst[k] = map[src[k]]
@@ -348,13 +348,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const limited = colors.slice(0, 256)
     if (limited.length === 0) limited[0] = 0x00000000
     const palette = new Uint32Array(limited)
-    const transparentIndex = Math.max(0, Math.min(ti | 0, palette.length - 1))
-
+    if (ti < 0 || ti >= palette.length) ti = 0
 
     // Remap indices by nearest color in the new palette
-    const remap = s.palette.map((c, i) => i === s.transparentIndex ? ti : nearestIndexInPalette(palette, c, transparentIndex))
+    const remap = s.palette.map((c, i) => i === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, c))
     const layers = s.layers.map(l => {
-      if (l.data instanceof Uint8Array) return l
+      if (!(l.data instanceof Uint8Array)) return l
       const src = l.data
       const dst = new Uint8Array(src.length)
       for (const i in src) {
@@ -365,14 +364,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // choose current index nearest to previous selected color
     const prevRGBA = s.palette[s.currentPaletteIndex ?? s.transparentIndex] ?? 0x00000000
-    const curIdx = s.currentPaletteIndex === s.transparentIndex ? ti : nearestIndexInPalette(palette, prevRGBA, transparentIndex)
+    const curIdx = s.currentPaletteIndex === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, prevRGBA)
     const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
 
     const recentColorsIndexed = s.recentColorsIndexed
-      .map(i => (i === s.transparentIndex ? ti : nearestIndexInPalette(palette, s.palette[i] ?? 0x00000000, transparentIndex)))
+      .map(i => (i === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, s.palette[i] ?? 0x00000000)))
       .filter((v, i, a) => a.indexOf(v) === i) // dedupe
 
-    return { palette, transparentIndex, layers, currentPaletteIndex: curIdx, color: colorHex, recentColorsIndexed }
+    return { palette, transparentIndex: ti, layers, currentPaletteIndex: curIdx, color: colorHex, recentColorsIndexed }
   }),
   addPaletteColor: (rgba) => {
     const s = get()
@@ -725,7 +724,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           for (let x = 0; x < bw; x++) {
             const rgba = sel.floating[y * bw + x] >>> 0
             if ((rgba & 0xff) === 0) { idxOut[y * bw + x] = s.transparentIndex & 0xff; continue }
-            const pi = nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+            const pi = nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
             idxOut[y * bw + x] = pi & 0xff
           }
         }
@@ -772,7 +771,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           for (let x = 0; x < bw; x++) {
             const rgba = sel.floating[y * bw + x] >>> 0
             if ((rgba & 0xff) === 0) { idxOut[y * bw + x] = s.transparentIndex & 0xff; continue }
-            const pi = nearestIndexInPalette(s.palette, rgba, s.transparentIndex)
+            const pi = nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
             idxOut[y * bw + x] = pi & 0xff
           }
         }
