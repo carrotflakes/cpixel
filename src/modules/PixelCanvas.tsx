@@ -266,22 +266,28 @@ function useTiltParallax(
   const ENABLED = options?.enabled ?? true
   const SHIFT_TRIGGER = options?.trigger ?? 180
   const STOP_ROTATION = SHIFT_TRIGGER * 0.25
-  const DAMPING = options?.damping ?? 0.01
+  const DAMPING1 = 0.75
+  const DAMPING2 = options?.damping ?? 0.001
   const MIN_MAG = 1.0
   const AMOUNT = options?.amount ?? 0.5
 
   const [active, setActive] = useState(false)
   const shiftOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
   const [shiftTick, setShiftTick] = useState(0)
-  const rafShift = useRef<number>(0)
+  const loopActive = useRef(false)
 
-  const dampLoop = useRef<() => void>(() => { })
-  dampLoop.current = () => {
-    const time = performance.now()
-    rafShift.current = requestAnimationFrame(() => {
-      setShiftTick(t => t + 1)
+  const startLoop = () => {
+    if (loopActive.current) return
+    loopActive.current = true
+    let time = performance.now()
+    let lastRotationAt = time
+    const f = () => {
+      setShiftTick(t => (t + 1) % 1000000)
+      if (!loopActive.current) return
 
-      const elapsed = performance.now() - time
+      const now = performance.now()
+      const elapsed = now - time
+      time = now
       const dt = elapsed / 1000
 
       const { beta, alpha } = rotationRateRef.current
@@ -289,21 +295,27 @@ function useTiltParallax(
       dx += beta * AMOUNT * dt
       dy += alpha * AMOUNT * dt
 
-      const damp = Math.pow(DAMPING, dt)
+      const isStopRotation = Math.abs(beta) + Math.abs(alpha) < STOP_ROTATION
+      if (!isStopRotation)
+        lastRotationAt = now
+      const elapsedSinceStop = now - lastRotationAt
+
+      const damp = Math.pow(elapsedSinceStop < 200 ? DAMPING1 : DAMPING2, dt)
       dx *= damp
       dy *= damp
 
-      // Stop
-      if (Math.abs(dx) + Math.abs(dy) < MIN_MAG && Math.abs(beta) + Math.abs(alpha) < STOP_ROTATION) {
+      // End
+      if (Math.abs(dx) + Math.abs(dy) < MIN_MAG && isStopRotation) {
         shiftOffsetRef.current = { dx: 0, dy: 0 }
         setActive(false)
-        rafShift.current = 0
+        loopActive.current = false
         return
       }
 
       shiftOffsetRef.current = { dx, dy }
-      dampLoop.current()
-    })
+      requestAnimationFrame(f)
+    }
+    f()
   }
 
   // Trigger on threshold crossing when inactive
@@ -314,11 +326,10 @@ function useTiltParallax(
     if (Math.abs(alpha) + Math.abs(beta) < SHIFT_TRIGGER) return
 
     setActive(true)
-    if (!rafShift.current) dampLoop.current()
-    setShiftTick(0)
+    startLoop()
   }, [rotationRate.alpha, rotationRate.beta, active, SHIFT_TRIGGER, ENABLED])
 
-  useEffect(() => () => { if (rafShift.current) cancelAnimationFrame(rafShift.current) }, [])
+  useEffect(() => () => { loopActive.current = false }, [])
 
   return { active, shiftOffsetRef, shiftTick }
 }
