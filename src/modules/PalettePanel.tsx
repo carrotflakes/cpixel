@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { rgbaToCSSHex, parseCSSColor } from './utils/color'
-import { useAppStore } from './store'
-import { LuPin, LuArrowUp, LuArrowDown, LuTrash2, LuChevronDown, LuChevronUp } from 'react-icons/lu'
-import { ColorPicker } from './ColorPicker'
-import { RCMenuRoot, RCMenuTrigger, RCMenuContent, RCMenuItem, RCMenuSeparator } from './ui/RadixContextMenu'
-import { PalettePresetsDialog } from './PalettePresetsDialog'
+import { useRef, useState } from 'react'
+import { LuArrowDown, LuArrowUp, LuChevronDown, LuChevronUp, LuPin, LuTrash2 } from 'react-icons/lu'
 import { COLOR_BOX_STYLE, ColorBoxInner } from './ColorBox'
+import { ColorPicker } from './ColorPicker'
+import { PalettePresetsDialog } from './PalettePresetsDialog'
+import { useAppStore } from './store'
+import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from './ui/RadixContextMenu'
+import { parseCSSColor, rgbaToCSSHex } from './utils/color'
+import { useUIState } from './useUiStore'
 
 export function PalettePanel() {
   const mode = useAppStore(s => s.mode)
@@ -22,9 +23,7 @@ export function PalettePanel() {
 
   const panelRef = useRef<HTMLDivElement | null>(null)
   const [presetsOpen, setPresetsOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('paletteCollapsed') === '1' } catch { return false }
-  })
+  const [collapsed, setCollapsed] = useUIState('palettePanelCollapsed', false)
   const longPressRef = useRef<{ timer?: number; index?: number } | null>({})
   const suppressClickRef = useRef(false)
   const touchStartPos = useRef<{ x: number; y: number } | null>(null)
@@ -32,13 +31,6 @@ export function PalettePanel() {
 
   // Track last context menu position (for opening Edit color picker near pointer)
   const lastContextPos = useRef<{ x: number; y: number } | null>(null)
-
-  // Persist collapse state and close popovers when collapsing
-  useEffect(() => {
-    try { localStorage.setItem('paletteCollapsed', collapsed ? '1' : '0') } catch { }
-    if (collapsed) { setPresetsOpen(false); setEdit(null) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapsed])
 
   if (mode !== 'indexed') return null
 

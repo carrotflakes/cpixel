@@ -4,6 +4,7 @@ import { parseCSSColor, rgbaToCSSHex, unpackRGBA, packRGBA } from './utils/color
 import { ColorBox } from './ColorBox'
 import { PALETTE_PRESETS } from './presets/palettes'
 import { LuChevronDown, LuChevronUp } from 'react-icons/lu'
+import { useUIState } from './useUiStore'
 
 type Props = {
   color: string
@@ -59,8 +60,8 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
   const rgba = useMemo(() => unpackRGBA(parseCSSColor(color)), [color])
   const [hsv, setHSV] = useState<HSV>(() => rgbToHsv(rgba.r, rgba.g, rgba.b, rgba.a / 255))
   const [hexInput, setHexInput] = useState<string>('')
-  const [showPreset, setShowPreset] = useState(true)
-  const [presetId, setPresetId] = useState<string>(() => PALETTE_PRESETS[0]?.id || '')
+  const [showPreset, setShowPreset] = useUIState('colorPickerShowPreset', false)
+  const [presetId, setPresetId] = useUIState('colorPickerPresetId', PALETTE_PRESETS[0]?.id ?? '')
   const rootRef = useRef<HTMLDivElement | null>(null)
   const svRef = useRef<HTMLDivElement | null>(null)
   const hueRef = useRef<HTMLDivElement | null>(null)

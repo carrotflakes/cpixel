@@ -1,8 +1,8 @@
-import { useAppStore } from './store'
-import { LuEye, LuEyeOff, LuArrowUp, LuArrowDown, LuPlus, LuTrash2, LuCopy, LuEraser } from 'react-icons/lu'
 import { FaLock, FaLockOpen } from 'react-icons/fa'
-import { useState } from 'react'
-import { RCMenuRoot, RCMenuTrigger, RCMenuContent, RCMenuItem, RCMenuSeparator } from './ui/RadixContextMenu'
+import { LuArrowDown, LuArrowUp, LuCopy, LuEraser, LuEye, LuEyeOff, LuPlus, LuTrash2 } from 'react-icons/lu'
+import { useAppStore } from './store'
+import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from './ui/RadixContextMenu'
+import { useUIState } from './useUiStore'
 
 export function LayersPanel() {
   const layers = useAppStore(s => s.layers)
@@ -16,7 +16,7 @@ export function LayersPanel() {
   const toggleLocked = useAppStore(s => s.toggleLocked)
   const clearLayer = useAppStore(s => s.clearLayer)
 
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useUIState('layersPanelCollapsed', false)
 
   if (collapsed) {
     return (
