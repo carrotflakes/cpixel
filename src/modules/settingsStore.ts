@@ -15,6 +15,8 @@ export type SettingsState = {
   setTiltParallaxAlpha: (n: number) => void
   rightClickTool: ToolType
   setRightClickTool: (t: ToolType) => void
+  usePen: boolean
+  setUsePen: (v: boolean) => void
 }
 
 const KEY = 'cpixel.settings.v1'
@@ -46,10 +48,12 @@ export const useSettingsStore = create<SettingsState>()(
       },
       rightClickTool: 'eraser',
       setRightClickTool: (t) => set({ rightClickTool: t }),
+      usePen: false,
+      setUsePen: (v: boolean) => set({ usePen: !!v }),
     }),
     {
       name: KEY,
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         checkerSize: s.checkerSize,
@@ -58,9 +62,10 @@ export const useSettingsStore = create<SettingsState>()(
         tiltParallaxAmount: s.tiltParallaxAmount,
         tiltParallaxAlpha: s.tiltParallaxAlpha,
         rightClickTool: s.rightClickTool,
+        usePen: s.usePen,
       }),
       migrate: (persisted: any, _fromVersion) => {
-        const state = { checkerSize: 4, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5, tiltParallaxAlpha: 0.9, rightClickTool: 'eraser' }
+        const state = { checkerSize: 4, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5, tiltParallaxAlpha: 0.9, rightClickTool: 'eraser', usePen: false }
         if (!persisted || typeof persisted !== 'object') return state
         if (typeof persisted.checkerSize === 'number') state.checkerSize = persisted.checkerSize
         if (typeof persisted.tiltParallaxEnabled === 'boolean') state.tiltParallaxEnabled = persisted.tiltParallaxEnabled
@@ -68,6 +73,7 @@ export const useSettingsStore = create<SettingsState>()(
         if (typeof persisted.tiltParallaxAmount === 'number') state.tiltParallaxAmount = persisted.tiltParallaxAmount
         if (typeof persisted.tiltParallaxAlpha === 'number') state.tiltParallaxAlpha = persisted.tiltParallaxAlpha
         if (typeof persisted.rightClickTool === 'string') state.rightClickTool = persisted.rightClickTool
+        if (typeof persisted.usePen === 'boolean') state.usePen = persisted.usePen
         return state
       },
     }

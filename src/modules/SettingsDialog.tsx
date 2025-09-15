@@ -16,12 +16,15 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const setTiltAlpha = useSettingsStore(s => s.setTiltParallaxAlpha)
   const rightClickTool = useSettingsStore(s => s.rightClickTool)
   const setRightClickTool = useSettingsStore(s => s.setRightClickTool)
+  const usePen = useSettingsStore(s => s.usePen)
+  const setUsePen = useSettingsStore(s => s.setUsePen)
   const [checkerStr, setCheckerStr] = useState(String(checkerSize))
   const [tiltTriggerStr, setTiltTriggerStr] = useState(String(tiltTrigger))
   const [tiltAmountStr, setTiltAmountStr] = useState(String(tiltAmount))
   const [tiltAlphaStr, setTiltAlphaStr] = useState(String(tiltAlpha))
   const [rightClickToolLocal, setRightClickToolLocal] = useState(rightClickTool)
   const [tiltEnabledLocal, setTiltEnabledLocal] = useState<boolean>(tiltEnabled)
+  const [usePenLocal, setUsePenLocal] = useState<boolean>(usePen)
   const firstRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -32,9 +35,10 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     setTiltAmountStr(String(tiltAmount))
     setTiltAlphaStr(String(tiltAlpha))
     setRightClickToolLocal(rightClickTool)
+    setUsePenLocal(usePen)
     const t = setTimeout(() => firstRef.current?.focus(), 0)
     return () => clearTimeout(t)
-  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount, tiltAlpha, rightClickTool])
+  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount, tiltAlpha, rightClickTool, usePen])
 
   useEffect(() => {
     if (!open) return
@@ -69,6 +73,7 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     }
     setTiltEnabled(tiltEnabledLocal)
     setRightClickTool(rightClickToolLocal)
+    setUsePen(usePenLocal)
     onClose()
   }
 
@@ -109,6 +114,15 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
                 <option value="bucket">bucket</option>
                 <option value="pan">pan</option>
               </select>
+            </label>
+            <label className="flex items-center gap-2 select-none">
+              <input
+                type="checkbox"
+                checked={usePenLocal}
+                onChange={(e) => setUsePenLocal(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <span className="text-sm">Pen mode</span>
             </label>
           </div>
           <fieldset className="flex flex-col gap-3 border border-border rounded p-3 max-w-[26rem]">

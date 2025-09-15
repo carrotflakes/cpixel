@@ -38,6 +38,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const commitSelectionMove = useAppStore(s => s.commitSelectionMove)
   const W = useAppStore(s => s.width)
   const H = useAppStore(s => s.height)
+  const settings = useSettingsStore()
 
   const TOUCH_MOVE_DIST_THRESHOLD = 5 * window.devicePixelRatio
 
@@ -122,7 +123,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       touchState.current.pointers.push({ id: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY })
   }
 
-  const startTool = (x: number, y: number, e: { button: number, shiftKey: boolean }) => {
+  const startTool_ = (e: { x?: number, y?: number, clientX?: number, clientY?: number, button: number, shiftKey: boolean }) => {
+    const { x, y } = e.x !== undefined && e.y !== undefined ? { x: e.x, y: e.y } : pickPoint(e.clientX!, e.clientY!)
+
     if (isEyedropperTool()) { pickColorAt(x, y); return true }
 
     if (!inBounds(x, y)) return false
@@ -185,6 +188,23 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     }
   }
 
+  const startTool = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    firstTouch.current = null
+    state.current = 'tool'
+    toolPointerId.current = e.pointerId
+
+    if (curTool.current === 'pan') {
+      panState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
+      if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
+      return
+    }
+
+    if (startTool_(e)) {
+      return
+    }
+    onPointer(e)
+  }
+
   const onPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (touchState.current.multiGesture) return
 
@@ -214,7 +234,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     switch (state.current) {
       case null:
-        curTool.current = e.button === 2 ? useSettingsStore.getState().rightClickTool : useAppStore.getState().tool
+        curTool.current = e.button === 2 ? settings.rightClickTool : useAppStore.getState().tool
         if (e.altKey) curTool.current = 'eyedropper'
         if (e.button === 1 || (e.button === 0 && e.ctrlKey)) curTool.current = 'pan'
 
@@ -225,22 +245,14 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
           firstTouch.current = { pointerId: e.pointerId, x, y, clientX: e.clientX, clientY: e.clientY, button: e.button, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey }
         } else {
-          state.current = 'tool'
-          toolPointerId.current = e.pointerId
-
-          if (curTool.current === 'pan') {
-            panState.current = { lastX: e.clientX, lastY: e.clientY, panning: true }
-            if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
-            return
-          }
-
-          if (startTool(x, y, e)) {
-            return
-          }
-          onPointer(e)
+          startTool(e)
         }
         return
       case "firstTouch":
+        if (e.pointerType === 'pen') {
+          startTool(e)
+          return
+        }
         if (e.pointerType === 'touch') {
           addPointer(e)
           if (touchState.current.pointers.length === 2) {
@@ -286,6 +298,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           if (dist < TOUCH_MOVE_DIST_THRESHOLD)
             return
 
+          if (settings.usePen)
+            return
+
           firstTouch.current = null
           state.current = 'tool'
           toolPointerId.current = e.pointerId
@@ -296,7 +311,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             return
           }
 
-          if (startTool(f.x, f.y, e)) {
+          if (startTool_(f)) {
             return
           }
           onPointer(e)
@@ -468,10 +483,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         if (f?.pointerId === e.pointerId) {
           firstTouch.current = null
 
-          if (curTool.current === 'pan')
+          if (settings.usePen)
             return
-          if (!startTool(f.x, f.y, e))
-            onPointer(e)
 
           endTool()
         }
