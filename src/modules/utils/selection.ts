@@ -46,6 +46,17 @@ export function polygonToMask(W: number, H: number, points: Point[]) {
   return { mask, bounds: { left, top, right, bottom } }
 }
 
+export function oddMask(W: number, H: number) {
+  const mask = new Uint8Array(W * H)
+  for (let y = 0; y < H; y++) {
+    const row = y * W
+    for (let x = 0; x < W; x++) {
+      if (((x + y) & 1) === 1) mask[row + x] = 1
+    }
+  }
+  return { mask, bounds: { left: 0, top: 0, right: W - 1, bottom: H - 1 } }
+}
+
 export function isPointInMask(mask: Uint8Array | undefined, W: number, H: number, x: number, y: number) {
   if (!mask) return false
   if (x < 0 || y < 0 || x >= W || y >= H) return false

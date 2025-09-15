@@ -6,6 +6,7 @@ import { SettingsDialog } from '../SettingsDialog'
 import { useAppStore } from '../store'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { GoogleDrive } from '../utils/googleDrive'
+import { oddMask } from '../utils/selection'
 
 export function MoreMenu() {
   // store selectors
@@ -127,6 +128,25 @@ export function MoreMenu() {
                   <LuFlipVertical aria-hidden />
                   <span>Flip vertical</span>
                 </DropdownMenu.Item>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
+            {/* Select submenu */}
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className={itemCls}>
+                <span>Select</span>
+                <LuChevronRight className="ml-auto" aria-hidden />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => {
+                  const state = useAppStore.getState()
+                  state.setSelectionRect(0, 0, state.width - 1, state.height - 1)
+                  setOpen(false)
+                }}>Select All</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => {
+                  const {mask, bounds} = oddMask(curW, curH)
+                  useAppStore.getState().setSelectionMask(mask, bounds)
+                  setOpen(false)
+                }}>Select Odd</DropdownMenu.Item>
               </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
             {/* Import submenu */}
