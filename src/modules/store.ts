@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useLogStore } from './logStore'
 import { clamp } from './utils/view'
 import { nearestIndexInPalette, parseCSSColor, rgbaToCSSHex } from './utils/color'
 import { generatePaletteFromComposite } from './utils/palette'
@@ -727,13 +728,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!sel?.bounds) return {}
     const bw = sel.bounds.right - sel.bounds.left + 1
     const bh = sel.bounds.bottom - sel.bounds.top + 1
+    const patch: Partial<AppState> = {}
     if (sel.floating) {
       if (s.mode === 'truecolor') {
-        return { clipboard: { kind: 'rgba', pixels: sel.floating.slice(0), width: bw, height: bh } }
+        patch.clipboard = { kind: 'rgba', pixels: sel.floating.slice(0), width: bw, height: bh }
+      } else if (sel.floatingIndices) {
+        patch.clipboard = { kind: 'indexed', indices: sel.floatingIndices.slice(0), width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
       } else {
-        if (sel.floatingIndices) {
-          return { clipboard: { kind: 'indexed', indices: sel.floatingIndices.slice(0), width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex } }
-        }
         const idxOut = new Uint8Array(bw * bh)
         for (let y = 0; y < bh; y++) {
           for (let x = 0; x < bw; x++) {
@@ -743,7 +744,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             idxOut[y * bw + x] = pi & 0xff
           }
         }
-        return { clipboard: { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex } }
+        patch.clipboard = { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
       }
     }
     const W = s.width
@@ -753,7 +754,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (s.mode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
       const float = extractFloatingTruecolor(layer.data, sel.mask, sel.bounds, W)
-      return { clipboard: { kind: 'rgba', pixels: float, width: bw, height: bh } }
+      patch.clipboard = { kind: 'rgba', pixels: float, width: bw, height: bh }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       const ti = s.transparentIndex
@@ -766,21 +767,25 @@ export const useAppStore = create<AppState>((set, get) => ({
           outIdx[fi] = (!sel.mask || sel.mask[i]) ? (layer.data[i] ?? ti) : (ti & 0xff)
         }
       }
-      return { clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } }
+      patch.clipboard = { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }
     }
+    useLogStore.getState().pushLog({ message: 'Copied selection' })
+    return patch
   }),
   cutSelection: () => set((s) => {
     const sel = s.selection
     if (!sel || !sel.bounds) return {}
     const bw = sel.bounds.right - sel.bounds.left + 1
     const bh = sel.bounds.bottom - sel.bounds.top + 1
+    const patch: Partial<AppState> = {
+      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }
+    }
     if (sel.floating) {
       if (s.mode === 'truecolor') {
-        return { clipboard: { kind: 'rgba', pixels: sel.floating.slice(0), width: bw, height: bh }, selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+        patch.clipboard = { kind: 'rgba', pixels: sel.floating.slice(0), width: bw, height: bh }
+      } else if (sel.floatingIndices) {
+        patch.clipboard = { kind: 'indexed', indices: sel.floatingIndices.slice(0), width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
       } else {
-        if (sel.floatingIndices) {
-          return { clipboard: { kind: 'indexed', indices: sel.floatingIndices.slice(0), width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }, selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
-        }
         const idxOut = new Uint8Array(bw * bh)
         for (let y = 0; y < bh; y++) {
           for (let x = 0; x < bw; x++) {
@@ -790,7 +795,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             idxOut[y * bw + x] = pi & 0xff
           }
         }
-        return { clipboard: { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }, selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+        patch.clipboard = { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
       }
     }
     const W = s.width
@@ -804,7 +809,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
-      return nextPartialState(s, { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'rgba', pixels: float, width: bw, height: bh } })
+      patch.layers = layers
+      patch.clipboard = { kind: 'rgba', pixels: float, width: bw, height: bh }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       const ti = s.transparentIndex
@@ -812,8 +818,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       const outIdx = extractFloatingIndexed(layer.data, sel.mask, sel.bounds, W, ti)
-      return nextPartialState(s, { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }, layers, clipboard: { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti } })
+      patch.layers = layers
+      patch.clipboard = { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }
     }
+    useLogStore.getState().pushLog({ message: 'Cut selection' })
+    return nextPartialState(s, patch)
   }),
   pasteClipboard: () => set((s) => {
     const clip = s.clipboard
@@ -931,7 +940,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const prev = s._undo[s._undo.length - 1]
     const undo = s._undo.slice(0, -1)
     const snap = createSnapshot(s)
-    return {
+    const patch: Partial<AppState> = {
       width: prev.width,
       height: prev.height,
       mode: prev.mode,
@@ -951,13 +960,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       dirty: true,
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
+    useLogStore.getState().pushLog({ message: 'UNDO' })
+    return patch
   }),
   redo: () => set((s) => {
     if (!s._redo || s._redo.length === 0) return {}
     const next = s._redo[s._redo.length - 1]
     const redo = s._redo.slice(0, -1)
     const snap = createSnapshot(s)
-    return {
+    const patch: Partial<AppState> = {
       width: next.width,
       height: next.height,
       mode: next.mode,
@@ -977,6 +988,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       dirty: true,
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     }
+    useLogStore.getState().pushLog({ message: 'REDO' })
+    return patch
   }),
   clearLayer: () => set((s) => {
     const W = s.width, H = s.height

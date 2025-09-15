@@ -1,4 +1,5 @@
 import { FileMeta, useAppStore } from './store'
+import { useLogStore } from './logStore'
 
 // Simple localStorage autosave / restore
 // - Periodic save (every 10s)
@@ -70,6 +71,7 @@ function restore() {
     const data = JSON.parse(raw)
     if (data && data.app === 'cpixel') {
       useAppStore.getState().importJSON(data, data.fileMeta)
+      useLogStore.getState().pushLog({ message: 'Autosave restored' })
     }
   } catch {
     // ignore corrupt

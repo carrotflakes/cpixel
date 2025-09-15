@@ -7,6 +7,7 @@ import { useAppStore } from '../store'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { GoogleDrive } from '../utils/googleDrive'
 import { oddMask } from '../utils/selection'
+import { useLogStore } from '../logStore'
 
 export function MoreMenu() {
   // store selectors
@@ -143,7 +144,7 @@ export function MoreMenu() {
                   setOpen(false)
                 }}>Select All</DropdownMenu.Item>
                 <DropdownMenu.Item className={itemCls} onSelect={() => {
-                  const {mask, bounds} = oddMask(curW, curH)
+                  const { mask, bounds } = oddMask(curW, curH)
                   useAppStore.getState().setSelectionMask(mask, bounds)
                   setOpen(false)
                 }}>Select Odd</DropdownMenu.Item>
@@ -387,7 +388,11 @@ async function saveProjectToGoogleDrive(filename: string, fileId?: string): Prom
     recentColorsIndexed: recentColorsIndexed ?? [],
   }
   const name = filename && /\.json$/i.test(filename) ? filename : `${filename || 'cpixel'}.json`
-  return await GoogleDrive.saveJSON(name, payload, fileId)
+  const result = await GoogleDrive.saveJSON(name, payload, fileId)
+
+  useLogStore.getState().pushLog({ message: 'Saved to Google Drive' })
+
+  return result
 }
 
 async function handleDriveSignIn(setDriveError: (s: string | null) => void, setDriveOpen: (s: any) => void) {
