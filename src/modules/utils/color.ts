@@ -51,7 +51,7 @@ const dist2 = (a: RGBA, b: RGBA) => {
 
 export function nearestIndexInPalette(palette: Uint32Array, transparentIndex: number, rgba: number): number {
   const c = unpackRGBA(rgba)
-  if (c.r === 0) return transparentIndex
+  if (c.a === 0) return transparentIndex
   let best = transparentIndex
   let bestD = Number.POSITIVE_INFINITY
   for (let i = 0; i < palette.length; i++) {
