@@ -4,7 +4,7 @@ import { parseCSSColor, rgbaToCSSHex, unpackRGBA, packRGBA } from './utils/color
 import { ColorBox } from './ColorBox'
 import { PALETTE_PRESETS } from './presets/palettes'
 import { LuChevronDown, LuChevronUp } from 'react-icons/lu'
-import { useUIState } from './useUiStore'
+import { useUIState } from './stores/useUiStore'
 
 type Props = {
   color: string

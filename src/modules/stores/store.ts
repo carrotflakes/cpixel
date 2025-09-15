@@ -1,17 +1,17 @@
 import { create } from 'zustand'
 import { useLogStore } from './logStore'
-import { clamp } from './utils/view'
-import { nearestIndexInPalette, parseCSSColor, rgbaToCSSHex } from './utils/color'
-import { generatePaletteFromComposite } from './utils/palette'
-import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
-import { normalizeImportedJSON } from './utils/io'
-import { equalU32, equalU8 } from './utils/arrays'
-import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed, drawEllipseOutlineTruecolor, drawEllipseOutlineIndexed, drawEllipseFilledTruecolor, drawEllipseFilledIndexed } from './utils/paint'
-import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard, fillSelectedTruecolor, fillSelectedIndexed, rectToMask } from './utils/selection'
-import { resizeLayers } from './utils/resize'
-import { flipLayersHorizontal, flipLayersVertical } from './utils/flip'
-import { compositeImageData } from './utils/composite'
-import { translateTruecolor, translateIndexed } from './utils/translate'
+import { clamp } from '../utils/view.ts'
+import { nearestIndexInPalette, parseCSSColor, rgbaToCSSHex } from '../utils/color.ts'
+import { generatePaletteFromComposite } from '../utils/palette.ts'
+import { floodFillIndexed, floodFillTruecolor } from '../utils/fill.ts'
+import { normalizeImportedJSON } from '../utils/io.ts'
+import { equalU32, equalU8 } from '../utils/arrays.ts'
+import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed, drawEllipseOutlineTruecolor, drawEllipseOutlineIndexed, drawEllipseFilledTruecolor, drawEllipseFilledIndexed } from '../utils/paint.ts'
+import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard, fillSelectedTruecolor, fillSelectedIndexed, rectToMask } from '../utils/selection.ts'
+import { resizeLayers } from '../utils/resize.ts'
+import { flipLayersHorizontal, flipLayersVertical } from '../utils/flip.ts'
+import { compositeImageData } from '../utils/composite.ts'
+import { translateTruecolor, translateIndexed } from '../utils/translate.ts'
 
 const WIDTH = 64
 const HEIGHT = 64
@@ -1049,7 +1049,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   exportAse: async () => {
     const { mode, layers, palette, transparentIndex, width, height } = get()
     try {
-      const { encodeAseprite } = await import('./utils/aseprite.ts')
+      const { encodeAseprite } = await import('../utils/aseprite.ts')
       const buffer = encodeAseprite({
         width,
         height,
@@ -1116,7 +1116,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   importAse: async (buffer: ArrayBuffer, fileMeta?: FileMeta) => {
     try {
-      const { decodeAseprite, aseToCpixel } = await import('./utils/aseprite.ts')
+      const { decodeAseprite, aseToCpixel } = await import('../utils/aseprite.ts')
       const parsed = await decodeAseprite(buffer, { preserveIndexed: true })
       if (!parsed) return
       const converted = aseToCpixel(parsed)

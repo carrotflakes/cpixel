@@ -2,7 +2,7 @@ import { FaEraser } from 'react-icons/fa'
 import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette, LuCheck, LuCircle } from 'react-icons/lu'
 import { RiDragMove2Fill } from 'react-icons/ri'
 import { PiLasso, PiRectangleDashed, PiMagicWand } from 'react-icons/pi'
-import { useAppStore } from '../store'
+import { useAppStore } from '../stores/store'
 import { useState } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 

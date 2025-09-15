@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
-import { useAppStore, MIN_SCALE, MAX_SCALE, ToolType } from '../store'
+import { useAppStore, MIN_SCALE, MAX_SCALE, ToolType } from '../stores/store'
 import { clamp, clampView } from '../utils/view'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel, findTopPaletteIndex, LayerLike } from '../utils/composite'
 import { isPointInMask, polygonToMask, magicWandMask } from '../utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
-import { useSettingsStore } from '../settingsStore'
+import { useSettingsStore } from '../stores/settingsStore'
 
 export type ShapePreview = {
   kind: 'line' | 'rect' | 'ellipse'

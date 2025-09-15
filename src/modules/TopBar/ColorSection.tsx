@@ -1,4 +1,4 @@
-import { useAppStore } from '../store'
+import { useAppStore } from '../stores/store'
 import { ColorPicker, useColorPopover } from '../ColorPicker'
 import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { ColorBoxInner, COLOR_BOX_STYLE } from '../ColorBox'

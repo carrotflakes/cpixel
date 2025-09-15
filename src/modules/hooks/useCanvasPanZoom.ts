@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { clampView } from '../utils/view'
-import { MIN_SCALE, MAX_SCALE } from '../store'
+import { MIN_SCALE, MAX_SCALE } from '../stores/store'
 
 export function useCanvasPanZoom(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,

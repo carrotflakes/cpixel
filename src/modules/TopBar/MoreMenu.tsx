@@ -3,11 +3,11 @@ import { FaEllipsisV, FaEraser } from 'react-icons/fa'
 import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings, LuFlipHorizontal, LuFlipVertical } from 'react-icons/lu'
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
 import { SettingsDialog } from '../SettingsDialog'
-import { useAppStore } from '../store'
+import { useAppStore } from '../stores/store'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { GoogleDrive } from '../utils/googleDrive'
 import { oddMask } from '../utils/selection'
-import { useLogStore } from '../logStore'
+import { useLogStore } from '../stores/logStore'
 
 export function MoreMenu() {
   // store selectors

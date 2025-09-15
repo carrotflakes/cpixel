@@ -1,6 +1,6 @@
 import { rgbaToCSSHex } from './utils/color'
-import { useAppStore } from './store'
-import { useLogStore } from './logStore'
+import { useAppStore } from './stores/store'
+import { useLogStore } from './stores/logStore'
 import { ColorBox } from './ColorBox'
 import { useEffect, useRef, useState } from 'react'
 

@@ -3,10 +3,10 @@ import { LuArrowDown, LuArrowUp, LuChevronDown, LuChevronUp, LuPin, LuTrash2 } f
 import { COLOR_BOX_STYLE, ColorBoxInner } from './ColorBox'
 import { ColorPicker } from './ColorPicker'
 import { PalettePresetsDialog } from './PalettePresetsDialog'
-import { useAppStore } from './store'
+import { useAppStore } from './stores/store'
 import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from './ui/RadixContextMenu'
 import { parseCSSColor, rgbaToCSSHex } from './utils/color'
-import { useUIState } from './useUiStore'
+import { useUIState } from './stores/useUiStore'
 
 export function PalettePanel() {
   const mode = useAppStore(s => s.mode)

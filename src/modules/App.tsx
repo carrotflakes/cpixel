@@ -3,7 +3,7 @@ import { TopBar } from "./TopBar/index";
 import { StatusBar } from "./StatusBar";
 import { PalettePanel } from "./PalettePanel";
 import { LayersPanel } from "./LayersPanel";
-import { useAppStore } from "./store";
+import { useAppStore } from "./stores/store";
 import { useEffect } from "react";
 
 export function App() {
