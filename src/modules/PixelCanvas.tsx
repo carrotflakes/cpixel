@@ -266,7 +266,7 @@ function useTiltParallax(
   const ENABLED = options?.enabled ?? true
   const SHIFT_TRIGGER = options?.trigger ?? 180
   const STOP_ROTATION = SHIFT_TRIGGER * 0.25
-  const DAMPING = options?.damping ?? 0.001
+  const DAMPING = options?.damping ?? 0.01
   const MIN_MAG = 1.0
   const AMOUNT = options?.amount ?? 0.5
 
