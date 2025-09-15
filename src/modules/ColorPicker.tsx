@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { parseCSSColor, rgbaToCSSHex, unpackRGBA, packRGBA } from './utils/color'
 import { ColorBox } from './ColorBox'
+import { PALETTE_PRESETS } from './presets/palettes'
+import { LuChevronDown, LuChevronUp } from 'react-icons/lu'
 
 type Props = {
   color: string
@@ -57,6 +59,8 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
   const rgba = useMemo(() => unpackRGBA(parseCSSColor(color)), [color])
   const [hsv, setHSV] = useState<HSV>(() => rgbToHsv(rgba.r, rgba.g, rgba.b, rgba.a / 255))
   const [hexInput, setHexInput] = useState<string>('')
+  const [showPreset, setShowPreset] = useState(true)
+  const [presetId, setPresetId] = useState<string>(() => PALETTE_PRESETS[0]?.id || '')
   const rootRef = useRef<HTMLDivElement | null>(null)
   const svRef = useRef<HTMLDivElement | null>(null)
   const hueRef = useRef<HTMLDivElement | null>(null)
@@ -138,9 +142,10 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
   const curHexNoAlpha = `#${[curRGB.r, curRGB.g, curRGB.b].map(n => n.toString(16).padStart(2, '0')).join('')}`
 
   const width = 220
+  const height = (showAlpha ? 320 : 260) + (showPreset ? 170 : 0)
   const margin = 8
   const x = Math.min(window.innerWidth - width - margin, Math.max(margin, anchor.x))
-  const y = Math.min(window.innerHeight - 280 - margin, Math.max(margin, anchor.y))
+  const y = Math.min(window.innerHeight - height - margin, Math.max(margin, anchor.y))
 
   const content = (
     <div
@@ -248,6 +253,59 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
         >
           Close
         </button>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted inline-flex items-center gap-1"
+            onClick={() => setShowPreset(v => !v)}
+            aria-expanded={!showPreset}
+            aria-label={showPreset ? 'Expand palette panel' : 'Collapse palette panel'}
+            title={showPreset ? 'Expand' : 'Collapse'}
+          >
+            {showPreset ? <LuChevronUp /> : <LuChevronDown />}
+          </button>
+          <span className="text-sm text-muted">Preset</span>
+        </div>
+        {showPreset && (<>
+          <select
+            id="cpixel-colorpicker-preset"
+            className="w-full mb-2 px-2 py-1 rounded border border-border bg-surface"
+            value={presetId}
+            onChange={(e) => setPresetId(e.target.value)}
+          >
+            {PALETTE_PRESETS.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-1 max-h-28 overflow-auto pr-1">
+            {(() => {
+              const preset = PALETTE_PRESETS.find(p => p.id === presetId)
+              if (!preset) return null
+              return [...preset.colors].map((c, i) => {
+                const isTransparent = (preset.transparentIndex ?? -1) === i
+                const hex = isTransparent ? '#0000' : rgbaToCSSHex(c)
+                return (
+                  <button
+                    key={i}
+                    className="w-5 h-5 rounded border border-border focus:outline-none focus:ring-1 focus:ring-accent"
+                    style={{ padding: 0 }}
+                    onClick={() => {
+                      onChangeLive(hex)
+                      const { r, g, b, a } = unpackRGBA(parseCSSColor(hex))
+                      setHSV(rgbToHsv(r, g, b, a / 255))
+                      setHexInput(hex)
+                    }}
+                    title={`Preset color #${i}`}
+                  >
+                    <ColorBox color={hex} className="w-full h-full rounded" />
+                  </button>
+                )
+              })
+            })()}
+          </div>
+        </>)}
       </div>
     </div>
   )
