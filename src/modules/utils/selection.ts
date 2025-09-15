@@ -10,7 +10,7 @@ export function rectToMask(W: number, H: number, x0: number, y0: number, x1: num
   const bottom = Math.min(H - 1, Math.max(y0, y1)) | 0
   for (let y = top; y <= bottom; y++) {
     const row = y * W
-    for (let x = left; x <= right; x++) mask[row + x] = 1
+    mask.fill(1, row + left, row + right + 1)
   }
   return { mask, bounds: { left, top, right, bottom } }
 }

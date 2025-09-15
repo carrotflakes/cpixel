@@ -6,7 +6,7 @@ import { floodFillIndexed, floodFillTruecolor } from './utils/fill'
 import { normalizeImportedJSON } from './utils/io'
 import { equalU32, equalU8 } from './utils/arrays'
 import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed, drawEllipseOutlineTruecolor, drawEllipseOutlineIndexed, drawEllipseFilledTruecolor, drawEllipseFilledIndexed } from './utils/paint'
-import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard, fillSelectedTruecolor, fillSelectedIndexed } from './utils/selection'
+import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard, fillSelectedTruecolor, fillSelectedIndexed, rectToMask } from './utils/selection'
 import { resizeLayers } from './utils/resize'
 import { flipLayersHorizontal, flipLayersVertical } from './utils/flip'
 import { compositeImageData } from './utils/composite'
@@ -638,20 +638,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   // Selection APIs
   setSelectionRect: (x0, y0, x1, y1) => set((s) => {
-    const W = s.width, H = s.height
-    // reuse selection util to build mask and bounds
-    const { mask, bounds } = (() => {
-      const left = Math.max(0, Math.min(x0 | 0, x1 | 0))
-      const right = Math.min(W - 1, Math.max(x0 | 0, x1 | 0))
-      const top = Math.max(0, Math.min(y0 | 0, y1 | 0))
-      const bottom = Math.min(H - 1, Math.max(y0 | 0, y1 | 0))
-      const m = new Uint8Array(W * H)
-      for (let y = top; y <= bottom; y++) {
-        const row = y * W
-        m.fill(1, row + left, row + right + 1)
-      }
-      return { mask: m, bounds: { left, top, right, bottom } }
-    })()
+    const { mask, bounds } = rectToMask(s.width, s.height, x0, y0, x1, y1)
     return { selection: { mask, bounds, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
   }),
   setSelectionMask: (mask, bounds) => set(() => ({ selection: { mask, bounds, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } })),
