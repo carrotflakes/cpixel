@@ -66,33 +66,29 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
   const svRef = useRef<HTMLDivElement | null>(null)
   const hueRef = useRef<HTMLDivElement | null>(null)
   const alphaRef = useRef<HTMLDivElement | null>(null)
-  // Track dragging to avoid external color sync jitter while interacting
-  const [isDragging, setIsDragging] = useState(false)
+  const isDraggingRef = useRef(false)
 
   // Keep HSV in sync when external color changes (but don’t fight while dragging)
   useEffect(() => {
     // While dragging, keep internal HSV stable (skip external sync)
-    if (isDragging) return
+    if (isDraggingRef.current) return
     const next = rgbToHsv(rgba.r, rgba.g, rgba.b, rgba.a / 255)
     setHSV(next)
     setHexInput(rgbaToCSSHex(packRGBA({ r: rgba.r, g: rgba.g, b: rgba.b, a: rgba.a })))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [color, isDragging])
+  }, [color])
 
 
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        // Commit the current value before closing
         emit(hsv, true)
         onClose()
       }
     }
-    const onDown = (e: MouseEvent | PointerEvent) => {
-      const t = e.target as Node | null
-      if (rootRef.current && t && rootRef.current.contains(t)) return
-      // Outside click: commit and close
+    const onDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && rootRef.current?.contains(e.target)) return
       emit(hsv, true)
       onClose()
     }
@@ -107,6 +103,7 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
   const emit = (next: HSV, done = false) => {
     const rgb = hsvToRgb(next.h, next.s, next.v)
     const rgba = packRGBA({ r: rgb.r, g: rgb.g, b: rgb.b, a: Math.round(next.a * 255) })
+    if (rgba === color) return
     if (done) onChangeDone(rgba)
     else onChangeLive(rgba)
     setHexInput(rgbaToCSSHex(rgba))
@@ -119,8 +116,8 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
     e.preventDefault()
     e.stopPropagation()
     if (!ref.current) return
-    setIsDragging(true);
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+    isDraggingRef.current = true
+      ; (e.target as HTMLElement).setPointerCapture?.(e.pointerId)
     const rect = ref.current.getBoundingClientRect()
     const handle = (ev: PointerEvent) => {
       onMove(rect, ev.clientX, ev.clientY)
@@ -129,7 +126,7 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
       window.removeEventListener('pointermove', handle)
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
-      setIsDragging(false)
+      isDraggingRef.current = false
     }
     window.addEventListener('pointermove', handle)
     window.addEventListener('pointerup', up)
@@ -236,8 +233,8 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
           onChange={(e) => {
             const v = e.target.value
             setHexInput(v)
-            if (/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) {
-              const rgba = parseCSSColor(v)
+            const rgba = parseCSSColor(v)
+            if (rgba != null) {
               const { r, g, b, a } = unpackRGBA(rgba)
               const next = rgbToHsv(r, g, b, a / 255)
               setHSV(next)
@@ -245,8 +242,8 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
             }
           }}
           onBlur={() => {
-            const v = hexInput
-            if (/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) onChangeDone(parseCSSColor(v))
+            const v = parseCSSColor(hexInput)
+            if (v != null) onChangeDone(v)
           }}
         />
         <button

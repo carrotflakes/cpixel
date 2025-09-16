@@ -14,7 +14,7 @@ export const unpackRGBA = (rgba: number): RGBA => ({
 })
 
 // Accepts #rrggbb or #rrggbbaa
-export function parseCSSColor(css: string): number {
+export function parseCSSColor(css: string): number | null {
   if (css.startsWith('#')) {
     const hex = css.slice(1)
     if (hex.length === 6) {
@@ -31,7 +31,7 @@ export function parseCSSColor(css: string): number {
       return packRGBA({ r, g, b, a })
     }
   }
-  return packRGBA({ r: 0, g: 0, b: 0, a: 0xff })
+  return null
 }
 
 export function rgbaToCSSHex(rgba: number): string {

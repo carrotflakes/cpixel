@@ -35,8 +35,7 @@ export function PalettePanel() {
   if (mode !== 'indexed') return null
 
   const onAddBlackColor = () => {
-    const rgba = parseCSSColor('#000000')
-    const idx = addPaletteColor(rgba)
+    const idx = addPaletteColor(parseCSSColor('#000000') ?? 0)
     setColorIndex(idx)
   }
 
