@@ -158,7 +158,7 @@ export function PixelCanvas() {
     return (
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
         <div
-          className="pointer-events-auto absolute z-100 flex flex-wrap bg-surface border border-border rounded shadow text-xs sm:text-sm"
+          className="pointer-events-auto absolute z-100 flex flex-wrap bg-surface/70 backdrop-blur border border-border rounded  shadow text-xs sm:text-sm"
           style={{ left: '50%', top: 8, transform: 'translateX(-50%)' }}
         >
           <button
@@ -216,11 +216,11 @@ export function PixelCanvas() {
       {tiltEnabled && motionPermission === 'prompt' && (
         <button
           onClick={requestMotionPermission}
-          className="absolute top-2 left-2 z-30 px-2 py-1 text-[11px] bg-blue-600 text-white rounded shadow active:scale-[0.97]"
+          className="absolute top-2 left-2 z-30 px-2 py-1 text-[11px] bg-surface/70 backdrop-blur rounded shadow active:scale-[0.97]"
         >Enable Motion</button>
       )}
       {motionPermission === 'denied' && (
-        <div className="absolute top-2 left-2 z-30 px-2 py-1 text-[11px] bg-red-600 text-white rounded shadow">Motion denied</div>
+        <div className="absolute top-2 left-2 z-30 px-2 py-1 text-[11px] bg-red-600/70 backdrop-blur text-white rounded shadow">Motion denied</div>
       )}
       {/* Debug tilt info */}
       {false && (<div className="absolute bottom-8 left-2 max-w-[240px] whitespace-pre pointer-events-none text-[10px] leading-tight font-mono bg-surface/80 backdrop-blur border border-border rounded p-2 select-none">
