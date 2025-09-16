@@ -5,6 +5,7 @@ import { ColorBox } from './ColorBox'
 import { PALETTE_PRESETS } from './presets/palettes'
 import { LuChevronDown, LuChevronUp } from 'react-icons/lu'
 import { useUIState } from './stores/useUiStore'
+import { useAppStore } from './stores/store'
 
 type Props = {
   color: string
@@ -61,7 +62,6 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
   const [hsv, setHSV] = useState<HSV>(() => rgbToHsv(rgba.r, rgba.g, rgba.b, rgba.a / 255))
   const [hexInput, setHexInput] = useState<string>('')
   const [showPreset, setShowPreset] = useUIState('colorPickerShowPreset', false)
-  const [presetId, setPresetId] = useUIState('colorPickerPresetId', PALETTE_PRESETS[0]?.id ?? '')
   const rootRef = useRef<HTMLDivElement | null>(null)
   const svRef = useRef<HTMLDivElement | null>(null)
   const hueRef = useRef<HTMLDivElement | null>(null)
@@ -257,56 +257,16 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted inline-flex items-center gap-1"
-            onClick={() => setShowPreset(v => !v)}
-            aria-expanded={!showPreset}
-            aria-label={showPreset ? 'Expand palette panel' : 'Collapse palette panel'}
-            title={showPreset ? 'Expand' : 'Collapse'}
-          >
-            {showPreset ? <LuChevronUp /> : <LuChevronDown />}
-          </button>
-          <span className="text-sm text-muted">Preset</span>
-        </div>
-        {showPreset && (<>
-          <select
-            id="cpixel-colorpicker-preset"
-            className="w-full mb-2 px-2 py-1 rounded border border-border bg-surface"
-            value={presetId}
-            onChange={(e) => setPresetId(e.target.value)}
-          >
-            {PALETTE_PRESETS.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-          <div className="flex flex-wrap gap-1 max-h-28 overflow-auto pr-1">
-            {(() => {
-              const preset = PALETTE_PRESETS.find(p => p.id === presetId)
-              if (!preset) return null
-              return [...preset.colors].map((c, i) => {
-                const isTransparent = (preset.transparentIndex ?? -1) === i
-                const hex = isTransparent ? '#0000' : rgbaToCSSHex(c)
-                return (
-                  <button
-                    key={i}
-                    className="w-5 h-5 rounded border border-border focus:outline-none focus:ring-1 focus:ring-accent"
-                    style={{ padding: 0 }}
-                    onClick={() => {
-                      onChangeLive(hex)
-                      const { r, g, b, a } = unpackRGBA(parseCSSColor(hex))
-                      setHSV(rgbToHsv(r, g, b, a / 255))
-                      setHexInput(hex)
-                    }}
-                    title={`Preset color #${i}`}
-                  >
-                    <ColorBox color={hex} className="w-full h-full rounded" />
-                  </button>
-                )
-              })
-            })()}
-          </div>
-        </>)}
+        <PresetPalette
+          showPreset={showPreset}
+          setShowPreset={setShowPreset}
+          onChange={(hex) => {
+            onChangeLive(hex)
+            const { r, g, b, a } = unpackRGBA(parseCSSColor(hex))
+            setHSV(rgbToHsv(r, g, b, a / 255))
+            setHexInput(hex)
+          }}
+        />
       </div>
     </div>
   )
@@ -329,4 +289,78 @@ export function useColorPopover() {
   }
   const close = () => setOpen(false)
   return { open, anchor, btnRef, toggle, close }
+}
+
+function PresetPalette({
+  showPreset,
+  setShowPreset,
+  onChange,
+}: {
+  showPreset: boolean
+  setShowPreset: React.Dispatch<React.SetStateAction<boolean>>
+  onChange: (hex: string) => void
+}) {
+  const [presetId, setPresetId] = useUIState('colorPickerPresetId', PALETTE_PRESETS[0].id)
+  const rct = useAppStore(s => s.recentColorsTruecolor)
+  const rci = useAppStore(s => s.recentColorsIndexed)
+  const mode = useAppStore(s => s.mode)
+  const palette = useAppStore(s => s.palette)
+  const history = useMemo(() => ({
+    id: 'history',
+    name: 'History',
+    colors: mode === 'indexed'
+      ? rci.map(i => palette[i] ?? 0x00000000)
+      : rct.map(parseCSSColor),
+    transparentIndex: -1,
+  }), [mode, rct, rci, palette])
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <button
+          className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted inline-flex items-center gap-1"
+          onClick={() => setShowPreset(v => !v)}
+          aria-expanded={!showPreset}
+          aria-label={showPreset ? 'Expand palette panel' : 'Collapse palette panel'}
+          title={showPreset ? 'Expand' : 'Collapse'}
+        >
+          {showPreset ? <LuChevronUp /> : <LuChevronDown />}
+        </button>
+        <span className="text-sm text-muted">Preset</span>
+      </div>
+      {showPreset && (<>
+        <select
+          id="cpixel-colorpicker-preset"
+          className="w-full mb-2 px-2 py-1 rounded border border-border bg-surface"
+          value={presetId}
+          onChange={(e) => setPresetId(e.target.value)}
+        >
+          {[history, ...PALETTE_PRESETS].map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+        <div className="flex flex-wrap gap-1 max-h-28 overflow-auto pr-1">
+          {(() => {
+            const preset = [history, ...PALETTE_PRESETS].find(p => p.id === presetId)
+            if (!preset) return null
+            return [...preset.colors].map((c, i) => {
+              const isTransparent = (preset.transparentIndex ?? -1) === i
+              const hex = isTransparent ? '#0000' : rgbaToCSSHex(c)
+              return (
+                <button
+                  key={i}
+                  className="w-5 h-5 rounded border border-border focus:outline-none focus:ring-1 focus:ring-accent"
+                  style={{ padding: 0 }}
+                  onClick={() => { onChange(hex) }}
+                  title={`Preset color #${i}`}
+                >
+                  <ColorBox color={hex} className="w-full h-full rounded" />
+                </button>
+              )
+            })
+          })()}
+        </div>
+      </>)}
+    </>
+  )
 }

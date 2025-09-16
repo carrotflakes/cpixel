@@ -256,6 +256,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { currentPaletteIndex: idx, color: hex }
   }),
   pushRecentColor: () => set((s) => {
+    const MAX_RECENT = 32
     if (s.mode === 'indexed') {
       // store palette index; if no currentPaletteIndex, derive nearest
       let idx = s.currentPaletteIndex
@@ -265,13 +266,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       if (idx === undefined) return {}
       const existing = s.recentColorsIndexed ?? []
-      const next = [idx, ...existing.filter(v => v !== idx)].slice(0, 10)
+      const next = [idx, ...existing.filter(v => v !== idx)].slice(0, MAX_RECENT)
       return { recentColorsIndexed: next }
     } else {
       const c = s.color
       const norm = (x: string) => x.toLowerCase()
       const existing = s.recentColorsTruecolor ?? []
-      const next = [c, ...existing.filter(v => norm(v) !== norm(c))].slice(0, 10)
+      const next = [c, ...existing.filter(v => norm(v) !== norm(c))].slice(0, MAX_RECENT)
       return { recentColorsTruecolor: next }
     }
   }),
