@@ -289,11 +289,17 @@ export function MoreMenu() {
         <DriveSaveDialog
           busy={driveBusy}
           error={driveError}
+          existingFiles={driveFiles}
+          onLoadFiles={async () => {
+            setDriveBusy(true); setDriveError(null)
+            try { const files = await GoogleDrive.listFiles(); setDriveFiles(files) } catch (e: any) { setDriveError(e?.message || 'Failed to list files') }
+            finally { setDriveBusy(false) }
+          }}
           onClose={() => setDriveOpen(null)}
-          onSave={async (filename) => {
+          onSave={async (filename, fileId) => {
             setDriveBusy(true); setDriveError(null)
             try {
-              const res = await saveProjectToGoogleDrive(filename, undefined)
+              const res = await saveProjectToGoogleDrive(filename, fileId)
               if (res) {
                 useAppStore.getState().setFileMeta({ name: res.name, source: { type: 'google-drive', fileId: res.id } })
               }
@@ -446,27 +452,65 @@ function DriveOpenDialog(props: { busy: boolean; files: { id: string; name: stri
   )
 }
 
-function DriveSaveDialog(props: { busy: boolean; error: string | null; onClose: () => void; onSave: (filename: string) => void }) {
-  const [filename, setFilename] = useState('cpixel.json')
+function DriveSaveDialog(props: { busy: boolean; error: string | null; existingFiles: { id: string; name: string }[]; onLoadFiles: () => void; onClose: () => void; onSave: (filename: string, fileId?: string) => void }) {
+  const defaultName = 'cpixel.json'
+  const [filename, setFilename] = useState(defaultName)
+  const [targetFileId, setTargetFileId] = useState<string | undefined>(undefined)
+
+  useEffect(() => { if (!props.existingFiles.length) props.onLoadFiles() }, [])
+
+  const selectingExisting = !!targetFileId
+
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40" role="dialog" aria-label="Save to Google Drive">
-      <div className="min-w-80 max-w-[90vw] rounded-md border border-border bg-elevated shadow-lg">
+      <div className="min-w-80 max-w-[90vw] w-[480px] rounded-md border border-border bg-elevated shadow-lg">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <div className="font-medium">Save to Google Drive</div>
           <button className="text-sm" onClick={props.onClose}>Close</button>
         </div>
         <div className="p-3 space-y-3">
-          <div className="text-sm">Filename</div>
-          <input
-            className="w-full px-2 py-1 border border-border rounded bg-surface"
-            value={filename}
-            onChange={(e) => setFilename(e.target.value)}
-            placeholder="cpixel.json"
-          />
-          <div className="flex gap-2 justify-end">
-            <button className="px-3 py-1 border border-border rounded" onClick={props.onClose}>Cancel</button>
-            <button className="px-3 py-1 border border-border rounded bg-surface-muted" onClick={() => props.onSave(filename)}>
-              {props.busy ? 'Saving…' : 'Save'}
+          <div className="space-y-1">
+            <div className="text-sm font-medium">Filename</div>
+            <input
+              className="w-full px-2 py-1 border border-border rounded bg-surface"
+              value={filename}
+              onChange={(e) => { setFilename(e.target.value); setTargetFileId(undefined) }}
+              placeholder={defaultName}
+              disabled={props.busy}
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="text-sm font-medium flex items-center justify-between">
+              <span>Or overwrite existing</span>
+              <button className="text-xs underline" onClick={props.onLoadFiles} disabled={props.busy}>Reload</button>
+            </div>
+            <div className="max-h-40 overflow-auto border border-border rounded">
+              {props.existingFiles.length === 0 ? (
+                <div className="p-2 text-xs text-muted">{props.busy ? 'Loading…' : 'No existing project files'}</div>
+              ) : (
+                <ul>
+                  {props.existingFiles.map(f => (
+                    <li key={f.id}>
+                      <button
+                        className={`w-full text-left px-2 py-1 text-xs hover:bg-surface-muted ${targetFileId === f.id ? 'bg-surface-muted' : ''}`}
+                        onClick={() => { setTargetFileId(f.id); setFilename(f.name) }}
+                        disabled={props.busy}
+                      >{f.name}</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {selectingExisting && <div className="text-[10px] text-muted">Will overwrite selected file.</div>}
+          </div>
+          <div className="flex gap-2 justify-end pt-1">
+            <button className="px-3 py-1 border border-border rounded" onClick={props.onClose} disabled={props.busy}>Cancel</button>
+            <button
+              className="px-3 py-1 border border-border rounded bg-surface-muted disabled:opacity-50"
+              onClick={() => props.onSave(filename.trim() || defaultName, targetFileId)}
+              disabled={props.busy || !filename.trim()}
+            >
+              {props.busy ? 'Saving…' : selectingExisting ? 'Overwrite' : 'Save'}
             </button>
           </div>
           {props.error && <div className="text-xs text-red-600">{props.error}</div>}
