@@ -73,13 +73,12 @@ export function MoreMenu() {
         <DropdownMenu.Trigger asChild>
           <button
             ref={triggerRef}
-            className="px-2 py-1 rounded border border-border bg-surface text-sm inline-flex items-center gap-1 hover:bg-surface-muted"
+            className="px-2 py-1 inline-flex items-center gap-1 rounded border border-border bg-surface hover:bg-surface-muted"
             aria-haspopup="menu"
             aria-expanded={open}
             title="More"
           >
             <FaEllipsisV aria-hidden />
-            <span className="hidden sm:inline">More</span>
           </button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
