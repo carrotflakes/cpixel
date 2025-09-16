@@ -1,17 +1,17 @@
 import { create } from 'zustand'
-import { useLogStore } from './logStore'
-import { clamp } from '../utils/view.ts'
-import { nearestIndexInPalette, parseCSSColor, rgbaToCSSHex } from '../utils/color.ts'
-import { generatePaletteFromComposite } from '../utils/palette.ts'
-import { floodFillIndexed, floodFillTruecolor } from '../utils/fill.ts'
-import { normalizeImportedJSON } from '../utils/io.ts'
 import { equalU32, equalU8 } from '../utils/arrays.ts'
-import { stampTruecolor, stampIndexed, drawLineBrushTruecolor, drawLineBrushIndexed, drawRectOutlineTruecolor, drawRectOutlineIndexed, drawRectFilledTruecolor, drawRectFilledIndexed, drawEllipseOutlineTruecolor, drawEllipseOutlineIndexed, drawEllipseFilledTruecolor, drawEllipseFilledIndexed } from '../utils/paint.ts'
-import { extractFloatingTruecolor, clearSelectedTruecolor, extractFloatingIndexed, clearSelectedIndexed, applyFloatingToTruecolorLayer, applyFloatingToIndexedLayer, buildFloatingFromClipboard, fillSelectedTruecolor, fillSelectedIndexed, rectToMask } from '../utils/selection.ts'
-import { resizeLayers } from '../utils/resize.ts'
-import { flipLayersHorizontal, flipLayersVertical } from '../utils/flip.ts'
+import { nearestIndexInPalette } from '../utils/color.ts'
 import { compositeImageData } from '../utils/composite.ts'
-import { translateTruecolor, translateIndexed } from '../utils/translate.ts'
+import { floodFillIndexed, floodFillTruecolor } from '../utils/fill.ts'
+import { flipLayersHorizontal, flipLayersVertical } from '../utils/flip.ts'
+import { normalizeImportedJSON } from '../utils/io.ts'
+import { drawEllipseFilledIndexed, drawEllipseFilledTruecolor, drawEllipseOutlineIndexed, drawEllipseOutlineTruecolor, drawLineBrushIndexed, drawLineBrushTruecolor, drawRectFilledIndexed, drawRectFilledTruecolor, drawRectOutlineIndexed, drawRectOutlineTruecolor, stampIndexed, stampTruecolor } from '../utils/paint.ts'
+import { generatePaletteFromComposite } from '../utils/palette.ts'
+import { resizeLayers } from '../utils/resize.ts'
+import { applyFloatingToIndexedLayer, applyFloatingToTruecolorLayer, buildFloatingFromClipboard, clearSelectedIndexed, clearSelectedTruecolor, extractFloatingIndexed, extractFloatingTruecolor, fillSelectedIndexed, fillSelectedTruecolor, rectToMask } from '../utils/selection.ts'
+import { translateIndexed, translateTruecolor } from '../utils/translate.ts'
+import { clamp } from '../utils/view.ts'
+import { useLogStore } from './logStore'
 
 const WIDTH = 64
 const HEIGHT = 64
@@ -43,12 +43,12 @@ export type AppState = {
   layers: Layer[]
   activeLayerId: string
   view: { x: number; y: number; scale: number }
-  color: string
+  color: number
   brushSize: number
   eraserSize: number
   shapeFill: boolean
   currentPaletteIndex?: number
-  recentColorsTruecolor: string[]
+  recentColorsTruecolor: number[]
   recentColorsIndexed: number[] // palette indices
   mode: 'truecolor' | 'indexed'
   palette: Uint32Array
@@ -56,7 +56,7 @@ export type AppState = {
   tool: ToolType
   shapeTool: 'rect' | 'ellipse'
   selectTool: 'select-rect' | 'select-lasso' | 'select-wand'
-  setColor: (c: string) => void
+  setColor: (c: number) => void
   setColorIndex: (i: number) => void
   pushRecentColor: () => void
   setPaletteColor: (index: number, rgba: number) => void
@@ -153,12 +153,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   layers: [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
   activeLayerId: 'L1',
   view: { x: 0, y: 0, scale: 5 },
-  color: '#000000',
+  color: 0x000000,
   brushSize: 1,
   eraserSize: 1,
   shapeFill: false,
   currentPaletteIndex: 1,
-  recentColorsTruecolor: ['#000000', '#ffffff'],
+  recentColorsTruecolor: [0x000000, 0xffffff],
   recentColorsIndexed: [],
   mode: 'truecolor',
   tool: 'brush',
@@ -240,20 +240,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { eraserSize: size }
   }),
   toggleShapeFill: () => set((s) => ({ shapeFill: !s.shapeFill })),
-  setColor: (c) => set((s) => {
+  setColor: (rgba) => set((s) => {
     if (s.mode === 'indexed') {
       // In indexed, pick nearest palette index and sync color/index
-      const rgba = parseCSSColor(c)
-      const idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
-      const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
-      return { color: hex, currentPaletteIndex: idx }
+      const idx = rgba === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
+      const color = s.palette[idx] ?? 0
+      return { color, currentPaletteIndex: idx }
     }
-    return { color: c }
+    return { color: rgba }
   }),
   setColorIndex: (i) => set((s) => {
     const idx = Math.max(0, Math.min(i | 0, Math.max(0, s.palette.length - 1)))
-    const hex = rgbaToCSSHex(s.palette[idx] ?? 0)
-    return { currentPaletteIndex: idx, color: hex }
+    const color = s.palette[idx] ?? 0
+    return { currentPaletteIndex: idx, color }
   }),
   pushRecentColor: () => set((s) => {
     const MAX_RECENT = 32
@@ -261,18 +260,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       // store palette index; if no currentPaletteIndex, derive nearest
       let idx = s.currentPaletteIndex
       if (idx === undefined) {
-        const rgba = parseCSSColor(s.color)
+        const rgba = s.color
         idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
       }
       if (idx === undefined) return {}
-      const existing = s.recentColorsIndexed ?? []
-      const next = [idx, ...existing.filter(v => v !== idx)].slice(0, MAX_RECENT)
+      const next = [idx, ...s.recentColorsIndexed.filter(v => v !== idx)].slice(0, MAX_RECENT)
       return { recentColorsIndexed: next }
     } else {
       const c = s.color
-      const norm = (x: string) => x.toLowerCase()
-      const existing = s.recentColorsTruecolor ?? []
-      const next = [c, ...existing.filter(v => norm(v) !== norm(c))].slice(0, MAX_RECENT)
+      const next = [c, ...s.recentColorsTruecolor.filter(v => v !== c)].slice(0, MAX_RECENT)
       return { recentColorsTruecolor: next }
     }
   }),
@@ -285,7 +281,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (equalU32(pal, s.palette)) return {}
     // If editing currently selected index, also sync visible color string
     const patch: Partial<AppState> = { palette: pal }
-    if (s.currentPaletteIndex === i) patch.color = rgbaToCSSHex(pal[i] >>> 0)
+    if (s.currentPaletteIndex === i) patch.color = pal[i]
     return patch
   }),
   removePaletteIndex: (idx) => set((s) => {
@@ -315,8 +311,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return { ...l, data: dst }
     })
-    const colorHex = rgbaToCSSHex(pal[ci] ?? 0)
-    return { palette: pal, transparentIndex: ti, layers, currentPaletteIndex: ci, color: colorHex }
+    const color = pal[ci] ?? 0
+    return { palette: pal, transparentIndex: ti, layers, currentPaletteIndex: ci, color }
   }),
   movePaletteIndex: (from, to) => set((s) => {
     const n = s.palette.length
@@ -353,7 +349,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // remap current palette index
     const ci = s.currentPaletteIndex !== undefined ? map[s.currentPaletteIndex] : undefined
     const patch: Partial<AppState> = { palette: pal, layers, transparentIndex: ti }
-    if (ci !== undefined) { patch.currentPaletteIndex = ci; patch.color = rgbaToCSSHex(pal[ci] ?? 0) }
+    if (ci !== undefined) { patch.currentPaletteIndex = ci; patch.color = pal[ci] ?? 0 }
     return patch
   }),
   applyPalettePreset: (colors, ti = 0) => set((s) => {
@@ -381,13 +377,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     // choose current index nearest to previous selected color
     const prevRGBA = s.palette[s.currentPaletteIndex ?? s.transparentIndex] ?? 0x00000000
     const curIdx = s.currentPaletteIndex === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, prevRGBA)
-    const colorHex = rgbaToCSSHex(palette[curIdx] ?? 0)
+    const color = palette[curIdx] ?? 0
 
     const recentColorsIndexed = s.recentColorsIndexed
       .map(i => (i === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, s.palette[i] ?? 0x00000000)))
       .filter((v, i, a) => a.indexOf(v) === i) // dedupe
 
-    return { palette, transparentIndex: ti, layers, currentPaletteIndex: curIdx, color: colorHex, recentColorsIndexed }
+    return { palette, transparentIndex: ti, layers, currentPaletteIndex: curIdx, color, recentColorsIndexed }
   }),
   addPaletteColor: (rgba) => {
     const s = get()
@@ -399,7 +395,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // If in indexed mode, select the newly added color
       if (s.mode === 'indexed') {
         const idx = next.length - 1
-        return { palette: next, currentPaletteIndex: idx, color: rgbaToCSSHex(next[idx] ?? 0) }
+        return { palette: next, currentPaletteIndex: idx, color: next[idx] ?? 0 }
       }
       return { palette: next }
     })
@@ -621,9 +617,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         return { id: l.id, visible: l.visible, locked: l.locked, data: idx }
       })
       // Sync current palette index nearest to current color
-      const rgba = parseCSSColor(s.color)
+      const rgba = s.color
       const curIdx = (rgba >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(autoPalette, rgba, transparentIndex)
-      return { mode: 'indexed', layers, currentPaletteIndex: curIdx, color: rgbaToCSSHex(autoPalette[curIdx] ?? 0), palette: autoPalette, transparentIndex, recentColorsIndexed: [] }
+      return { mode: 'indexed', layers, currentPaletteIndex: curIdx, color: autoPalette[curIdx] ?? 0, palette: autoPalette, transparentIndex, recentColorsIndexed: [] }
     } else {
       // convert all layers: indices -> truecolor
       const layers = s.layers.map(l => {
@@ -892,7 +888,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const layers = s.layers.slice()
     if (s.mode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
-      const rgba = parseCSSColor(s.color)
+      const rgba = s.color
       const out = fillSelectedTruecolor(layer.data, sel.mask, sel.bounds, W, rgba >>> 0)
       if (equalU32(out, layer.data)) return {}
       layers[li] = { ...layer, data: out }
@@ -1139,7 +1135,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         statePatch.palette = converted.palette
         statePatch.transparentIndex = converted.transparentIndex ?? 0
         statePatch.currentPaletteIndex = converted.transparentIndex ?? 0
-        statePatch.color = '#000000'
+        statePatch.color = 0x00000000
       } else {
         statePatch.mode = 'truecolor'
       }

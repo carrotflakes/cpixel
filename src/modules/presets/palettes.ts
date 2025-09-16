@@ -1,7 +1,6 @@
 // Built-in palette presets for indexed mode
 // Colors are encoded as 0xRRGGBBAA (alpha last), matching store representation.
 
-import { parseCSSColor } from "../utils/color"
 import { WPLACE_COLORS } from "./wplace"
 
 export type PalettePreset = {
@@ -62,13 +61,13 @@ export const PALETTE_PRESETS: PalettePreset[] = [
   {
     id: 'wplace-free', name: 'wplace (Free)', colors: new Uint32Array([
       0x00000000,
-      ...WPLACE_COLORS.filter(c => !c.locked).map(c => parseCSSColor(c.code))
+      ...WPLACE_COLORS.filter(c => !c.locked).map(c => packRGB(c.code))
     ]), transparentIndex: 0
   },
   {
     id: 'wplace', name: 'wplace', colors: new Uint32Array([
       0x00000000,
-      ...WPLACE_COLORS.map(c => parseCSSColor(c.code))
+      ...WPLACE_COLORS.map(c => packRGB(c.code))
     ]), transparentIndex: 0
   },
 ]

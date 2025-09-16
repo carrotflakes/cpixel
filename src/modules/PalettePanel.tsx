@@ -209,17 +209,15 @@ export function PalettePanel() {
 
       {!collapsed && edit?.open && (
         <ColorPicker
-          color={rgbaToCSSHex(palette[edit.index] ?? 0)}
+          color={palette[edit.index] ?? 0}
           open={true}
           anchor={{ x: edit.x, y: edit.y }}
           showAlpha={true}
           onClose={() => setEdit(null)}
-          onChangeLive={(hex) => {
-            const rgba = parseCSSColor(hex)
+          onChangeLive={(rgba) => {
             setPaletteColor(edit.index, rgba)
           }}
-          onChangeDone={(hex) => {
-            const rgba = parseCSSColor(hex)
+          onChangeDone={(rgba) => {
             setPaletteColor(edit.index, rgba)
             setEdit(null)
           }}

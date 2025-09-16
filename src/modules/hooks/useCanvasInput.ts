@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import { useAppStore, MIN_SCALE, MAX_SCALE, ToolType } from '../stores/store'
 import { clamp, clampView } from '../utils/view'
-import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
 import { compositePixel, findTopPaletteIndex, LayerLike } from '../utils/composite'
 import { isPointInMask, polygonToMask, magicWandMask } from '../utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
@@ -82,7 +81,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const paintFor = (erase: boolean) => (
     mode === 'indexed'
       ? (erase ? transparentIndex : currentPaletteIndex) ?? 0
-      : erase ? 0x00000000 : parseCSSColor(color)
+      : erase ? 0x00000000 : color
   )
   const isShapeTool = () => curTool.current === 'line' || curTool.current === 'rect' || curTool.current === 'ellipse'
   const isSelectionTool = () => curTool.current === 'select-rect' || curTool.current === 'select-lasso' || curTool.current === 'select-wand'
@@ -104,7 +103,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       setColorIndex(idx)
     } else {
       const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
-      setColor(rgbaToCSSHex(rgba))
+      setColor(rgba)
     }
   }
   const pointInSelection = (x: number, y: number) => isPointInMask(selectionMask, W, H, x, y)

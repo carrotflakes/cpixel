@@ -8,12 +8,12 @@ import { useUIState } from './stores/useUiStore'
 import { useAppStore } from './stores/store'
 
 type Props = {
-  color: string
+  color: number
   open: boolean
   anchor: { x: number; y: number }
   onClose: () => void
-  onChangeLive: (hex: string) => void
-  onChangeDone: (hex: string) => void
+  onChangeLive: (rgba: number) => void
+  onChangeDone: (rgba: number) => void
   showAlpha?: boolean
 }
 
@@ -58,7 +58,7 @@ function hsvToRgb(h: number, s: number, v: number) {
 function clamp01(x: number) { return Math.max(0, Math.min(1, x)) }
 
 export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChangeDone, showAlpha = true }: Props) {
-  const rgba = useMemo(() => unpackRGBA(parseCSSColor(color)), [color])
+  const rgba = useMemo(() => unpackRGBA(color), [color])
   const [hsv, setHSV] = useState<HSV>(() => rgbToHsv(rgba.r, rgba.g, rgba.b, rgba.a / 255))
   const [hexInput, setHexInput] = useState<string>('')
   const [showPreset, setShowPreset] = useUIState('colorPickerShowPreset', false)
@@ -106,10 +106,10 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
 
   const emit = (next: HSV, done = false) => {
     const rgb = hsvToRgb(next.h, next.s, next.v)
-    const hex = rgbaToCSSHex(packRGBA({ r: rgb.r, g: rgb.g, b: rgb.b, a: Math.round(next.a * 255) }))
-    if (done) onChangeDone(hex)
-    else onChangeLive(hex)
-    setHexInput(hex)
+    const rgba = packRGBA({ r: rgb.r, g: rgb.g, b: rgb.b, a: Math.round(next.a * 255) })
+    if (done) onChangeDone(rgba)
+    else onChangeLive(rgba)
+    setHexInput(rgbaToCSSHex(rgba))
   }
 
   const beginDrag = (
@@ -237,15 +237,16 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
             const v = e.target.value
             setHexInput(v)
             if (/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) {
-              const { r, g, b, a } = unpackRGBA(parseCSSColor(v))
+              const rgba = parseCSSColor(v)
+              const { r, g, b, a } = unpackRGBA(rgba)
               const next = rgbToHsv(r, g, b, a / 255)
               setHSV(next)
-              onChangeLive(v)
+              onChangeLive(rgba)
             }
           }}
           onBlur={() => {
             const v = hexInput
-            if (/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) onChangeDone(v)
+            if (/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) onChangeDone(parseCSSColor(v))
           }}
         />
         <button
@@ -260,11 +261,11 @@ export function ColorPicker({ color, open, anchor, onClose, onChangeLive, onChan
         <PresetPalette
           showPreset={showPreset}
           setShowPreset={setShowPreset}
-          onChange={(hex) => {
-            onChangeLive(hex)
-            const { r, g, b, a } = unpackRGBA(parseCSSColor(hex))
+          onChange={(rgba) => {
+            onChangeLive(rgba)
+            const { r, g, b, a } = unpackRGBA(rgba)
             setHSV(rgbToHsv(r, g, b, a / 255))
-            setHexInput(hex)
+            setHexInput(rgbaToCSSHex(rgba))
           }}
         />
       </div>
@@ -298,7 +299,7 @@ function PresetPalette({
 }: {
   showPreset: boolean
   setShowPreset: React.Dispatch<React.SetStateAction<boolean>>
-  onChange: (hex: string) => void
+  onChange: (rgba: number) => void
 }) {
   const [presetId, setPresetId] = useUIState('colorPickerPresetId', PALETTE_PRESETS[0].id)
   const rct = useAppStore(s => s.recentColorsTruecolor)
@@ -310,7 +311,7 @@ function PresetPalette({
     name: 'History',
     colors: mode === 'indexed'
       ? rci.map(i => palette[i] ?? 0x00000000)
-      : rct.map(parseCSSColor),
+      : rct,
     transparentIndex: -1,
   }), [mode, rct, rci, palette])
 
@@ -351,7 +352,7 @@ function PresetPalette({
                   key={i}
                   className="w-5 h-5 rounded border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                   style={{ padding: 0 }}
-                  onClick={() => { onChange(hex) }}
+                  onClick={() => { onChange(c) }}
                   title={`Preset color #${i}`}
                 >
                   <ColorBox color={hex} className="w-full h-full rounded" />

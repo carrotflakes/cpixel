@@ -1,5 +1,6 @@
 import { FileMeta, useAppStore } from './store'
 import { useLogStore } from './logStore'
+import { parseCSSColor } from '../utils/color'
 
 // Simple localStorage autosave / restore
 // - Periodic save (every 10s)
@@ -22,8 +23,8 @@ type PersistPayload = {
   activeLayerId: string
   palette: number[]
   transparentIndex: number
-  color: string
-  recentColorsTruecolor: string[]
+  color: number
+  recentColorsTruecolor: number[]
   recentColorsIndexed: number[]
   fileMeta?: FileMeta
 }
@@ -70,6 +71,12 @@ function restore() {
     if (!raw) return
     const data = JSON.parse(raw)
     if (data && data.app === 'cpixel') {
+      // migrate
+      data.color = typeof data.color === 'string' ? parseCSSColor(data.color) : data.color
+      data.recentColorsTruecolor = typeof data.recentColorsTruecolor[0] === 'string'
+        ? data.recentColorsTruecolor.map(parseCSSColor)
+        : data.recentColorsTruecolor
+
       useAppStore.getState().importJSON(data, data.fileMeta)
       useLogStore.getState().pushLog({ message: 'Autosave restored' })
     }

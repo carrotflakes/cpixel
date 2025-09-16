@@ -13,15 +13,15 @@ export type NormalizedImport = {
   activeLayerId: string
   palette: Uint32Array
   transparentIndex: number
-  color: string
-  recentColorsTruecolor: string[]
+  color: number
+  recentColorsTruecolor: number[]
   recentColorsIndexed: number[]
 }
 
 // Normalize a cpixel JSON payload into state-like fields. Returns null if invalid.
 export function normalizeImportedJSON(
   data: unknown,
-  defaults: { palette: Uint32Array; color: string; recentColorsTruecolor: string[]; recentColorsIndexed: number[] },
+  defaults: { palette: Uint32Array; color: number; recentColorsTruecolor: number[]; recentColorsIndexed: number[] },
 ): NormalizedImport | null {
   const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
   if (!isObj(data)) return null
@@ -77,14 +77,10 @@ export function normalizeImportedJSON(
   const activeLayerId = typeof obj.activeLayerId === 'string' && nextLayers.some(l => l.id === obj.activeLayerId)
     ? obj.activeLayerId
     : (nextLayers[0]?.id || 'L1')
-  const nextColor = typeof obj.color === 'string' ? obj.color : defaults.color
-  // Backward compatibility: if flat recentColors provided, apply to truecolor list
-  const flatRecent = Array.isArray(obj.recentColors)
-    ? (obj.recentColors as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 10)
-    : undefined
+  const nextColor = typeof obj.color === 'number' ? obj.color : defaults.color
   const rcTrue = Array.isArray(obj.recentColorsTruecolor)
-    ? (obj.recentColorsTruecolor as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 10)
-    : (flatRecent ?? defaults.recentColorsTruecolor)
+    ? (obj.recentColorsTruecolor as unknown[]).filter((x): x is number => typeof x === 'number').slice(0, 10)
+    : defaults.recentColorsTruecolor
   const rcIndexed = Array.isArray(obj.recentColorsIndexed)
     ? (obj.recentColorsIndexed as unknown[]).filter(x => Number.isFinite(Number(x))).map(x => Number(x) | 0).slice(0, 10)
     : defaults.recentColorsIndexed

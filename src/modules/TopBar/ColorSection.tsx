@@ -1,7 +1,7 @@
-import { useAppStore } from '../stores/store'
+import { COLOR_BOX_STYLE, ColorBoxInner } from '../ColorBox'
 import { ColorPicker, useColorPopover } from '../ColorPicker'
-import { parseCSSColor, rgbaToCSSHex } from '../utils/color'
-import { ColorBoxInner, COLOR_BOX_STYLE } from '../ColorBox'
+import { useAppStore } from '../stores/store'
+import { rgbaToCSSHex } from '../utils/color'
 
 export function ColorSection() {
   const color = useAppStore(s => s.color)
@@ -14,7 +14,7 @@ export function ColorSection() {
   const recentTrue = useAppStore(s => s.recentColorsTruecolor)
   const palette = useAppStore(s => s.palette)
   const recentColors = mode === 'indexed'
-    ? recentIndexed.map(i => rgbaToCSSHex((palette[i] ?? 0x00000000)))
+    ? recentIndexed.map(i => palette[i] ?? 0x00000000)
     : recentTrue
 
   return (
@@ -23,11 +23,11 @@ export function ColorSection() {
         <label className="hidden sm:inline text-sm text-muted">Color</label>
         <ColorButton
           color={color}
-          onChange={(hex) => {
+          onChange={(rgba) => {
             if (mode === 'indexed' && currentPaletteIndex !== undefined) {
-              setPaletteColor(currentPaletteIndex, parseCSSColor(hex))
+              setPaletteColor(currentPaletteIndex, rgba)
             } else {
-              setColor(hex)
+              setColor(rgba)
             }
           }}
         />
@@ -39,7 +39,7 @@ export function ColorSection() {
               key={mode === 'indexed' ? `${recentIndexed[idx]}` : c}
               className="h-5 w-5 rounded border border-border focus:outline-none"
               style={COLOR_BOX_STYLE}
-              title={mode === 'indexed' ? `Palette index ${recentIndexed[idx]}` : c}
+              title={mode === 'indexed' ? `Palette index ${recentIndexed[idx]}` : rgbaToCSSHex(c)}
               onClick={() => {
                 if (mode === 'indexed' && currentPaletteIndex !== undefined) {
                   setColorIndex(recentIndexed[idx])
@@ -48,7 +48,7 @@ export function ColorSection() {
                 }
               }}
             >
-              <ColorBoxInner color={c} />
+              <ColorBoxInner color={rgbaToCSSHex(c)} />
             </button>
           ))}
         </div>
@@ -57,8 +57,9 @@ export function ColorSection() {
   )
 }
 
-function ColorButton({ color, onChange }: { color: string; onChange: (c: string) => void }) {
+function ColorButton({ color, onChange }: { color: number; onChange: (c: number) => void }) {
   const { open, anchor, btnRef, toggle, close } = useColorPopover()
+  const hex = rgbaToCSSHex(color)
   return (
     <>
       <button
@@ -68,9 +69,9 @@ function ColorButton({ color, onChange }: { color: string; onChange: (c: string)
         onClick={toggle}
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={color}
+        title={hex}
       >
-        <ColorBoxInner color={color} />
+        <ColorBoxInner color={hex} />
       </button>
       <ColorPicker
         color={color}
