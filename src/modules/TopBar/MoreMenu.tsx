@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FaEllipsisV, FaEraser } from 'react-icons/fa'
 import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings, LuFlipHorizontal, LuFlipVertical } from 'react-icons/lu'
 import { CanvasSizeDialog } from '../CanvasSizeDialog'
+import { ExportPNGDialog } from '../ExportPNGDialog'
 import { SettingsDialog } from '../SettingsDialog'
 import { useAppStore } from '../stores/store'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -20,6 +21,7 @@ export function MoreMenu() {
   const [open, setOpen] = useState(false)
   const [sizeOpen, setSizeOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [exportPngOpen, setExportPngOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
   // Drive state & fullscreen
@@ -168,7 +170,7 @@ export function MoreMenu() {
                 <LuChevronRight className="ml-auto" aria-hidden />
               </DropdownMenu.SubTrigger>
               <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().exportPNG(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => { setExportPngOpen(true); /* export after dialog submit */ }}>
                   <LuDownload aria-hidden />
                   <span>PNG</span>
                 </DropdownMenu.Item>
@@ -260,6 +262,7 @@ export function MoreMenu() {
         onSubmit={(w, h) => { useAppStore.getState().resizeCanvas(w, h); setSizeOpen(false) }}
       />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ExportPNGDialog open={exportPngOpen} onClose={() => { setExportPngOpen(false); setOpen(false) }} />
 
       {/* Drive open dialog */}
       {driveOpen === 'open' && (

@@ -124,7 +124,7 @@ export type AppState = {
   hover?: { x: number; y: number; rgba?: number; index?: number }
   setHoverInfo: (h?: { x: number; y: number; rgba?: number; index?: number }) => void
   clearLayer: () => void
-  exportPNG: () => void
+  exportPNG: (scale?: number) => void
   exportJSON: () => void
   exportAse: () => Promise<void>
   importJSON: (data: unknown, meta?: FileMeta) => void
@@ -998,19 +998,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     else layers[li] = { ...layer, data: new Uint8Array(W * H) }
     return nextPartialState(s, { layers })
   }),
-  exportPNG: () => {
+  exportPNG: (scale?: number) => {
     const { mode, layers, palette, transparentIndex, width: W, height: H } = get()
-    const cvs = document.createElement('canvas')
-    cvs.width = W
-    cvs.height = H
-    const ctx = cvs.getContext('2d')!
+    const s = Math.max(1, Math.min(64, Math.floor(scale || 1))) // clamp scale 1-64
+    const base = document.createElement('canvas')
+    base.width = W
+    base.height = H
+    const bctx = base.getContext('2d')!
     const img = new ImageData(W, H)
     compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data })), mode, palette, transparentIndex, img)
-    ctx.putImageData(img, 0, 0)
+    bctx.putImageData(img, 0, 0)
+
+    let outCanvas = base
+    if (s !== 1) {
+      const scaled = document.createElement('canvas')
+      scaled.width = W * s
+      scaled.height = H * s
+      const sctx = scaled.getContext('2d')!
+      sctx.imageSmoothingEnabled = false
+      sctx.drawImage(base, 0, 0, W * s, H * s)
+      outCanvas = scaled
+    }
 
     const a = document.createElement('a')
-    a.href = cvs.toDataURL('image/png')
-    a.download = 'cpixel.png'
+    a.href = outCanvas.toDataURL('image/png')
+    a.download = s === 1 ? 'cpixel.png' : `cpixel@${s}x.png`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   },
