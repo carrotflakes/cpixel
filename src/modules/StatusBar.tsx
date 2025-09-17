@@ -4,6 +4,8 @@ import { useLogStore } from './stores/logStore'
 import { ColorBox } from './ColorBox'
 import { useEffect, useRef, useState } from 'react'
 
+const MESSAGE_DISPLAY_DURATION = 3000
+
 export function StatusBar() {
   const size = useAppStore(s => s.view.scale)
   const hover = useAppStore(s => s.hover)
@@ -23,7 +25,7 @@ export function StatusBar() {
     timeoutRef.current = window.setTimeout(() => {
       setActiveMessage(null)
       timeoutRef.current = null
-    }, 1000)
+    }, MESSAGE_DISPLAY_DURATION)
     return () => {
       if (timeoutRef.current) {
         window.clearTimeout(timeoutRef.current)
