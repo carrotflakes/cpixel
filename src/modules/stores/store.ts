@@ -1197,6 +1197,31 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 function nextPartialState(state: AppState, patch: Partial<AppState>): Partial<AppState> {
   const entry = buildDiff(state, { ...state, ...patch })
+
+  // Merge palette color changes into existing entry if present
+  const prevEntry = state._undo.at(-1)
+  if (prevEntry && Object.keys(prevEntry) + '' === 'palette' && entry && Object.keys(entry) + '' === 'palette') {
+    const prevPal = prevEntry.palette!
+    const nextPal = entry.palette!
+    if (prevPal.before.length === prevPal.after.length && prevPal.after.length === nextPal.after.length) {
+      const diffIdxs = []
+      for (let i = 0; i < prevPal.after.length; i++) {
+        if (prevPal.before[i] !== prevPal.after[i] || prevPal.after[i] !== nextPal.after[i]) diffIdxs.push(i)
+      }
+      if (diffIdxs.length === 1) {
+        const mergedEntry = { palette: { before: prevPal.before.slice(0), after: nextPal.after.slice(0) } }
+        return {
+          ...patch,
+          _undo: [...state._undo.slice(0, -1), mergedEntry],
+          _redo: [],
+          canUndo: true,
+          canRedo: false,
+          dirty: true,
+        }
+      }
+    }
+  }
+
   return {
     ...patch,
     _undo: entry ? [...state._undo, entry] : state._undo,
