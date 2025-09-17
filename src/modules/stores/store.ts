@@ -117,9 +117,9 @@ export type AppState = {
   redo: () => void
   canUndo: boolean
   canRedo: boolean
-  _undo: Snapshot[]
-  _redo: Snapshot[]
-  _stroking: boolean
+  _undo: HistoryEntry[]
+  _redo: HistoryEntry[]
+  _stroking?: { layers: Record<string, Uint32Array | Uint8Array> }
   dirty: boolean // TODO: need to update this
   hover?: { x: number; y: number; rgba?: number; index?: number }
   setHoverInfo: (h?: { x: number; y: number; rgba?: number; index?: number }) => void
@@ -137,14 +137,16 @@ export type AppState = {
   setFileMeta: (fileMeta: FileMeta | undefined) => void
 }
 
-type Snapshot = {
-  width: number
-  height: number
-  mode: 'truecolor' | 'indexed'
-  layers: Layer[]
-  activeLayerId: string
-  palette: Uint32Array
-  transparentIndex: number
+type HistoryEntry = {
+  width?: { before: number; after: number }
+  height?: { before: number; after: number }
+  mode?: { before: 'truecolor' | 'indexed'; after: 'truecolor' | 'indexed' }
+  activeLayerId?: { before: string; after: string }
+  transparentIndex?: { before: number; after: number }
+  palette?: { before: Uint32Array; after: Uint32Array }
+  layers?:
+  | { replaced: { before: Layer[]; after: Layer[] } }
+  | { dataChanges: Array<{ id: string; before: Uint32Array | Uint8Array; after: Uint32Array | Uint8Array }> }
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -176,7 +178,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // internal history state
   _undo: [],
   _redo: [],
-  _stroking: false,
+  _stroking: undefined,
   selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
   clipboard: undefined,
   // file metadata
@@ -187,7 +189,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const layer: Layer = s.mode === 'truecolor'
       ? { id, visible: true, locked: false, data: new Uint32Array(s.width * s.height) }
       : { id, visible: true, locked: false, data: new Uint8Array(s.width * s.height) }
-    return { layers: [...s.layers, layer], activeLayerId: id }
+    return nextPartialState(s, { layers: [...s.layers, layer], activeLayerId: id })
   }),
   removeLayer: (id) => set((s) => {
     if (s.layers.length <= 1) return {}
@@ -195,7 +197,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (idx < 0) return {}
     const next = s.layers.slice(0, idx).concat(s.layers.slice(idx + 1))
     const active = s.activeLayerId === id ? next[Math.max(0, idx - 1)].id : s.activeLayerId
-    return { layers: next, activeLayerId: active }
+    return nextPartialState(s, { layers: next, activeLayerId: active })
   }),
   duplicateLayer: (id) => set((s) => {
     const i = s.layers.findIndex(l => l.id === id)
@@ -207,7 +209,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       : { id: nid, visible: true, locked: false, data: new Uint8Array(src.data) }
     const next = s.layers.slice()
     next.splice(i + 1, 0, dup)
-    return { layers: next, activeLayerId: nid }
+    return nextPartialState(s, { layers: next, activeLayerId: nid })
   }),
   moveLayer: (id, toIndex) => set((s) => {
     const n = s.layers.length
@@ -218,7 +220,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const arr = s.layers.slice()
     const [item] = arr.splice(from, 1)
     arr.splice(to, 0, item)
-    return { layers: arr }
+    return nextPartialState(s, { layers: arr })
   }),
   setActiveLayer: (id) => set((s) => (s.layers.some(l => l.id === id) ? { activeLayerId: id } : {})),
   toggleVisible: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l) })),
@@ -282,7 +284,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // If editing currently selected index, also sync visible color string
     const patch: Partial<AppState> = { palette: pal }
     if (s.currentPaletteIndex === i) patch.color = pal[i]
-    return patch
+    return nextPartialState(s, patch)
   }),
   removePaletteIndex: (idx) => set((s) => {
     const n = s.palette.length
@@ -312,7 +314,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { ...l, data: dst }
     })
     const color = pal[ci] ?? 0
-    return { palette: pal, transparentIndex: ti, layers, currentPaletteIndex: ci, color }
+    return nextPartialState(s, { palette: pal, transparentIndex: ti, layers, currentPaletteIndex: ci, color })
   }),
   movePaletteIndex: (from, to) => set((s) => {
     const n = s.palette.length
@@ -350,7 +352,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const ci = s.currentPaletteIndex !== undefined ? map[s.currentPaletteIndex] : undefined
     const patch: Partial<AppState> = { palette: pal, layers, transparentIndex: ti }
     if (ci !== undefined) { patch.currentPaletteIndex = ci; patch.color = pal[ci] ?? 0 }
-    return patch
+    return nextPartialState(s, patch)
   }),
   applyPalettePreset: (colors, ti = 0) => set((s) => {
     if (s.mode === 'truecolor')
@@ -383,7 +385,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       .map(i => (i === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, s.palette[i] ?? 0x00000000)))
       .filter((v, i, a) => a.indexOf(v) === i) // dedupe
 
-    return { palette, transparentIndex: ti, layers, currentPaletteIndex: curIdx, color, recentColorsIndexed }
+    return nextPartialState(s, { palette, transparentIndex: ti, layers, currentPaletteIndex: curIdx, color, recentColorsIndexed })
   }),
   addPaletteColor: (rgba) => {
     const s = get()
@@ -395,15 +397,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       // If in indexed mode, select the newly added color
       if (s.mode === 'indexed') {
         const idx = next.length - 1
-        return { palette: next, currentPaletteIndex: idx, color: next[idx] ?? 0 }
+        return nextPartialState(s, { palette: next, currentPaletteIndex: idx, color: next[idx] ?? 0 })
       }
-      return { palette: next }
+      return nextPartialState(s, { palette: next })
     })
     return next.length - 1
   },
   setTransparentIndex: (idx) => set((s) => {
     const clamped = Math.max(0, Math.min(idx | 0, Math.max(0, s.palette.length - 1)))
-    return { transparentIndex: clamped }
+    if (clamped === s.transparentIndex) return {}
+    return nextPartialState(s, { transparentIndex: clamped })
   }),
   setView: (x, y, scale) => set(() => ({ view: { x, y, scale: clamp(scale, MIN_SCALE, MAX_SCALE) } })),
   translateAllLayers: (base, dx, dy) => set((s) => {
@@ -929,64 +932,70 @@ export const useAppStore = create<AppState>((set, get) => ({
   setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
   beginStroke: () => set((s) => {
     if (s._stroking) return {}
-    return nextPartialState(s, { _stroking: true })
+    const base: Record<string, Uint32Array | Uint8Array> = {}
+    for (const l of s.layers) base[l.id] = l.data.slice(0) as typeof l.data
+    return { _stroking: { layers: base } }
   }),
-  endStroke: () => set((s) => (s._stroking ? { _stroking: false } : {})),
+  endStroke: () => set((s) => {
+    if (!s._stroking) return {}
+    const base = s._stroking.layers
+    const changes: Array<{ id: string; before: Uint32Array | Uint8Array; after: Uint32Array | Uint8Array }> = []
+    if (base) {
+      for (const l of s.layers) {
+        const before = base[l.id]
+        if (!before) continue
+        const after = l.data
+        if (before instanceof Uint32Array && after instanceof Uint32Array) {
+          if (!equalU32(before, after)) changes.push({ id: l.id, before, after: after.slice(0) })
+        } else if (before instanceof Uint8Array && after instanceof Uint8Array) {
+          if (!equalU8(before, after)) changes.push({ id: l.id, before, after: after.slice(0) })
+        } else {
+          // Type change (shouldn't happen mid-stroke) — treat as changed
+          changes.push({ id: l.id, before, after: after.slice(0) })
+        }
+      }
+    }
+    const entry = changes.length > 0 ? { layers: { dataChanges: changes } } : undefined
+    return {
+      _stroking: undefined,
+      _undo: entry ? [...s._undo, entry] : s._undo,
+      _redo: entry ? [] : s._redo,
+      canUndo: entry ? true : s.canUndo,
+      canRedo: entry ? false : s.canRedo,
+      dirty: entry ? true : s.dirty,
+    }
+  }),
   undo: () => set((s) => {
-    if (!s._undo || s._undo.length === 0) return {}
-    const prev = s._undo[s._undo.length - 1]
+    if (s._undo.length === 0) return {}
+    const entry = s._undo[s._undo.length - 1]
     const undo = s._undo.slice(0, -1)
-    const snap = createSnapshot(s)
-    const patch: Partial<AppState> = {
-      width: prev.width,
-      height: prev.height,
-      mode: prev.mode,
-      layers: prev.layers.map((l: Snapshot['layers'][number]) => ({
-        id: l.id,
-        visible: l.visible,
-        locked: l.locked,
-        data: l.data instanceof Uint32Array ? new Uint32Array(l.data) : new Uint8Array(l.data),
-      })),
-      activeLayerId: prev.activeLayerId,
-      palette: new Uint32Array(prev.palette),
-      transparentIndex: prev.transparentIndex,
+    const patch = applyHistoryEntry(s, entry, 'undo')
+    useLogStore.getState().pushLog({ message: 'UNDO' })
+    return {
+      ...patch,
       _undo: undo,
-      _redo: [...s._redo, snap],
+      _redo: [...s._redo, entry],
       canUndo: undo.length > 0,
       canRedo: true,
-      dirty: true,
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+      dirty: true,
     }
-    useLogStore.getState().pushLog({ message: 'UNDO' })
-    return patch
   }),
   redo: () => set((s) => {
-    if (!s._redo || s._redo.length === 0) return {}
-    const next = s._redo[s._redo.length - 1]
+    if (s._redo.length === 0) return {}
+    const entry = s._redo[s._redo.length - 1]
     const redo = s._redo.slice(0, -1)
-    const snap = createSnapshot(s)
-    const patch: Partial<AppState> = {
-      width: next.width,
-      height: next.height,
-      mode: next.mode,
-      layers: next.layers.map((l: Snapshot['layers'][number]) => ({
-        id: l.id,
-        visible: l.visible,
-        locked: l.locked,
-        data: l.data instanceof Uint32Array ? new Uint32Array(l.data) : new Uint8Array(l.data),
-      })),
-      activeLayerId: next.activeLayerId,
-      palette: new Uint32Array(next.palette),
-      transparentIndex: next.transparentIndex,
-      _undo: [...s._undo, snap],
+    const patch = applyHistoryEntry(s, entry, 'redo')
+    useLogStore.getState().pushLog({ message: 'REDO' })
+    return {
+      ...patch,
+      _undo: [...s._undo, entry],
       _redo: redo,
       canUndo: true,
       canRedo: redo.length > 0,
-      dirty: true,
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+      dirty: true,
     }
-    useLogStore.getState().pushLog({ message: 'REDO' })
-    return patch
   }),
   clearLayer: () => set((s) => {
     const W = s.width, H = s.height
@@ -1186,33 +1195,98 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 }))
 
-function nextPartialState(curState: AppState, newState: Partial<AppState>): Partial<AppState> {
-  const snap = createSnapshot(curState)
+function nextPartialState(state: AppState, patch: Partial<AppState>): Partial<AppState> {
+  const entry = buildDiff(state, { ...state, ...patch })
   return {
-    ...newState,
-    _undo: [...curState._undo, snap],
-    _redo: [],
-    canUndo: true,
-    canRedo: false,
-    dirty: true,
+    ...patch,
+    _undo: entry ? [...state._undo, entry] : state._undo,
+    _redo: entry ? [] : state._redo,
+    canUndo: entry ? true : state.canUndo,
+    canRedo: entry ? false : state.canRedo,
+    dirty: entry ? true : state.dirty,
   }
 }
 
-function createSnapshot(state: AppState): Snapshot {
-  return {
-    width: state.width,
-    height: state.height,
-    mode: state.mode,
-    layers: state.layers.map((l: Layer) => ({
-      id: l.id,
-      visible: l.visible,
-      locked: l.locked,
-      data: l.data.slice(0),
-    })),
-    activeLayerId: state.activeLayerId,
-    palette: state.palette.slice(0),
-    transparentIndex: state.transparentIndex,
+// Build a diff entry between before and after states. Only include changed fields.
+function buildDiff(before: AppState, after: AppState): HistoryEntry | null {
+  const entry: HistoryEntry = {}
+  if (before.width !== after.width) entry.width = { before: before.width, after: after.width }
+  if (before.height !== after.height) entry.height = { before: before.height, after: after.height }
+  if (before.mode !== after.mode) entry.mode = { before: before.mode, after: after.mode }
+  if (before.activeLayerId !== after.activeLayerId) entry.activeLayerId = { before: before.activeLayerId, after: after.activeLayerId }
+  if (before.transparentIndex !== after.transparentIndex) entry.transparentIndex = { before: before.transparentIndex, after: after.transparentIndex }
+  if (!equalU32(before.palette, after.palette)) entry.palette = { before: before.palette.slice(0), after: after.palette.slice(0) }
+
+  // Layers: if structure (ids/visibility/locked/count/type) differs, store full replacement; else store only data changes.
+  let structureDiffers = false
+  if (before.layers.length !== after.layers.length) structureDiffers = true
+  if (!structureDiffers) {
+    for (let i = 0; i < before.layers.length; i++) {
+      const b = before.layers[i], a = after.layers[i]
+      if (!a || b.id !== a.id || b.visible !== a.visible || b.locked !== a.locked || (b.data instanceof Uint32Array) !== (a.data instanceof Uint32Array)) {
+        structureDiffers = true
+        break
+      }
+    }
   }
+  if (structureDiffers) {
+    entry.layers = { replaced: { before: cloneLayers(before.layers), after: cloneLayers(after.layers) } }
+  } else {
+    const changes: Array<{ id: string; before: Uint32Array | Uint8Array; after: Uint32Array | Uint8Array }> = []
+    for (let i = 0; i < before.layers.length; i++) {
+      const b = before.layers[i], a = after.layers[i]
+      if (b.data instanceof Uint32Array && a.data instanceof Uint32Array) {
+        if (!equalU32(b.data, a.data)) changes.push({ id: a.id, before: b.data.slice(0), after: a.data.slice(0) })
+      } else if (b.data instanceof Uint8Array && a.data instanceof Uint8Array) {
+        if (!equalU8(b.data, a.data)) changes.push({ id: a.id, before: b.data.slice(0), after: a.data.slice(0) })
+      } else {
+        // type mismatch shouldn't happen here due to structure check, but guard anyway
+        changes.push({ id: a.id, before: b.data.slice(0), after: a.data.slice(0) })
+      }
+    }
+    if (changes.length > 0) entry.layers = { dataChanges: changes }
+  }
+
+  if (Object.keys(entry).length === 0) return null
+  return entry
+}
+
+function cloneLayers(layers: Layer[]): Layer[] {
+  return layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: l.data.slice(0) }))
+}
+
+function applyHistoryEntry(state: AppState, entry: HistoryEntry, dir: 'undo' | 'redo'): Partial<AppState> {
+  const patch: Partial<AppState> = {}
+  const pick = <T>(pair?: { before: T; after: T }) => pair ? (dir === 'undo' ? pair.before : pair.after) : undefined
+  const width = pick(entry.width)
+  const height = pick(entry.height)
+  const mode = pick(entry.mode)
+  const activeLayerId = pick(entry.activeLayerId)
+  const transparentIndex = pick(entry.transparentIndex)
+  const palette = pick(entry.palette)
+  if (width !== undefined) patch.width = width
+  if (height !== undefined) patch.height = height
+  if (mode !== undefined) patch.mode = mode
+  if (activeLayerId !== undefined) patch.activeLayerId = activeLayerId
+  if (transparentIndex !== undefined) patch.transparentIndex = transparentIndex
+  if (palette !== undefined) patch.palette = palette.slice(0)
+
+  if (entry.layers) {
+    if ('replaced' in entry.layers) {
+      const v = pick(entry.layers.replaced)
+      if (v) patch.layers = cloneLayers(v)
+    } else if ('dataChanges' in entry.layers) {
+      // Apply per-layer data changes on current layers array
+      const nextLayers = state.layers.map(l => ({ ...l }))
+      for (const dc of entry.layers.dataChanges) {
+        const arr = dir === 'undo' ? dc.before : dc.after
+        const i = nextLayers.findIndex(x => x.id === dc.id)
+        if (i >= 0) nextLayers[i] = { ...nextLayers[i], data: arr.slice(0) }
+      }
+      patch.layers = nextLayers
+    }
+  }
+  return patch
 }
 
 function newLayerId(layers: Layer[]): string {
