@@ -485,6 +485,17 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           if (settings.usePen)
             return
 
+          // Invoke tool that would have been started on pointerdown
+          beginStroke()
+          const contiguous = !e.shiftKey
+          if (isBucketTool()) {
+            useAppStore.getState().fillBucket(f.x, f.y, paintFor(false), contiguous)
+          } else if (isBrushishTool()) {
+            const erase = curTool.current === 'eraser'
+            mouseStroke.current = { active: true, erase, lastX: f.x, lastY: f.y }
+            useAppStore.getState().setAt(f.x, f.y, paintFor(erase))
+          }
+
           endTool()
         }
         return
