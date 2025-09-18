@@ -152,6 +152,21 @@ export function PixelCanvas() {
     }
   }, [layers, palette, mode, transparentIndex, view, hover?.x, hover?.y, shapePreview, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
 
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    // This is a workaround to fix the issue where drawing does not occur when drawing quickly with an Apple Pencil.
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      canvas.focus();
+    };
+
+    canvas.addEventListener("touchstart", onTouchStart, {
+      passive: false,
+    });
+  }, [])
+
   const overlay = (() => {
     if (parallaxActive) return null // hide selection UI in parallax mode
     if (!selection.mask || !selection.bounds) return null
