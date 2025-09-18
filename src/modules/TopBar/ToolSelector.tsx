@@ -3,8 +3,12 @@ import { LuPaintbrush, LuPaintBucket, LuSlash, LuSquare, LuPipette, LuCheck, LuC
 import { RiDragMove2Fill } from 'react-icons/ri'
 import { PiLasso, PiRectangleDashed, PiMagicWand } from 'react-icons/pi'
 import { useAppStore } from '../stores/store'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+
+const itemCls = 'px-3 py-2 rounded-sm text-sm flex items-center gap-2 cursor-pointer select-none outline-none focus:bg-surface-muted data-[disabled]:opacity-50'
+const contentCls = 'z-1000 p-1 border border-border bg-elevated rounded-md shadow-lg'
+const separatorCls = 'my-1 h-px bg-border'
 
 export function ToolSelector() {
   const tool = useAppStore(s => s.tool)
@@ -21,7 +25,6 @@ export function ToolSelector() {
   // Brush size menu
   const [brushOpen, setBrushOpen] = useState(false)
   const brushSize = useAppStore(s => s.brushSize)
-  const setBrushSize = useAppStore(s => s.setBrushSize)
   const eraserSize = useAppStore(s => s.eraserSize)
   const setEraserSize = useAppStore(s => s.setEraserSize)
   const W = useAppStore(s => s.width)
@@ -32,12 +35,6 @@ export function ToolSelector() {
 
   // Shape options menu
   const [shapeOpen, setShapeOpen] = useState(false)
-
-  // Radix handles outside click / Escape.
-
-  const itemCls = 'px-3 py-2 rounded-sm text-sm flex items-center gap-2 cursor-pointer select-none outline-none focus:bg-surface-muted data-[disabled]:opacity-50'
-  const contentCls = 'z-1000 p-1 border border-border bg-elevated rounded-md shadow-lg'
-  const separatorCls = 'my-1 h-px bg-border'
 
   return (
     <div className="flex items-center gap-2 ml-auto">
@@ -57,26 +54,7 @@ export function ToolSelector() {
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content className={contentCls} sideOffset={6} align="start">
-              <div className="px-3 py-2 flex flex-col gap-2">
-                <div className="flex gap-2 text-sm">Brush Size: {brushSize}</div>
-                <input
-                  type="range"
-                  min={1}
-                  max={maxDim}
-                  value={brushSize}
-                  onChange={e => setBrushSize(Number(e.target.value))}
-                  aria-label="Brush size"
-                />
-                <div className="flex flex-wrap gap-1">
-                  {PRESET_SIZES.map(sz => (
-                    <button
-                      key={sz}
-                      onClick={() => { setBrushSize(sz) }}
-                      className={`px-2 py-1 rounded border text-xs ${brushSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
-                    >{sz}</button>
-                  ))}
-                </div>
-              </div>
+              <BrushMenu maxDim={maxDim} />
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -235,3 +213,155 @@ const SELECT_TOOLS = [
 ] as const
 
 const PRESET_SIZES = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32]
+
+function BrushMenu({ maxDim }: { maxDim: number }) {
+  const brushSize = useAppStore(s => s.brushSize)
+  const setBrushSize = useAppStore(s => s.setBrushSize)
+  const brushSubMode = useAppStore(s => s.brushSubMode)
+  const setBrushSubMode = useAppStore(s => s.setBrushSubMode)
+  const brushPattern = useAppStore(s => s.brushPattern)
+  const setBrushPattern = useAppStore(s => s.setBrushPattern)
+
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const { size } = brushPattern
+    const cellSize = 10
+    canvas.width = size * cellSize + 1
+    canvas.height = size * cellSize + 1
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const idx = y * size + x
+        const on = brushPattern.mask[idx] === 1
+        ctx.fillStyle = on ? 'black' : 'white'
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize)
+        ctx.strokeStyle = '#ccc'
+        ctx.strokeRect(x * cellSize + 0.5, y * cellSize + 0.5, cellSize + 0.5, cellSize + 0.5)
+      }
+    }
+  }, [brushSubMode, brushPattern])
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const { size } = brushPattern
+    const x = Math.floor((e.clientX - rect.left) * size / rect.width)
+    const y = Math.floor((e.clientY - rect.top) * size / rect.height)
+    if (x < 0 || x >= size || y < 0 || y >= size) return
+    const idx = y * size + x
+    const newMask = new Uint8Array(brushPattern.mask)
+    newMask[idx] = newMask[idx] === 1 ? 0 : 1
+    setBrushPattern(size, newMask)
+  }
+
+  return (<div className="px-3 py-2 flex flex-col gap-2">
+    <div className="flex gap-2 text-sm">Brush Size: {brushSize}</div>
+    <input
+      type="range"
+      min={1}
+      max={maxDim}
+      value={brushSize}
+      onChange={e => setBrushSize(Number(e.target.value))}
+      aria-label="Brush size"
+    />
+    <div className="flex flex-wrap gap-1">
+      {PRESET_SIZES.map(sz => (
+        <button
+          key={sz}
+          onClick={() => { setBrushSize(sz) }}
+          className={`px-2 py-1 rounded border text-xs ${brushSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
+        >{sz}</button>
+      ))}
+    </div>
+    <div className="mt-2 border-t border-border pt-2">
+      <div className="flex items-center justify-between text-sm mb-2">
+        <span>Brush Mode</span>
+        <div className="inline-flex rounded overflow-hidden border border-border">
+          <button
+            className={`px-2 py-1 text-xs ${brushSubMode === 'normal' ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted'}`}
+            onClick={() => setBrushSubMode('normal')}
+          >Normal</button>
+          <button
+            className={`px-2 py-1 text-xs border-l border-border ${brushSubMode === 'pattern' ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted'}`}
+            onClick={() => setBrushSubMode('pattern')}
+          >Pattern</button>
+        </div>
+      </div>
+      {brushSubMode === 'pattern' && (
+        <div className="flex gap-2 justify-between">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-sm">
+              <DropdownMenu.Root modal={false}>
+                <DropdownMenu.Trigger asChild>
+                  <button className="px-2 py-1 rounded border text-xs bg-surface hover:bg-surface-muted border-border">
+                    Preset
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content className={contentCls} sideOffset={6} align="start">
+                    {PRESET_PATTERNS.map(p => (
+                      <DropdownMenu.Item
+                        key={p.name}
+                        className={itemCls}
+                        onSelect={() => {
+                          setBrushSubMode('pattern')
+                          setBrushPattern(p.n, p.mask)
+                        }}
+                      >
+                        {p.name}
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span>Size</span>
+              <input
+                type="number"
+                min={1}
+                max={16}
+                value={brushPattern.size}
+                onChange={(e) => {
+                  const n = Math.max(1, Math.min(16, Number(e.target.value) | 0))
+                  const mask = new Uint8Array(n * n)
+                  for (let y = 0; y < n; y++)
+                    for (let x = 0; x < n; x++)
+                      mask[y * n + x] = (x < brushPattern.size && y < brushPattern.size) ? brushPattern.mask[y * brushPattern.size + x] : 0
+                  setBrushPattern(n, mask)
+                }}
+                className="w-16 px-2 py-1 bg-surface rounded border border-border text-right"
+                aria-label="Pattern size"
+              />
+            </div>
+            <button className='px-2 py-1 rounded border border-border bg-surface hover:bg-surface-muted text-sm' onClick={() => {
+              const mask = new Uint8Array(brushPattern.mask)
+              for (let i = 0; i < mask.length; i++)
+                mask[i] = 1 - mask[i]
+              setBrushPattern(brushPattern.size, mask)
+            }}>Invert</button>
+          </div>
+          <canvas
+            ref={canvasRef}
+            onClick={handleCanvasClick}
+            className="w-32 border border-border cursor-pointer"
+            style={{ imageRendering: 'pixelated' }}
+          />
+        </div>
+      )}
+    </div>
+  </div>)
+}
+
+const PRESET_PATTERNS = [
+  { name: 'Checker 2x2', n: 2, mask: new Uint8Array([1, 0, 0, 1]) },
+  { name: 'Dot 2x2', n: 2, mask: new Uint8Array([1, 0, 0, 0]) },
+  { name: 'Dot 3x3', n: 3, mask: new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0, 0]) },
+  { name: 'Dot 4x4', n: 4, mask: new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) },
+] as const

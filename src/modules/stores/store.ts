@@ -5,7 +5,7 @@ import { compositeImageData } from '../utils/composite.ts'
 import { floodFillIndexed, floodFillTruecolor } from '../utils/fill.ts'
 import { flipLayersHorizontal, flipLayersVertical } from '../utils/flip.ts'
 import { normalizeImportedJSON } from '../utils/io.ts'
-import { drawEllipseFilledIndexed, drawEllipseFilledTruecolor, drawEllipseOutlineIndexed, drawEllipseOutlineTruecolor, drawLineBrushIndexed, drawLineBrushTruecolor, drawRectFilledIndexed, drawRectFilledTruecolor, drawRectOutlineIndexed, drawRectOutlineTruecolor, stampIndexed, stampTruecolor } from '../utils/paint.ts'
+import { drawEllipseFilledIndexed, drawEllipseFilledTruecolor, drawEllipseOutlineIndexed, drawEllipseOutlineTruecolor, drawLineBrushIndexed, drawLineBrushTruecolor, drawLineBrushIndexedPattern, drawLineBrushTruecolorPattern, drawRectFilledIndexed, drawRectFilledTruecolor, drawRectOutlineIndexed, drawRectOutlineTruecolor, stampIndexed, stampTruecolor, stampIndexedPattern, stampTruecolorPattern } from '../utils/paint.ts'
 import { generatePaletteFromComposite } from '../utils/palette.ts'
 import { resizeLayers } from '../utils/resize.ts'
 import { applyFloatingToIndexedLayer, applyFloatingToTruecolorLayer, buildFloatingFromClipboard, clearSelectedIndexed, clearSelectedTruecolor, extractFloatingIndexed, extractFloatingTruecolor, fillSelectedIndexed, fillSelectedTruecolor, rectToMask } from '../utils/selection.ts'
@@ -45,6 +45,8 @@ export type AppState = {
   view: { x: number; y: number; scale: number }
   color: number
   brushSize: number
+  brushSubMode: 'normal' | 'pattern'
+  brushPattern: { size: number; mask: Uint8Array }
   eraserSize: number
   shapeFill: boolean
   currentPaletteIndex?: number
@@ -76,6 +78,8 @@ export type AppState = {
   setTool: (t: ToolType) => void
   setBrushSize: (n: number) => void
   setEraserSize: (n: number) => void
+  setBrushSubMode: (m: 'normal' | 'pattern') => void
+  setBrushPattern: (size: number, mask: Uint8Array) => void
   toggleShapeFill: () => void
   setView: (x: number, y: number, scale: number) => void
   setAt: (x: number, y: number, rgbaOrIndex: number) => void
@@ -158,6 +162,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   color: 0x000000,
   brushSize: 1,
   eraserSize: 1,
+  brushSubMode: 'normal',
+  brushPattern: { size: 2, mask: new Uint8Array([1, 0, 0, 1]) },
   shapeFill: false,
   currentPaletteIndex: 1,
   recentColorsTruecolor: [0x000000, 0xffffff],
@@ -241,6 +247,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const size = Math.max(1, Math.min(Math.floor(n), maxDim))
     return { eraserSize: size }
   }),
+  setBrushSubMode: (m) => set(() => ({ brushSubMode: m })),
+  setBrushPattern: (size, mask) => set(() => ({ brushPattern: { size: Math.max(1, size | 0), mask } })),
   toggleShapeFill: () => set((s) => ({ shapeFill: !s.shapeFill })),
   setColor: (rgba) => set((s) => {
     if (s.mode === 'indexed') {
@@ -444,13 +452,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       const size = Math.max(1, (s.tool === 'eraser' ? s.eraserSize : s.brushSize) | 0)
       if (s.mode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
-        const out = stampTruecolor(layer.data, W, H, x, y, size, rgbaOrIndex >>> 0, s.selection?.mask)
+        const out = (s.tool === 'brush' && s.brushSubMode === 'pattern')
+          ? stampTruecolorPattern(layer.data, W, H, x, y, size, rgbaOrIndex >>> 0, s.brushPattern.size, s.brushPattern.mask, s.selection?.mask)
+          : stampTruecolor(layer.data, W, H, x, y, size, rgbaOrIndex >>> 0, s.selection?.mask)
         if (equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
         if (!(layer.data instanceof Uint8Array)) return {}
-        const out = stampIndexed(layer.data, W, H, x, y, size, rgbaOrIndex & 0xff, s.selection?.mask)
+        const out = (s.tool === 'brush' && s.brushSubMode === 'pattern')
+          ? stampIndexedPattern(layer.data, W, H, x, y, size, rgbaOrIndex & 0xff, s.brushPattern.size, s.brushPattern.mask, s.selection?.mask)
+          : stampIndexed(layer.data, W, H, x, y, size, rgbaOrIndex & 0xff, s.selection?.mask)
         if (equalU8(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
@@ -474,13 +486,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       const size = Math.max(1, (s.tool === 'eraser' ? s.eraserSize : s.brushSize) | 0)
       if (s.mode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
-        const out = drawLineBrushTruecolor(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex >>> 0, s.selection?.mask)
+        const out = (s.tool === 'brush' && s.brushSubMode === 'pattern')
+          ? drawLineBrushTruecolorPattern(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex >>> 0, s.brushPattern.size, s.brushPattern.mask, s.selection?.mask)
+          : drawLineBrushTruecolor(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex >>> 0, s.selection?.mask)
         if (equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
         if (!(layer.data instanceof Uint8Array)) return {}
-        const out = drawLineBrushIndexed(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex & 0xff, s.selection?.mask)
+        const out = (s.tool === 'brush' && s.brushSubMode === 'pattern')
+          ? drawLineBrushIndexedPattern(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex & 0xff, s.brushPattern.size, s.brushPattern.mask, s.selection?.mask)
+          : drawLineBrushIndexed(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex & 0xff, s.selection?.mask)
         if (equalU8(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
