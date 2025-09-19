@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useCanvasInput } from './hooks/useCanvasInput'
-import { useTilt } from './hooks/useTilt'
-import { useSettingsStore } from './stores/settingsStore'
-import { useAppStore } from './stores/store'
-import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas, drawSelectionOutline } from './utils/canvasDraw'
-import { compositeImageData } from './utils/composite'
+import { useCanvasInput } from './useCanvasInput'
+import { useTilt } from '@/hooks/useTilt'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { useAppStore } from '@/stores/store'
+import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas, drawSelectionOutline } from '@/utils/canvasDraw'
+import { compositeImageData } from '@/utils/composite'
 
 const GRID_THRESHOLD = 8
 

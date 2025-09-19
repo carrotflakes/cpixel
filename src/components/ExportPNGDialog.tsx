@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useAppStore } from './stores/store'
+import { useAppStore } from '@/stores/store'
 
 export function ExportPNGDialog(props: { open: boolean; onClose: () => void }) {
   const { open, onClose } = props

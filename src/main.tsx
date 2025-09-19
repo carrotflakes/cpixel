@@ -1,8 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { App } from './modules/App'
+import { App } from './components/App'
 import './index.css'
-import { initAutosave } from './modules/stores/autosave'
+import { initAutosave } from './stores/autosave'
 
 initAutosave()
 

@@ -1,7 +1,7 @@
-import { rgbaToCSSHex } from './utils/color'
-import { useAppStore } from './stores/store'
-import { useLogStore } from './stores/logStore'
-import { ColorBox } from './ColorBox'
+import { rgbaToCSSHex } from '@/utils/color'
+import { useAppStore } from '@/stores/store'
+import { useLogStore } from '@/stores/logStore'
+import { ColorBox } from '@/components/ColorBox'
 import { useEffect, useRef, useState } from 'react'
 
 const MESSAGE_DISPLAY_DURATION = 3000

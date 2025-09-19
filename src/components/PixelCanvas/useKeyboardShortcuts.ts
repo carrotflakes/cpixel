@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useAppStore } from '../stores/store'
+import { useAppStore } from '@/stores/store'
 
 export function useKeyboardShortcuts(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,

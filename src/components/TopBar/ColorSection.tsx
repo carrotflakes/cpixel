@@ -1,7 +1,7 @@
 import { COLOR_BOX_STYLE, ColorBoxInner } from '../ColorBox'
 import { ColorPicker, useColorPopover } from '../ColorPicker'
-import { useAppStore } from '../stores/store'
-import { rgbaToCSSHex } from '../utils/color'
+import { useAppStore } from '@/stores/store'
+import { rgbaToCSSHex } from '@/utils/color'
 
 export function ColorSection() {
   const color = useAppStore(s => s.color)

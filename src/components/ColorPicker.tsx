@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { parseCSSColor, rgbaToCSSHex, unpackRGBA, packRGBA } from './utils/color'
-import { ColorBox } from './ColorBox'
-import { PALETTE_PRESETS } from './presets/palettes'
+import { parseCSSColor, rgbaToCSSHex, unpackRGBA, packRGBA } from '@/utils/color'
+import { ColorBox } from '@/components/ColorBox'
+import { PALETTE_PRESETS } from '@/presets/palettes'
 import { LuChevronDown, LuChevronUp } from 'react-icons/lu'
-import { useUIState } from './stores/useUiStore'
-import { useAppStore } from './stores/store'
+import { useUIState } from '@/stores/useUiStore'
+import { useAppStore } from '@/stores/store'
 
 type Props = {
   color: number

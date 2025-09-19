@@ -1,8 +1,8 @@
 import { FaLock, FaLockOpen } from 'react-icons/fa'
 import { LuArrowDown, LuArrowUp, LuCopy, LuEraser, LuEye, LuEyeOff, LuPlus, LuTrash2 } from 'react-icons/lu'
-import { useAppStore } from './stores/store'
-import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from './ui/RadixContextMenu'
-import { useUIState } from './stores/useUiStore'
+import { useAppStore } from '@/stores/store'
+import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from '@/components/ui/RadixContextMenu'
+import { useUIState } from '@/stores/useUiStore'
 
 export function LayersPanel() {
   const layers = useAppStore(s => s.layers)

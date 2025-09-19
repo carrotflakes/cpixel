@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { FaEllipsisV, FaEraser } from 'react-icons/fa'
 import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings, LuFlipHorizontal, LuFlipVertical } from 'react-icons/lu'
-import { CanvasSizeDialog } from '../CanvasSizeDialog'
-import { ExportPNGDialog } from '../ExportPNGDialog'
-import { SettingsDialog } from '../SettingsDialog'
-import { useAppStore } from '../stores/store'
+import { CanvasSizeDialog } from '@/components/CanvasSizeDialog'
+import { ExportPNGDialog } from '@/components/ExportPNGDialog'
+import { SettingsDialog } from '@/components/SettingsDialog'
+import { useAppStore } from '@/stores/store'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { GoogleDrive } from '../utils/googleDrive'
-import { oddMask } from '../utils/selection'
-import { useLogStore } from '../stores/logStore'
+import { GoogleDrive } from '@/utils/googleDrive'
+import { oddMask } from '@/utils/selection'
+import { useLogStore } from '@/stores/logStore'
 
 export function MoreMenu() {
   // store selectors

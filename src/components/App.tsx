@@ -1,9 +1,9 @@
-import { PixelCanvas } from "./PixelCanvas";
-import { TopBar } from "./TopBar/index";
-import { StatusBar } from "./StatusBar";
-import { PalettePanel } from "./PalettePanel";
-import { LayersPanel } from "./LayersPanel";
-import { useAppStore } from "./stores/store";
+import { PixelCanvas } from "@/components/PixelCanvas/PixelCanvas";
+import { TopBar } from "@/components/TopBar/index";
+import { StatusBar } from "@/components/StatusBar";
+import { PalettePanel } from "@/components/PalettePanel";
+import { LayersPanel } from "@/components/LayersPanel";
+import { useAppStore } from "@/stores/store";
 import { useEffect } from "react";
 
 export function App() {

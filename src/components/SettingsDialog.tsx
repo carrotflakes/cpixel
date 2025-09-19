@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSettingsStore } from './stores/settingsStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const { open, onClose } = props

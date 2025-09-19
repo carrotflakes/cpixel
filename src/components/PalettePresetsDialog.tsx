@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { PALETTE_PRESETS, PalettePreset } from './presets/palettes'
-import { rgbaToCSSHex } from './utils/color'
-import { ColorBox } from './ColorBox'
+import { PALETTE_PRESETS, PalettePreset } from '@/presets/palettes'
+import { rgbaToCSSHex } from '@/utils/color'
+import { ColorBox } from '@/components/ColorBox'
 
 type Props = {
   open: boolean

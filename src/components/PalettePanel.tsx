@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
 import { LuArrowDown, LuArrowUp, LuChevronDown, LuChevronUp, LuPin, LuTrash2 } from 'react-icons/lu'
-import { COLOR_BOX_STYLE, ColorBoxInner } from './ColorBox'
-import { ColorPicker } from './ColorPicker'
-import { PalettePresetsDialog } from './PalettePresetsDialog'
-import { useAppStore } from './stores/store'
-import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from './ui/RadixContextMenu'
-import { parseCSSColor, rgbaToCSSHex } from './utils/color'
-import { useUIState } from './stores/useUiStore'
+import { COLOR_BOX_STYLE, ColorBoxInner } from '@/components/ColorBox'
+import { ColorPicker } from '@/components/ColorPicker'
+import { PalettePresetsDialog } from '@/components/PalettePresetsDialog'
+import { useAppStore } from '@/stores/store'
+import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from '@/components/ui/RadixContextMenu'
+import { parseCSSColor, rgbaToCSSHex } from '@/utils/color'
+import { useUIState } from '@/stores/useUiStore'
 
 export function PalettePanel() {
   const mode = useAppStore(s => s.mode)
