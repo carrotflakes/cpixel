@@ -4,8 +4,12 @@ import React from 'react'
 // Thin styling wrapper around Radix primitives to match existing MenuItem look.
 // This will be used incrementally to replace the bespoke ContextMenu implementation.
 
-export const RCMenuRoot = ContextMenu.Root
 export const RCMenuTrigger = ContextMenu.Trigger
+
+export function RCMenuRoot(props: React.ComponentProps<typeof ContextMenu.Root>) {
+  const { children, ...rest } = props
+  return <ContextMenu.Root modal={false} {...rest}>{children}</ContextMenu.Root>
+}
 
 export function RCMenuContent(props: React.ComponentProps<typeof ContextMenu.Content>) {
   const { className, ...rest } = props
@@ -74,17 +78,4 @@ export function SimpleRadixContextMenu(props: { trigger: React.ReactNode; childr
       <RCMenuContent>{children}</RCMenuContent>
     </RCMenuRoot>
   )
-}
-
-// NOTE: Additional migration steps will replace custom menus with Radix components gradually.
-
-export default {
-  Root: RCMenuRoot,
-  Trigger: RCMenuTrigger,
-  Content: RCMenuContent,
-  Item: RCMenuItem,
-  Separator: RCMenuSeparator,
-  Sub: RCMenuSub,
-  SubTrigger: RCMenuSubTrigger,
-  SubContent: RCMenuSubContent,
 }

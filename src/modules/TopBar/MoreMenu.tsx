@@ -71,7 +71,7 @@ export function MoreMenu() {
 
   return (
     <>
-      <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+      <DropdownMenu.Root modal={false} open={open} onOpenChange={setOpen}>
         <DropdownMenu.Trigger asChild>
           <button
             ref={triggerRef}
