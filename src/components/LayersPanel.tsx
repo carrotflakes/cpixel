@@ -1,8 +1,11 @@
+import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from '@/components/ui/RadixContextMenu'
+import { useAppStore } from '@/stores/store'
+import { useUIState } from '@/stores/useUiStore'
+import { ensureHiDPICanvas, getCheckerCanvas } from '@/utils/canvasDraw.ts'
+import { compositeImageData } from '@/utils/composite.ts'
+import { useEffect, useRef } from 'react'
 import { FaLock, FaLockOpen } from 'react-icons/fa'
 import { LuArrowDown, LuArrowUp, LuCopy, LuEraser, LuEye, LuEyeOff, LuPlus, LuTrash2 } from 'react-icons/lu'
-import { useAppStore } from '@/stores/store'
-import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from '@/components/ui/RadixContextMenu'
-import { useUIState } from '@/stores/useUiStore'
 
 export function LayersPanel() {
   const layers = useAppStore(s => s.layers)
@@ -48,9 +51,7 @@ export function LayersPanel() {
                   <button className="p-1 rounded" title={l.visible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); toggleVisible(l.id) }}>
                     {l.visible ? <LuEye /> : <LuEyeOff />}
                   </button>
-                  <button className="p-1 rounded" title={l.locked ? 'Unlock' : 'Lock'} onClick={(e) => { e.stopPropagation(); toggleLocked(l.id) }}>
-                    {l.locked ? <FaLock /> : <FaLockOpen />}
-                  </button>
+                  <LayerPreview layer={l} />
                   <div className="flex-1 truncate">{l.id}</div>
                   <div className="flex flex-col">
                     <button className="p-1 rounded disabled:opacity-50" title="Down" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.min(layers.length - 1, idx + 1)) }}><LuArrowUp /></button>
@@ -59,6 +60,10 @@ export function LayersPanel() {
                 </div>
               </RCMenuTrigger>
               <RCMenuContent>
+                <RCMenuItem onSelect={() => { toggleLocked(l.id) }}>
+                  {l.locked ? (<FaLockOpen aria-hidden />) : (<FaLock aria-hidden />)}
+                  <span>{l.locked ? 'Unlock' : 'Lock'}</span>
+                </RCMenuItem>
                 <RCMenuItem onSelect={() => { if (active !== l.id) setActive(l.id); clearLayer() }}>
                   <LuEraser aria-hidden />
                   <span>Clear</span>
@@ -77,6 +82,67 @@ export function LayersPanel() {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function LayerPreview({ layer }: { layer: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }; }) {
+  const width = useAppStore(s => s.width)
+  const height = useAppStore(s => s.height)
+  const mode = useAppStore(s => s.mode)
+  const palette = useAppStore(s => s.palette)
+  const transparentIndex = useAppStore(s => s.transparentIndex)
+  const blockRedraw = useAppStore(s => !!s._stroking)
+
+  const ref = useRef<HTMLCanvasElement | null>(null)
+
+  useEffect(() => {
+    if (blockRedraw) return
+    const cvs = ref.current
+    if (!cvs) return
+    const ctx = cvs.getContext('2d')
+    if (!ctx) return
+    const { rect } = ensureHiDPICanvas(cvs, ctx)
+    ctx.clearRect(0, 0, rect.width, rect.height)
+
+    ctx.save()
+    // checker background
+    const checker = getCheckerCanvas(4, rect.width, rect.height)
+    ctx.drawImage(checker, 0, 0, rect.width, rect.height)
+    // render layer to ImageData
+    const img = ctx.createImageData(width, height)
+    compositeImageData([{ visible: true, data: layer.data }], mode, palette, transparentIndex, img)
+    // draw scaled into thumb
+    const off = new OffscreenCanvas(img.width, img.height)
+    const octx = off.getContext('2d', { willReadFrequently: true })!
+    octx.putImageData(img, 0, 0)
+    ctx.imageSmoothingEnabled = false
+    const scale = Math.min(rect.width / img.width, rect.height / img.height) || 1
+    const drawW = Math.max(1, Math.floor(img.width * scale))
+    const drawH = Math.max(1, Math.floor(img.height * scale))
+    const dx = Math.floor((rect.width - drawW) / 2)
+    const dy = Math.floor((rect.height - drawH) / 2)
+    ctx.drawImage(off, dx, dy, drawW, drawH)
+    // overlay if locked
+    if (layer.locked) {
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'
+      ctx.fillRect(0, 0, rect.width, rect.height)
+    }
+    // clip to bounds
+    ctx.globalCompositeOperation = 'destination-in'
+    ctx.fillStyle = 'black'
+    ctx.fillRect(dx, dy, drawW, drawH)
+    ctx.restore()
+  }, [layer.data, layer.locked, width, height, mode, palette, transparentIndex, blockRedraw])
+
+  return (
+    <div className="relative w-10 h-10 pointer-events-none">
+      <canvas ref={ref} className="w-10 h-10" />
+      {layer.locked && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <FaLock className="text-sm text-black/70" aria-hidden />
+        </div>
+      )}
     </div>
   )
 }
