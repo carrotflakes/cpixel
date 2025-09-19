@@ -4,7 +4,7 @@ import { useAppStore } from '@/stores/store'
 import { rgbaToCSSHex } from '@/utils/color'
 
 export function ColorSection() {
-  const color = useAppStore(s => s.color)
+  const color = useAppStore(s => s.currentColor())
   const setColor = useAppStore(s => s.setColor)
   const setColorIndex = useAppStore(s => s.setColorIndex)
   const setPaletteColor = useAppStore(s => s.setPaletteColor)
@@ -34,7 +34,7 @@ export function ColorSection() {
       </div>
       {recentColors?.length > 0 && (
         <div className="flex items-center gap-1" aria-label="Recent colors">
-          {recentColors.slice(0, 8).map((c, idx) => (
+          {recentColors.slice(0, 4).map((c, idx) => (
             <button
               key={mode === 'indexed' ? `${recentIndexed[idx]}` : c}
               className="h-5 w-5 rounded border border-border focus:outline-none"
@@ -64,7 +64,7 @@ function ColorButton({ color, onChange }: { color: number; onChange: (c: number)
     <>
       <button
         ref={btnRef}
-        className="h-7 w-10 rounded border border-border"
+        className="h-6 w-6 rounded border border-border"
         style={COLOR_BOX_STYLE}
         onClick={toggle}
         aria-haspopup="dialog"

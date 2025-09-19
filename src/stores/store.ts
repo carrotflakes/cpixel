@@ -62,6 +62,7 @@ export type AppState = {
   setColorIndex: (i: number) => void
   pushRecentColor: () => void
   setPaletteColor: (index: number, rgba: number) => void
+  currentColor: () => number
   // layer ops
   addLayer: () => void
   removeLayer: (id: string) => void
@@ -294,6 +295,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (s.currentPaletteIndex === i) patch.color = pal[i]
     return nextPartialState(s, patch)
   }),
+  currentColor: () => {
+    const s = get()
+    if (s.mode === 'truecolor') return s.color
+    return s.palette[s.currentPaletteIndex ?? 0] ?? 0
+  },
   removePaletteIndex: (idx) => set((s) => {
     const n = s.palette.length
     if (idx < 0 || idx >= n || n <= 1) return {}
