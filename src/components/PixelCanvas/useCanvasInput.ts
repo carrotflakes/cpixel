@@ -7,7 +7,7 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
 import { useSettingsStore } from '@/stores/settingsStore'
 
-export type ShapePreview = {
+type ShapePreview = {
   kind: 'line' | 'rect' | 'ellipse'
   startX: number
   startY: number

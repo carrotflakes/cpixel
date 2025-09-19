@@ -126,8 +126,8 @@ export function drawShapePreview(
     ctx.restore()
   } else {
     ctx.beginPath()
-    ctx.moveTo(x0, y0)
-    ctx.lineTo(x1, y1)
+    ctx.moveTo((startX + 0.5) * s, (startY + 0.5) * s)
+    ctx.lineTo((curX + 0.5) * s, (curY + 0.5) * s)
     ctx.stroke()
   }
   ctx.restore()
