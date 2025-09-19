@@ -1,15 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
-import { FaEllipsisV, FaEraser } from 'react-icons/fa'
-import { LuCheck, LuChevronRight, LuDownload, LuMaximize, LuSettings, LuFlipHorizontal, LuFlipVertical } from 'react-icons/lu'
 import { CanvasSizeDialog } from '@/components/CanvasSizeDialog'
 import { ExportPNGDialog } from '@/components/ExportPNGDialog'
 import { SettingsDialog } from '@/components/SettingsDialog'
-import { useAppStore } from '@/stores/store'
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { GoogleDrive } from '@/utils/googleDrive'
-import { oddMask } from '@/utils/selection'
 import { useLogStore } from '@/stores/logStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useAppStore } from '@/stores/store'
+import { GoogleDrive } from '@/utils/googleDrive'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { useEffect, useRef, useState } from 'react'
+import { FaEllipsisV } from 'react-icons/fa'
+import { LuCheck, LuChevronRight, LuDownload, LuFlipHorizontal, LuFlipVertical, LuMaximize, LuSettings } from 'react-icons/lu'
 
 export function MoreMenu() {
   // store selectors
@@ -97,6 +96,12 @@ export function MoreMenu() {
                 <DropdownMenu.Item disabled={!canUndo} className={itemCls} onSelect={() => { if (!canUndo) return; undo(); setOpen(false) }}>Undo{navigator.maxTouchPoints > 2 ? ' (2 finger tap)' : ''}</DropdownMenu.Item>
                 <DropdownMenu.Item disabled={!canRedo} className={itemCls} onSelect={() => { if (!canRedo) return; redo(); setOpen(false) }}>Redo{navigator.maxTouchPoints > 3 ? ' (3 finger tap)' : ''}</DropdownMenu.Item>
                 <DropdownMenu.Separator className={separatorCls} />
+                <DropdownMenu.Item className={itemCls} onSelect={() => {
+                  const state = useAppStore.getState()
+                  state.setSelectionRect(0, 0, state.width - 1, state.height - 1)
+                  setOpen(false)
+                }}>Select All</DropdownMenu.Item>
+                <DropdownMenu.Separator className={separatorCls} />
                 <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; copySelection(); setOpen(false) }}>Copy</DropdownMenu.Item>
                 <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; useAppStore.getState().beginStroke(); cutSelection(); useAppStore.getState().endStroke(); setOpen(false) }}>Cut</DropdownMenu.Item>
                 <DropdownMenu.Item disabled={!hasClipboard} className={itemCls} onSelect={() => { if (!hasClipboard) return; pasteClipboard(); setOpen(false) }}>Paste</DropdownMenu.Item>
@@ -119,10 +124,6 @@ export function MoreMenu() {
                     </DropdownMenu.Item>
                   </DropdownMenu.SubContent>
                 </DropdownMenu.Sub>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().clearLayer(); setOpen(false) }}>
-                  <FaEraser aria-hidden />
-                  <span>Clear layer</span>
-                </DropdownMenu.Item>
                 <DropdownMenu.Separator className={separatorCls} />
                 <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().beginStroke(); useAppStore.getState().flipHorizontal(); useAppStore.getState().endStroke(); setOpen(false) }}>
                   <LuFlipHorizontal aria-hidden />
@@ -132,25 +133,6 @@ export function MoreMenu() {
                   <LuFlipVertical aria-hidden />
                   <span>Flip vertical</span>
                 </DropdownMenu.Item>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Sub>
-            {/* Select submenu */}
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger className={itemCls}>
-                <span>Select</span>
-                <LuChevronRight className="ml-auto" aria-hidden />
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item className={itemCls} onSelect={() => {
-                  const state = useAppStore.getState()
-                  state.setSelectionRect(0, 0, state.width - 1, state.height - 1)
-                  setOpen(false)
-                }}>Select All</DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => {
-                  const { mask, bounds } = oddMask(curW, curH)
-                  useAppStore.getState().setSelectionMask(mask, bounds)
-                  setOpen(false)
-                }}>Select Odd</DropdownMenu.Item>
               </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
             {/* Import submenu */}
