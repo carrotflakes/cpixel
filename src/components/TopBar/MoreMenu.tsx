@@ -9,6 +9,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { GoogleDrive } from '@/utils/googleDrive'
 import { oddMask } from '@/utils/selection'
 import { useLogStore } from '@/stores/logStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 export function MoreMenu() {
   // store selectors
@@ -17,6 +18,7 @@ export function MoreMenu() {
   const curW = useAppStore(s => s.width)
   const curH = useAppStore(s => s.height)
   const fileMeta = useAppStore(s => s.fileMeta)
+  const googleDriveEnabled = useSettingsStore(s => s.googleDrive)
 
   const [open, setOpen] = useState(false)
   const [sizeOpen, setSizeOpen] = useState(false)
@@ -185,31 +187,33 @@ export function MoreMenu() {
               </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
             {/* Drive submenu */}
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger className={itemCls}>
-                <span>Google Drive</span>
-                <LuChevronRight className="ml-auto" aria-hidden />
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item className={itemCls} onSelect={async () => { await handleDriveSignIn(setDriveError, setDriveOpen); setOpen(false) }}>
-                  {GoogleDrive.isSignedIn() ? 'Signed in' : 'Sign in'}
-                </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { openDriveOpen(setDriveOpen, setDriveBusy, setDriveError, setDriveFiles); setOpen(false) }}>
-                  Open from Drive…
-                </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} disabled={fileMeta?.source.type !== 'google-drive'} onSelect={() => {
-                  if (fileMeta?.source.type === 'google-drive')
-                    saveProjectToGoogleDrive(fileMeta.name, fileMeta.source.fileId)
-                  setOpen(false)
-                }}>
-                  Save
-                </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { setDriveOpen('save'); setOpen(false) }}>
-                  Save As…
-                </DropdownMenu.Item>
-                {driveError && <div className="px-3 py-2 text-xs text-red-600 max-w-56">{driveError}</div>}
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Sub>
+            {googleDriveEnabled && clientId && (
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger className={itemCls}>
+                  <span>Google Drive</span>
+                  <LuChevronRight className="ml-auto" aria-hidden />
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                  <DropdownMenu.Item className={itemCls} onSelect={async () => { await handleDriveSignIn(setDriveError, setDriveOpen); setOpen(false) }}>
+                    {GoogleDrive.isSignedIn() ? 'Signed in' : 'Sign in'}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item className={itemCls} onSelect={() => { openDriveOpen(setDriveOpen, setDriveBusy, setDriveError, setDriveFiles); setOpen(false) }}>
+                    Open from Drive…
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item className={itemCls} disabled={fileMeta?.source.type !== 'google-drive'} onSelect={() => {
+                    if (fileMeta?.source.type === 'google-drive')
+                      saveProjectToGoogleDrive(fileMeta.name, fileMeta.source.fileId)
+                    setOpen(false)
+                  }}>
+                    Save
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item className={itemCls} onSelect={() => { setDriveOpen('save'); setOpen(false) }}>
+                    Save As…
+                  </DropdownMenu.Item>
+                  {driveError && <div className="px-3 py-2 text-xs text-red-600 max-w-56">{driveError}</div>}
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Sub>
+            )}
             <DropdownMenu.Item className={itemCls} onSelect={() => { setSettingsOpen(true); setOpen(false) }}>
               <LuSettings aria-hidden />
               <span>Settings…</span>

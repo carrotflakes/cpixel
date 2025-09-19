@@ -17,39 +17,48 @@ export type SettingsState = {
   setRightClickTool: (t: ToolType) => void
   usePen: boolean
   setUsePen: (v: boolean) => void
+  googleDrive: boolean
+  setGoogleDrive: (v: boolean) => void
 }
 
 const KEY = 'cpixel.settings.v1'
 
+const DEFAULT_STATE = {
+  checkerSize: 4,
+  tiltParallaxEnabled: true,
+  tiltParallaxTrigger: 180,
+  tiltParallaxAmount: 0.5,
+  tiltParallaxAlpha: 0.9,
+  rightClickTool: 'eraser',
+  usePen: false,
+  googleDrive: false
+} as const
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      checkerSize: 4,
+      ...DEFAULT_STATE,
       setCheckerSize: (n: number) => {
         const v = Math.max(1, Math.min(64, Math.floor(n)))
         set({ checkerSize: v })
       },
-      tiltParallaxEnabled: true,
       setTiltParallaxEnabled: (v: boolean) => set({ tiltParallaxEnabled: !!v }),
       tiltParallaxTrigger: 180,
       setTiltParallaxTrigger: (n: number) => {
         const v = Math.max(20, Math.min(720, Math.round(n)))
         set({ tiltParallaxTrigger: v })
       },
-      tiltParallaxAmount: 0.5,
       setTiltParallaxAmount: (n: number) => {
         const v = Math.max(0.05, Math.min(5, Number(n)))
         set({ tiltParallaxAmount: v })
       },
-      tiltParallaxAlpha: 0.9,
       setTiltParallaxAlpha: (n: number) => {
         const v = Math.max(0.05, Math.min(1, Number(n)))
         set({ tiltParallaxAlpha: v })
       },
-      rightClickTool: 'eraser',
       setRightClickTool: (t) => set({ rightClickTool: t }),
-      usePen: false,
       setUsePen: (v: boolean) => set({ usePen: !!v }),
+      setGoogleDrive: (v: boolean) => set({ googleDrive: !!v }),
     }),
     {
       name: KEY,
@@ -63,9 +72,10 @@ export const useSettingsStore = create<SettingsState>()(
         tiltParallaxAlpha: s.tiltParallaxAlpha,
         rightClickTool: s.rightClickTool,
         usePen: s.usePen,
+        googleDrive: s.googleDrive,
       }),
       migrate: (persisted: any, _fromVersion) => {
-        const state = { checkerSize: 4, tiltParallaxEnabled: true, tiltParallaxTrigger: 180, tiltParallaxAmount: 0.5, tiltParallaxAlpha: 0.9, rightClickTool: 'eraser', usePen: false }
+        const state = { ...DEFAULT_STATE }
         if (!persisted || typeof persisted !== 'object') return state
         if (typeof persisted.checkerSize === 'number') state.checkerSize = persisted.checkerSize
         if (typeof persisted.tiltParallaxEnabled === 'boolean') state.tiltParallaxEnabled = persisted.tiltParallaxEnabled
@@ -74,6 +84,7 @@ export const useSettingsStore = create<SettingsState>()(
         if (typeof persisted.tiltParallaxAlpha === 'number') state.tiltParallaxAlpha = persisted.tiltParallaxAlpha
         if (typeof persisted.rightClickTool === 'string') state.rightClickTool = persisted.rightClickTool
         if (typeof persisted.usePen === 'boolean') state.usePen = persisted.usePen
+        if (typeof persisted.googleDrive === 'boolean') state.googleDrive = persisted.googleDrive
         return state
       },
     }

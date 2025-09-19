@@ -5,19 +5,13 @@ import { useSettingsStore } from '@/stores/settingsStore'
 export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const { open, onClose } = props
   const checkerSize = useSettingsStore(s => s.checkerSize)
-  const setCheckerSize = useSettingsStore(s => s.setCheckerSize)
   const tiltEnabled = useSettingsStore(s => s.tiltParallaxEnabled)
-  const setTiltEnabled = useSettingsStore(s => s.setTiltParallaxEnabled)
   const tiltTrigger = useSettingsStore(s => s.tiltParallaxTrigger)
-  const setTiltTrigger = useSettingsStore(s => s.setTiltParallaxTrigger)
   const tiltAmount = useSettingsStore(s => s.tiltParallaxAmount)
-  const setTiltAmount = useSettingsStore(s => s.setTiltParallaxAmount)
   const tiltAlpha = useSettingsStore(s => s.tiltParallaxAlpha)
-  const setTiltAlpha = useSettingsStore(s => s.setTiltParallaxAlpha)
   const rightClickTool = useSettingsStore(s => s.rightClickTool)
-  const setRightClickTool = useSettingsStore(s => s.setRightClickTool)
   const usePen = useSettingsStore(s => s.usePen)
-  const setUsePen = useSettingsStore(s => s.setUsePen)
+  const googleDrive = useSettingsStore(s => s.googleDrive)
   const [checkerStr, setCheckerStr] = useState(String(checkerSize))
   const [tiltTriggerStr, setTiltTriggerStr] = useState(String(tiltTrigger))
   const [tiltAmountStr, setTiltAmountStr] = useState(String(tiltAmount))
@@ -25,6 +19,7 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const [rightClickToolLocal, setRightClickToolLocal] = useState(rightClickTool)
   const [tiltEnabledLocal, setTiltEnabledLocal] = useState<boolean>(tiltEnabled)
   const [usePenLocal, setUsePenLocal] = useState<boolean>(usePen)
+  const [googleDriveLocal, setGoogleDriveLocal] = useState<boolean>(googleDrive)
   const firstRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -51,29 +46,31 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   }, [open, checkerStr])
 
   const apply = () => {
+    const api = useSettingsStore.getState();
     const v = Number(checkerStr)
     if (Number.isFinite(v)) {
       const norm = Math.max(1, Math.min(64, Math.floor(v)))
-      setCheckerSize(norm)
+      api.setCheckerSize(norm)
     }
     const t = Number(tiltTriggerStr)
     if (Number.isFinite(t)) {
       const normT = Math.max(20, Math.min(720, Math.round(t)))
-      setTiltTrigger(normT)
+      api.setTiltParallaxTrigger(normT)
     }
     const a = Number(tiltAmountStr)
     if (Number.isFinite(a)) {
       const normA = Math.max(0.05, Math.min(5, a))
-      setTiltAmount(normA)
+      api.setTiltParallaxAmount(normA)
     }
     const al = Number(tiltAlphaStr)
     if (Number.isFinite(al)) {
       const normAl = Math.max(0.05, Math.min(1, al))
-      setTiltAlpha(normAl)
+      api.setTiltParallaxAlpha(normAl)
     }
-    setTiltEnabled(tiltEnabledLocal)
-    setRightClickTool(rightClickToolLocal)
-    setUsePen(usePenLocal)
+    api.setTiltParallaxEnabled(tiltEnabledLocal)
+    api.setRightClickTool(rightClickToolLocal)
+    api.setUsePen(usePenLocal)
+    api.setGoogleDrive(googleDriveLocal)
     onClose()
   }
 
@@ -179,6 +176,15 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
             </label>
             <p className="text-[11px] text-muted leading-snug">Layers fan out briefly when |α|+|β| exceeds this angular velocity threshold.</p>
           </fieldset>
+          <label className="flex items-center gap-2 select-none">
+            <input
+              type="checkbox"
+              checked={googleDriveLocal}
+              onChange={(e) => setGoogleDriveLocal(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="text-sm">Use Google Drive</span>
+          </label>
         </div>
         <div className="mt-6 flex gap-2 justify-end">
           <button className="px-3 py-1 rounded border border-border bg-surface hover:bg-surface-muted" onClick={onClose}>Cancel</button>
