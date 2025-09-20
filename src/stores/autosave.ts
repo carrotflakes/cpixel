@@ -57,7 +57,7 @@ function saveNow() {
   try {
     const s = useAppStore.getState()
     // Avoid saving mid-stroke to prevent excessive snapshots
-    if ((s as any)._stroking) return
+    if (s.mode !== null) return
     const payload = buildPayload()
     localStorage.setItem(KEY, JSON.stringify(payload))
   } catch {

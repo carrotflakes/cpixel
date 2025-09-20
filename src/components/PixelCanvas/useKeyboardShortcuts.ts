@@ -6,7 +6,7 @@ export function useKeyboardShortcuts(
 ) {
   const undo = useAppStore(s => s.undo)
   const redo = useAppStore(s => s.redo)
-  const selectionBounds = useAppStore(s => s.selection.bounds)
+  const selection = useAppStore(s => s.selection)
 
   // beginStroke/endStroke and selectionBounds are referenced via getState when needed
   useEffect(() => {
@@ -35,28 +35,26 @@ export function useKeyboardShortcuts(
       }
       // Copy / Cut / Paste for selections
       if (k === 'c') {
-        if (selectionBounds) {
-          useAppStore.getState().copySelection();
+        if (selection) {
+          useAppStore.getState().copySelection()
           e.preventDefault()
         }
         return
       }
       if (k === 'x') {
-        if (selectionBounds) {
-          useAppStore.getState().beginStroke()
-          useAppStore.getState().cutSelection();
-          useAppStore.getState().endStroke()
+        if (selection) {
+          useAppStore.getState().cutSelection()
           e.preventDefault()
         }
         return
       }
       if (k === 'v') {
-        useAppStore.getState().pasteClipboard();
+        useAppStore.getState().pasteClipboard()
         e.preventDefault()
         return
       }
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [undo, redo, selectionBounds])
+  }, [undo, redo, selection])
 }

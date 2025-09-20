@@ -194,47 +194,6 @@ export function extractFloatingSelectionIndices(
   return floatIdx
 }
 
-export function buildFloatingFromClipboard(
-  clip:
-    | { kind: 'rgba'; width: number; height: number; pixels: Uint32Array }
-    | { kind: 'indexed'; width: number; height: number; indices: Uint8Array; palette: Uint32Array; transparentIndex: number },
-  bw: number,
-  bh: number
-): Uint32Array {
-  // Returns a cropped/cropped-or-copied Uint32Array of size bw*bh from clipboard
-  if (clip.kind === 'rgba') {
-    if (bw !== clip.width || bh !== clip.height) {
-      const cropped = new Uint32Array(bw * bh)
-      for (let y = 0; y < bh; y++) {
-        const srcRow = y * clip.width
-        cropped.set(clip.pixels.subarray(srcRow, srcRow + bw), y * bw)
-      }
-      return cropped
-    } else {
-      return clip.pixels.slice(0)
-    }
-  } else {
-    const srcW = clip.width, srcH = clip.height
-    const full = new Uint32Array(srcW * srcH)
-    for (let y = 0; y < srcH; y++) {
-      for (let x = 0; x < srcW; x++) {
-        const pi = clip.indices[y * srcW + x] ?? clip.transparentIndex
-        full[y * srcW + x] = clip.palette[pi] ?? 0x00000000
-      }
-    }
-    if (bw !== srcW || bh !== srcH) {
-      const cropped = new Uint32Array(bw * bh)
-      for (let y = 0; y < bh; y++) {
-        const srcRow = y * srcW
-        cropped.set(full.subarray(srcRow, srcRow + bw), y * bw)
-      }
-      return cropped
-    } else {
-      return full
-    }
-  }
-}
-
 // Magic wand: build a mask selecting all pixels connected (contiguous=true) or all matching color (contiguous=false)
 // colorRef is either RGBA (truecolor mode) or palette index (indexed mode with provideIndices=true)
 export function magicWandMask(

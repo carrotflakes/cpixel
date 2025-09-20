@@ -3,7 +3,7 @@ import { useCanvasInput } from './useCanvasInput'
 import { useTilt } from '@/hooks/useTilt'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAppStore } from '@/stores/store'
-import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas, drawSelectionOutline } from '@/utils/canvasDraw'
+import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas, drawSelectionOutline, drawBoundsOutline } from '@/utils/canvasDraw'
 import { compositeImageData } from '@/utils/composite'
 
 const GRID_THRESHOLD = 8
@@ -11,6 +11,7 @@ const GRID_THRESHOLD = 8
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const { shapePreview, interactionActive, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPointerLeave } = useCanvasInput(canvasRef)
+  const mode = useAppStore(s => s.mode)
   const hover = useAppStore(s => s.hover)
   const view = useAppStore(s => s.view)
   const W = useAppStore(s => s.width)
@@ -45,7 +46,7 @@ export function PixelCanvas() {
 
   // Animate marching ants
   useEffect(() => {
-    if (!selection.mask || !selection.bounds) {
+    if (!selection) {
       setAntsPhase(0)
       return
     }
@@ -58,7 +59,7 @@ export function PixelCanvas() {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [selection.mask, selection.bounds])
+  }, [selection])
 
   useEffect(() => {
     const cvs = canvasRef.current
@@ -122,35 +123,38 @@ export function PixelCanvas() {
       )
     }
     // selection overlay and floating
-    if (selection.mask && selection.bounds) {
-      drawSelectionOverlay(ctx, selection.mask, W, H, view.scale)
-      const dx = selection.offsetX
-      const dy = selection.offsetY
+    if (mode?.type === 'transform') {
+      const bw = mode.width
+      const bh = mode.height
+      if (!floatCanvasRef.current) floatCanvasRef.current = new OffscreenCanvas(bw, bh)
+      if (floatCanvasRef.current.width !== bw || floatCanvasRef.current.height !== bh) {
+        floatCanvasRef.current.width = bw
+        floatCanvasRef.current.height = bh
+      }
+      const fctx = floatCanvasRef.current.getContext('2d', { willReadFrequently: true })!
+      const img = fctx.createImageData(bw, bh)
+      const src = mode.data
+      for (let i = 0, p = 0; i < src.length; i++, p += 4) {
+        const rgba = src[i] >>> 0
+        img.data[p] = (rgba >>> 24) & 0xff
+        img.data[p + 1] = (rgba >>> 16) & 0xff
+        img.data[p + 2] = (rgba >>> 8) & 0xff
+        img.data[p + 3] = rgba & 0xff
+      }
+      fctx.putImageData(img, 0, 0)
+      const x = mode.transform.cx - mode.width / 2
+      const y = mode.transform.cy - mode.height / 2
       const s = view.scale
-      drawSelectionOutline(ctx, selection.mask, W, H, s, antsPhase, dx, dy)
-      if (selection.floating) {
-        const bw = selection.bounds.right - selection.bounds.left + 1
-        const bh = selection.bounds.bottom - selection.bounds.top + 1
-        if (!floatCanvasRef.current) floatCanvasRef.current = new OffscreenCanvas(bw, bh)
-        if (floatCanvasRef.current.width !== bw || floatCanvasRef.current.height !== bh) {
-          floatCanvasRef.current.width = bw
-          floatCanvasRef.current.height = bh
-        }
-        const fctx = floatCanvasRef.current.getContext('2d', { willReadFrequently: true })!
-        const img = fctx.createImageData(bw, bh)
-        const src = selection.floating
-        for (let i = 0, p = 0; i < src.length; i++, p += 4) {
-          const rgba = src[i] >>> 0
-          img.data[p] = (rgba >>> 24) & 0xff
-          img.data[p + 1] = (rgba >>> 16) & 0xff
-          img.data[p + 2] = (rgba >>> 8) & 0xff
-          img.data[p + 3] = rgba & 0xff
-        }
-        fctx.putImageData(img, 0, 0)
-        ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, (selection.bounds.left + dx) * s, (selection.bounds.top + dy) * s, bw * s, bh * s)
+      ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, x * s, y * s, bw * s, bh * s)
+      drawBoundsOutline(ctx, mode.width, mode.height, mode.transform, s, antsPhase)
+    } else {
+      if (selection) {
+        drawSelectionOverlay(ctx, selection.mask, W, H, view.scale)
+        if (mode === null)
+          drawSelectionOutline(ctx, selection.mask, W, H, view.scale, antsPhase, 0, 0)
       }
     }
-  }, [layers, palette, colorMode, transparentIndex, view, hover?.x, hover?.y, shapePreview, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
+  }, [mode, layers, palette, colorMode, transparentIndex, view, hover?.x, hover?.y, shapePreview, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -168,8 +172,23 @@ export function PixelCanvas() {
   }, [])
 
   const overlay = (() => {
+    if (mode?.type === 'transform') return (
+      <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
+        <div
+          className="pointer-events-auto absolute z-100 flex flex-wrap bg-surface/70 backdrop-blur border border-border rounded  shadow text-xs sm:text-sm"
+          style={{ left: '50%', top: 8, transform: 'translateX(-50%)' }}
+        >
+          <button
+            onClick={() => useAppStore.getState().endTransform()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="End"
+          >End</button>
+        </div>
+      </div>)
+
+    if (mode !== null) return null
     if (parallaxActive) return null // hide selection UI in parallax mode
-    if (!selection.mask || !selection.bounds) return null
+    if (!selection) return null
     return (
       <div className="absolute inset-0 pointer-events-none select-none" aria-hidden={false}>
         <div

@@ -92,7 +92,7 @@ function LayerPreview({ layer }: { layer: { id: string; visible: boolean; locked
   const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)
   const transparentIndex = useAppStore(s => s.transparentIndex)
-  const blockRedraw = useAppStore(s => !!s._stroking)
+  const blockRedraw = useAppStore(s => s.mode !== null)
 
   const ref = useRef<HTMLCanvasElement | null>(null)
 

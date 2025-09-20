@@ -16,6 +16,7 @@ type ShapePreview = {
 }
 
 export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+  const mode = useAppStore(s => s.mode)
   const view = useAppStore(s => s.view)
   const color = useAppStore(s => s.color)
   const setColor = useAppStore(s => s.setColor)
@@ -33,8 +34,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const setSelectionRect = useAppStore(s => s.setSelectionRect)
   const setSelectionMask = useAppStore(s => s.setSelectionMask)
   const beginSelectionDrag = useAppStore(s => s.beginSelectionDrag)
-  const setSelectionOffset = useAppStore(s => s.setSelectionOffset)
-  const commitSelectionMove = useAppStore(s => s.commitSelectionMove)
   const W = useAppStore(s => s.width)
   const H = useAppStore(s => s.height)
   const settings = useSettingsStore()
@@ -63,7 +62,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const state = useRef<null | "firstTouch" | "pinch" | "tool">(null)
   const firstTouch = useRef<{ pointerId: number, x: number; y: number; clientX: number; clientY: number; button: number; shiftKey: boolean; ctrlKey: boolean } | null>(null)
   const toolPointerId = useRef<number | null>(null)
-  const curTool = useRef<ToolType>('brush')
+  const curTool = useRef<ToolType | 'transform'>('brush')
 
   useKeyboardShortcuts(canvasRef)
   useCanvasPanZoom(canvasRef, view, setView, W, H)
@@ -140,7 +139,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (isSelectionTool()) {
       // drag move if inside selection, else start creating
       if (selectionMask && pointInSelection(x, y)) {
-        beginStroke()
         beginSelectionDrag()
         selectionDrag.current = { active: true, startX: x, startY: y }
         return true
@@ -168,6 +166,10 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         setSelectionMask(mask, bounds)
         return true
       }
+    }
+    if (curTool.current === 'transform' && mode?.type === 'transform') {
+      selectionDrag.current = { active: true, startX: x, startY: y }
+      return true
     }
     if (isShapeTool()) {
       startShapeAt(x, y)
@@ -235,6 +237,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       case null:
         curTool.current = e.button === 2 ? settings.rightClickTool : useAppStore.getState().tool
         if (e.altKey) curTool.current = 'eyedropper'
+        if (mode?.type === 'transform') curTool.current = 'transform'
         if (e.button === 1 || (e.button === 0 && e.ctrlKey)) curTool.current = 'pan'
 
         if (e.pointerType === 'touch') {
@@ -378,7 +381,15 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         }
         // Selection drag/create
         if (selectionDrag.current.active) {
-          setSelectionOffset(x - selectionDrag.current.startX, y - selectionDrag.current.startY)
+          // Can we use setState?
+          useAppStore.setState(s => {
+            if (s.mode?.type !== 'transform') return {}
+            const dx = x - selectionDrag.current.startX
+            const dy = y - selectionDrag.current.startY
+            selectionDrag.current.startX = x
+            selectionDrag.current.startY = y
+            return { mode: { ...s.mode, transform: { ...s.mode.transform, cx: s.mode.transform.cx + dx, cy: s.mode.transform.cy + dy } } }
+          })
           return
         }
         if (rectSelecting.current.active) {
@@ -418,8 +429,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     panState.current.panning = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
     if (selectionDrag.current.active) {
-      commitSelectionMove()
-      endStroke()
       selectionDrag.current.active = false
       return
     }

@@ -133,37 +133,6 @@ export function drawShapePreview(
   ctx.restore()
 }
 
-export function drawSelectionMarchingAnts(
-  ctx: CanvasRenderingContext2D,
-  mask: Uint8Array,
-  W: number,
-  H: number,
-  size: number,
-  phase: number = 0
-) {
-  // Simple marching ants around mask bounds (not per-pixel outline for perf)
-  // Find bounds
-  let left = W, right = -1, top = H, bottom = -1
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (mask[y * W + x]) {
-        if (x < left) left = x
-        if (x > right) right = x
-        if (y < top) top = y
-        if (y > bottom) bottom = y
-      }
-    }
-  }
-  if (right < left || bottom < top) return
-  const s = size
-  ctx.save()
-  ctx.strokeStyle = '#000'
-  ctx.setLineDash([4, 3])
-  ctx.lineDashOffset = -phase
-  ctx.strokeRect(left * s + 0.5, top * s + 0.5, (right - left + 1) * s - 1, (bottom - top + 1) * s - 1)
-  ctx.restore()
-}
-
 export function drawSelectionOverlay(
   ctx: CanvasRenderingContext2D,
   mask: Uint8Array,
@@ -240,6 +209,39 @@ export function drawSelectionOutline(
   ctx.setLineDash([4, 4])
   ctx.lineDashOffset = -phase
   f()
+
+  ctx.restore()
+}
+
+export function drawBoundsOutline(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  transform: { cx: number; cy: number; angle: number; scaleX: number; scaleY: number },
+  size: number,
+  phase: number = 0,
+) {
+  const s = size
+  const cx = transform.cx * s
+  const cy = transform.cy * s
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate(transform.angle)
+  ctx.scale(transform.scaleX, transform.scaleY)
+  ctx.translate(-cx, -cy)
+
+  const x = transform.cx - w / 2
+  const y = transform.cy - h / 2
+
+  ctx.lineWidth = 1
+
+  ctx.strokeStyle = '#000'
+  ctx.strokeRect(x * s + 0.5, y * s + 0.5, w * s - 1, h * s - 1)
+
+  ctx.strokeStyle = '#fff'
+  ctx.setLineDash([4, 4])
+  ctx.lineDashOffset = -phase
+  ctx.strokeRect(x * s + 0.5, y * s + 0.5, w * s - 1, h * s - 1)
 
   ctx.restore()
 }

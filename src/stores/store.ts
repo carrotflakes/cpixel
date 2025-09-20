@@ -8,7 +8,7 @@ import { normalizeImportedJSON } from '@/utils/io.ts'
 import { drawEllipseFilledIndexed, drawEllipseFilledTruecolor, drawEllipseOutlineIndexed, drawEllipseOutlineTruecolor, drawLineBrushIndexed, drawLineBrushTruecolor, drawLineBrushIndexedPattern, drawLineBrushTruecolorPattern, drawRectFilledIndexed, drawRectFilledTruecolor, drawRectOutlineIndexed, drawRectOutlineTruecolor, stampIndexed, stampTruecolor, stampIndexedPattern, stampTruecolorPattern } from '@/utils/paint.ts'
 import { generatePaletteFromComposite } from '@/utils/palette.ts'
 import { resizeLayers } from '@/utils/resize.ts'
-import { applyFloatingToIndexedLayer, applyFloatingToTruecolorLayer, buildFloatingFromClipboard, clearSelectedIndexed, clearSelectedTruecolor, extractFloatingIndexed, extractFloatingTruecolor, fillSelectedIndexed, fillSelectedTruecolor, rectToMask } from '@/utils/selection.ts'
+import { applyFloatingToIndexedLayer, applyFloatingToTruecolorLayer, clearSelectedIndexed, clearSelectedTruecolor, extractFloatingIndexed, extractFloatingTruecolor, fillSelectedIndexed, fillSelectedTruecolor, rectToMask } from '@/utils/selection.ts'
 import { translateIndexed, translateTruecolor } from '@/utils/translate.ts'
 import { clamp } from '@/utils/view.ts'
 import { useLogStore } from '@/stores/logStore.ts'
@@ -38,6 +38,18 @@ type Layer = {
 export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand' | 'move' | 'pan'
 
 export type AppState = {
+  mode:
+  | null
+  | { type: 'stroking', layers: Record<string, Uint32Array | Uint8Array> }
+  | {
+    type: 'transform',
+    orgLayer: Layer,
+    width: number,
+    height: number,
+    data: Uint32Array,
+    dataIdx?: Uint8Array,
+    transform: { cx: number, cy: number, angle: number, scaleX: number, scaleY: number },
+  },
   width: number
   height: number
   layers: Layer[]
@@ -90,23 +102,18 @@ export type AppState = {
   fillBucket: (x: number, y: number, rgbaOrIndex: number, contiguous: boolean) => void
   setColorMode: (m: 'truecolor' | 'indexed') => void
   translateAllLayers: (base: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[], dx: number, dy: number) => void
-  selection: {
-    mask?: Uint8Array
-    bounds?: { left: number; top: number; right: number; bottom: number }
-    offsetX: number
-    offsetY: number
-    floating?: Uint32Array
-    floatingIndices?: Uint8Array
+  selection?: {
+    mask: Uint8Array
+    bounds: { left: number; top: number; right: number; bottom: number }
   }
   clipboard?:
-  | { kind: 'rgba'; width: number; height: number; pixels: Uint32Array }
-  | { kind: 'indexed'; width: number; height: number; indices: Uint8Array; palette: Uint32Array; transparentIndex: number }
+  | { kind: 'rgba'; width: number; height: number; data: Uint32Array }
+  | { kind: 'indexed'; width: number; height: number; data: Uint8Array; palette: Uint32Array; transparentIndex: number }
   setSelectionRect: (x0: number, y0: number, x1: number, y1: number) => void
   setSelectionMask: (mask: Uint8Array, bounds: { left: number; top: number; right: number; bottom: number }) => void
   clearSelection: () => void
   beginSelectionDrag: () => void
-  setSelectionOffset: (dx: number, dy: number) => void
-  commitSelectionMove: () => void
+  endTransform: () => void
   // selection clipboard ops
   copySelection: () => void
   cutSelection: () => void
@@ -124,7 +131,6 @@ export type AppState = {
   canRedo: boolean
   _undo: HistoryEntry[]
   _redo: HistoryEntry[]
-  _stroking?: { layers: Record<string, Uint32Array | Uint8Array> }
   dirty: boolean // TODO: need to update this
   hover?: { x: number; y: number; rgba?: number; index?: number }
   setHoverInfo: (h?: { x: number; y: number; rgba?: number; index?: number }) => void
@@ -155,6 +161,7 @@ type HistoryEntry = {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  mode: null,
   width: WIDTH,
   height: HEIGHT,
   layers: [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
@@ -185,8 +192,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // internal history state
   _undo: [],
   _redo: [],
-  _stroking: undefined,
-  selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+  selection: undefined,
   clipboard: undefined,
   // file metadata
   fileMeta: undefined,
@@ -443,7 +449,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (x < 0 || y < 0 || x >= W || y >= H) return {}
 
       // Block painting while a floating selection exists to force commit first
-      if (s.selection?.floating) return {}
+      if (s.mode?.type !== 'stroking') return {}
       // Selection mask constraint
       if (s.selection?.mask) {
         const i = y * W + x
@@ -486,7 +492,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (li < 0) return {}
       const layer = s.layers[li]
       if (layer.locked) return {}
-      if (s.selection?.floating) return {}
+      if (s.mode?.type !== 'stroking') return {}
       if (!inBounds(x0, y0) && !inBounds(x1, y1)) return {}
       const layers = s.layers.slice()
       const size = Math.max(1, (s.tool === 'eraser' ? s.eraserSize : s.brushSize) | 0)
@@ -523,7 +529,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (li < 0) return {}
       const layer = s.layers[li]
       if (layer.locked) return {}
-      if (s.selection?.floating) return {}
+      if (s.mode?.type !== 'stroking') return {}
       const layers = s.layers.slice()
       if (s.colorMode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
@@ -554,7 +560,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (li < 0) return {}
       const layer = s.layers[li]
       if (layer.locked) return {}
-      if (s.selection?.floating) return {}
+      if (s.mode?.type !== 'stroking') return {}
       const layers = s.layers.slice()
       if (s.colorMode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
@@ -580,7 +586,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const W = s.width, H = s.height
       if (x < 0 || y < 0 || x >= W || y >= H) return {}
-      if (s.selection?.floating) return {}
+      if (s.mode?.type !== 'stroking') return {}
       const mask = s.selection?.mask
       if (mask) {
         const i0 = y * W + x
@@ -662,14 +668,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Selection APIs
   setSelectionRect: (x0, y0, x1, y1) => set((s) => {
     const { mask, bounds } = rectToMask(s.width, s.height, x0, y0, x1, y1)
-    return { selection: { mask, bounds, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+    return { selection: { mask, bounds } }
   }),
-  setSelectionMask: (mask, bounds) => set(() => ({ selection: { mask, bounds, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } })),
-  clearSelection: () => set({ selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }),
+  setSelectionMask: (mask, bounds) => set(() => ({ selection: { mask, bounds } })),
+  clearSelection: () => set({ selection: undefined }),
   beginSelectionDrag: () => set((s) => {
+    if (s.mode !== null) return {}
     const sel = s.selection
     if (!sel || !sel.mask || !sel.bounds) return {}
-    if (sel.floating) return {}
     const W = s.width
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
@@ -682,7 +688,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
-      return { selection: { ...sel, floating: float, floatingIndices: undefined, offsetX: 0, offsetY: 0 }, layers }
+      const cx = (sel.bounds.left + sel.bounds.right + 1) / 2
+      const cy = (sel.bounds.top + sel.bounds.bottom + 1) / 2
+      const width = sel.bounds.right - sel.bounds.left + 1
+      const height = sel.bounds.bottom - sel.bounds.top + 1
+      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 } }, selection: undefined }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       const pal = s.palette
@@ -695,39 +705,40 @@ export const useAppStore = create<AppState>((set, get) => ({
       const out = clearSelectedIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
-      return { selection: { ...sel, floating: float, floatingIndices: floatIdx, offsetX: 0, offsetY: 0 }, layers }
+      const cx = (sel.bounds.left + sel.bounds.right + 1) / 2
+      const cy = (sel.bounds.top + sel.bounds.bottom + 1) / 2
+      const width = sel.bounds.right - sel.bounds.left + 1
+      const height = sel.bounds.bottom - sel.bounds.top + 1
+      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, dataIdx: floatIdx, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 } }, selection: undefined }
     }
   }),
-  setSelectionOffset: (dx, dy) => set((s) => s.selection ? { selection: { ...s.selection, offsetX: dx | 0, offsetY: dy | 0 } } : {}),
-  commitSelectionMove: () => set((s) => {
-    const sel = s.selection
-    if (!sel || !sel.mask || !sel.bounds || !sel.floating) return {}
-    const dx = (sel.offsetX ?? 0) | 0
-    const dy = (sel.offsetY ?? 0) | 0
+  endTransform: () => set((s) => {
+    const transform = s.mode
+    if (transform?.type !== 'transform') return {}
     const W = s.width, H = s.height
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
-    const bw = sel.bounds.right - sel.bounds.left + 1
-    const bh = sel.bounds.bottom - sel.bounds.top + 1
-    const dstLeft = sel.bounds.left + dx
-    const dstTop = sel.bounds.top + dy
+    const bw = transform.width
+    const bh = transform.height
+    const dstLeft = Math.round(transform.transform.cx - transform.width / 2)
+    const dstTop = Math.round(transform.transform.cy - transform.height / 2)
     if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
-      const out = applyFloatingToTruecolorLayer(layer.data, sel.floating, dstLeft, dstTop, bw, bh, W, H)
+      const out = applyFloatingToTruecolorLayer(layer.data, transform.data, dstLeft, dstTop, bw, bh, W, H)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
-      return { layers, selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+      return nextPartialState({ ...s, layers: s.layers.map(l => l.id === s.activeLayerId ? transform.orgLayer : l) }, { mode: null, layers, selection: undefined })
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       let out: Uint8Array
-      if (sel.floatingIndices) {
+      if (transform.dataIdx) {
         // Direct indices path (exact copy)
         out = new Uint8Array(layer.data)
         for (let y = 0; y < bh; y++) {
           for (let x = 0; x < bw; x++) {
-            const pi = sel.floatingIndices[y * bw + x] & 0xff
+            const pi = transform.dataIdx[y * bw + x] & 0xff
             if (pi === (s.transparentIndex & 0xff)) continue
             const X = dstLeft + x
             const Y = dstTop + y
@@ -737,38 +748,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       } else {
         // Fallback: derive indices from RGBA (legacy)
-        out = applyFloatingToIndexedLayer(layer.data, sel.floating, s.palette, s.transparentIndex, dstLeft, dstTop, bw, bh, W, H)
+        out = applyFloatingToIndexedLayer(layer.data, transform.data, s.palette, s.transparentIndex, dstLeft, dstTop, bw, bh, W, H)
       }
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
-      return { layers, selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+      return nextPartialState({ ...s, layers: s.layers.map(l => l.id === s.activeLayerId ? transform.orgLayer : l) }, { mode: null, layers, selection: undefined })
     }
   }),
   // Clipboard operations
   copySelection: () => set((s) => {
+    if (s.mode !== null) return {}
     const sel = s.selection
     if (!sel?.bounds) return {}
     const bw = sel.bounds.right - sel.bounds.left + 1
     const bh = sel.bounds.bottom - sel.bounds.top + 1
     const patch: Partial<AppState> = {}
-    if (sel.floating) {
-      if (s.colorMode === 'truecolor') {
-        patch.clipboard = { kind: 'rgba', pixels: sel.floating.slice(0), width: bw, height: bh }
-      } else if (sel.floatingIndices) {
-        patch.clipboard = { kind: 'indexed', indices: sel.floatingIndices.slice(0), width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
-      } else {
-        const idxOut = new Uint8Array(bw * bh)
-        for (let y = 0; y < bh; y++) {
-          for (let x = 0; x < bw; x++) {
-            const rgba = sel.floating[y * bw + x] >>> 0
-            if ((rgba & 0xff) === 0) { idxOut[y * bw + x] = s.transparentIndex & 0xff; continue }
-            const pi = nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
-            idxOut[y * bw + x] = pi & 0xff
-          }
-        }
-        patch.clipboard = { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
-      }
-    }
     const W = s.width
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
@@ -776,7 +770,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
       const float = extractFloatingTruecolor(layer.data, sel.mask, sel.bounds, W)
-      patch.clipboard = { kind: 'rgba', pixels: float, width: bw, height: bh }
+      patch.clipboard = { kind: 'rgba', data: float, width: bw, height: bh }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       const ti = s.transparentIndex
@@ -789,36 +783,19 @@ export const useAppStore = create<AppState>((set, get) => ({
           outIdx[fi] = (!sel.mask || sel.mask[i]) ? (layer.data[i] ?? ti) : (ti & 0xff)
         }
       }
-      patch.clipboard = { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }
+      patch.clipboard = { kind: 'indexed', data: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }
     }
     useLogStore.getState().pushLog({ message: 'Copied selection' })
     return patch
   }),
   cutSelection: () => set((s) => {
+    if (s.mode !== null) return {}
     const sel = s.selection
     if (!sel || !sel.bounds) return {}
     const bw = sel.bounds.right - sel.bounds.left + 1
     const bh = sel.bounds.bottom - sel.bounds.top + 1
     const patch: Partial<AppState> = {
-      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }
-    }
-    if (sel.floating) {
-      if (s.colorMode === 'truecolor') {
-        patch.clipboard = { kind: 'rgba', pixels: sel.floating.slice(0), width: bw, height: bh }
-      } else if (sel.floatingIndices) {
-        patch.clipboard = { kind: 'indexed', indices: sel.floatingIndices.slice(0), width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
-      } else {
-        const idxOut = new Uint8Array(bw * bh)
-        for (let y = 0; y < bh; y++) {
-          for (let x = 0; x < bw; x++) {
-            const rgba = sel.floating[y * bw + x] >>> 0
-            if ((rgba & 0xff) === 0) { idxOut[y * bw + x] = s.transparentIndex & 0xff; continue }
-            const pi = nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
-            idxOut[y * bw + x] = pi & 0xff
-          }
-        }
-        patch.clipboard = { kind: 'indexed', indices: idxOut, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
-      }
+      selection: undefined
     }
     const W = s.width
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
@@ -832,7 +809,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       patch.layers = layers
-      patch.clipboard = { kind: 'rgba', pixels: float, width: bw, height: bh }
+      patch.clipboard = { kind: 'rgba', data: float, width: bw, height: bh }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       const ti = s.transparentIndex
@@ -841,7 +818,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       layers[li] = { ...layer, data: out }
       const outIdx = extractFloatingIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       patch.layers = layers
-      patch.clipboard = { kind: 'indexed', indices: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }
+      patch.clipboard = { kind: 'indexed', data: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }
     }
     useLogStore.getState().pushLog({ message: 'Cut selection' })
     return nextPartialState(s, patch)
@@ -849,33 +826,46 @@ export const useAppStore = create<AppState>((set, get) => ({
   pasteClipboard: () => set((s) => {
     const clip = s.clipboard
     if (!clip) return {}
-    const W = s.width, H = s.height
-    const bw = Math.min(clip.width, W)
-    const bh = Math.min(clip.height, H)
-    const left = Math.max(0, Math.min(W - bw, ((W - bw) / 2) | 0))
-    const top = Math.max(0, Math.min(H - bh, ((H - bh) / 2) | 0))
-    const right = left + bw - 1
-    const bottom = top + bh - 1
-    const mask = new Uint8Array(W * H)
-    for (let y = top; y <= bottom; y++) {
-      const row = y * W
-      mask.fill(1, row + left, row + right + 1)
-    }
-    const float = buildFloatingFromClipboard(clip, bw, bh)
-    let floatIdx: Uint8Array | undefined
-    if (clip.kind === 'indexed') {
-      // Crop indices similarly (bw,bh already computed)
-      if (bw !== clip.width || bh !== clip.height) {
-        floatIdx = new Uint8Array(bw * bh)
-        for (let y = 0; y < bh; y++) {
-          const srcRow = y * clip.width
-          floatIdx.set(clip.indices.subarray(srcRow, srcRow + bw), y * bw)
-        }
-      } else {
-        floatIdx = clip.indices.slice(0)
+    // const bw = clip.width
+    // const bh = clip.height
+    // const float = buildFloatingFromClipboard(clip, bw, bh)
+    // let floatIdx: Uint8Array | undefined
+    // if (clip.kind === 'indexed') {
+    //   // Crop indices similarly (bw,bh already computed)
+    //   if (bw !== clip.width || bh !== clip.height) {
+    //     floatIdx = new Uint8Array(bw * bh)
+    //     for (let y = 0; y < bh; y++) {
+    //       const srcRow = y * clip.width
+    //       floatIdx.set(clip.data.subarray(srcRow, srcRow + bw), y * bw)
+    //     }
+    //   } else {
+    //     floatIdx = clip.data.slice(0)
+    //   }
+    // }
+    let data: Uint32Array
+    let dataIdx: Uint8Array | undefined = undefined
+    if (clip.kind === 'rgba') {
+      data = clip.data.slice(0)
+    } else {
+      // convert indices to RGBA using clipboard palette
+      const pal = clip.palette ?? []
+      data = new Uint32Array(clip.data.length)
+      for (let i = 0; i < data.length; i++) {
+        const pi = clip.data[i] & 0xff
+        data[i] = pi === clip.transparentIndex ? 0x00000000 : pal[pi] ?? 0x00000000
       }
+      dataIdx = clip.data.slice(0)
     }
-    return { selection: { mask, bounds: { left, top, right, bottom }, offsetX: 0, offsetY: 0, floating: float, floatingIndices: floatIdx }, tool: 'select-rect' }
+    const mode = {
+      type: 'transform' as const,
+      orgLayer: s.layers.find(l => l.id === s.activeLayerId)!,
+      width: clip.width,
+      height: clip.height,
+      data,
+      dataIdx,
+      transform: { cx: s.width / 2, cy: s.height / 2, angle: 0, scaleX: 1, scaleY: 1 }
+    } as const
+    return { mode, tool: s.selectTool }
   }),
   invertSelection: () => set((s) => {
     const sel = s.selection
@@ -897,14 +887,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     if (right < left || bottom < top) {
-      return { selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+      return { selection: undefined }
     }
-    return { selection: { mask, bounds: { left, top, right, bottom }, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined } }
+    return { selection: { mask, bounds: { left, top, right, bottom } } }
   }),
   fillSelection: () => set((s) => {
+    if (s.mode !== null) return {}
     const sel = s.selection
     if (!sel || !sel.bounds) return {}
-    if (sel.floating) return {}
     const W = s.width
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
@@ -928,9 +918,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   }),
   eraseSelection: () => set((s) => {
+    if (s.mode !== null) return {}
     const sel = s.selection
     if (!sel || !sel.bounds) return {}
-    if (sel.floating) return {}
     const W = s.width
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
@@ -953,14 +943,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
   beginStroke: () => set((s) => {
-    if (s._stroking) return {}
+    if (s.mode !== null) return {}
     const base: Record<string, Uint32Array | Uint8Array> = {}
     for (const l of s.layers) base[l.id] = l.data.slice(0) as typeof l.data
-    return { _stroking: { layers: base } }
+    return { mode: { type: 'stroking', layers: base } }
   }),
   endStroke: () => set((s) => {
-    if (!s._stroking) return {}
-    const base = s._stroking.layers
+    if (s.mode?.type !== 'stroking') return {}
+    const base = s.mode.layers
     const changes: Array<{ id: string; before: Uint32Array | Uint8Array; after: Uint32Array | Uint8Array }> = []
     if (base) {
       for (const l of s.layers) {
@@ -979,7 +969,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     const entry = changes.length > 0 ? { layers: { dataChanges: changes } } : undefined
     return {
-      _stroking: undefined,
+      mode: null,
       _undo: entry ? [...s._undo, entry] : s._undo,
       _redo: entry ? [] : s._redo,
       canUndo: entry ? true : s.canUndo,
@@ -999,7 +989,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       _redo: [...s._redo, entry],
       canUndo: undo.length > 0,
       canRedo: true,
-      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+      selection: undefined,
       dirty: true,
     }
   }),
@@ -1015,7 +1005,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       _redo: redo,
       canUndo: true,
       canRedo: redo.length > 0,
-      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+      selection: undefined,
       dirty: true,
     }
   }),
@@ -1170,7 +1160,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         _redo: [],
         canUndo: false,
         canRedo: false,
-        selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+        selection: undefined,
         fileMeta,
       }
       if (converted.colorMode === 'indexed') {
@@ -1200,19 +1190,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       width: newW,
       height: newH,
       layers: resizeLayers(s.layers, s.colorMode, oldW, oldH, newW, newH),
-      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+      selection: undefined,
     })
   }),
   flipHorizontal: () => set((s) => {
     return nextPartialState(s, {
       layers: flipLayersHorizontal(s.layers, s.colorMode, s.width, s.height),
-      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+      selection: undefined,
     })
   }),
   flipVertical: () => set((s) => {
     return nextPartialState(s, {
       layers: flipLayersVertical(s.layers, s.colorMode, s.width, s.height),
-      selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
+      selection: undefined,
     })
   }),
 }))
