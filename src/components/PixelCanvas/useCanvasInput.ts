@@ -23,7 +23,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const beginStroke = useAppStore(s => s.beginStroke)
   const endStroke = useAppStore(s => s.endStroke)
   const layers = useAppStore(s => s.layers)
-  const mode = useAppStore(s => s.mode)
+  const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)
   const transparentIndex = useAppStore(s => s.transparentIndex)
   const currentPaletteIndex = useAppStore(s => s.currentPaletteIndex)
@@ -79,7 +79,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
   const paintFor = (erase: boolean) => (
-    mode === 'indexed'
+    colorMode === 'indexed'
       ? (erase ? transparentIndex : currentPaletteIndex) ?? 0
       : erase ? 0x00000000 : color
   )
@@ -92,17 +92,17 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const updateHover = (x: number, y: number) => {
     if (touchState.current.multiGesture) return
     if (!inBounds(x, y)) { setHoverInfo(undefined); return }
-    const hov = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
-    const idx = mode === 'indexed' ? findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
+    const hov = compositePixel(layers, x, y, colorMode, palette, transparentIndex, W, H)
+    const idx = colorMode === 'indexed' ? findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex : undefined
     setHoverInfo({ x, y, rgba: hov, index: idx })
   }
   const pickColorAt = (x: number, y: number) => {
     if (!inBounds(x, y)) return
-    if (mode === 'indexed') {
+    if (colorMode === 'indexed') {
       const idx = findTopPaletteIndex(layers, x, y, W, H, transparentIndex) ?? transparentIndex
       setColorIndex(idx)
     } else {
-      const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, W, H)
+      const rgba = compositePixel(layers, x, y, colorMode, palette, transparentIndex, W, H)
       setColor(rgba)
     }
   }
@@ -157,8 +157,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       } else if (curTool.current === 'select-wand') {
         const contiguous = !e.shiftKey
         const colorGetter = (px: number, py: number) => {
-          if (mode === 'truecolor') {
-            return compositePixel(layers, px, py, mode, palette, transparentIndex, W, H) >>> 0
+          if (colorMode === 'truecolor') {
+            return compositePixel(layers, px, py, colorMode, palette, transparentIndex, W, H) >>> 0
           } else {
             const idx = findTopPaletteIndex(layers as LayerLike[], px, py, W, H, transparentIndex) ?? transparentIndex
             return idx & 0xff

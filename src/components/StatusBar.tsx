@@ -10,7 +10,7 @@ export function StatusBar() {
   const width = useAppStore(s => s.width)
   const height = useAppStore(s => s.height)
   const hover = useAppStore(s => s.hover)
-  const mode = useAppStore(s => s.mode)
+  const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)
   const logs = useLogStore(s => s.logs)
 
@@ -46,13 +46,13 @@ export function StatusBar() {
   return (
     <div className="text-xs flex items-center gap-2 px-3 py-1 border-t border-border bg-surface/70 backdrop-blur overflow-x-auto [&>span]:whitespace-nowrap">
       <span className="text-muted">Size: {width}, {height}</span>
-      <span className="text-muted">Mode: {mode}{mode === 'indexed' ? ` (${palette.length})` : ''}</span>
+      <span className="text-muted">Mode: {colorMode}{colorMode === 'indexed' ? ` (${palette.length})` : ''}</span>
       {hover ? (
         <>
           <span>Pos: {hover.x}, {hover.y}</span>
           {hover.rgba !== undefined ? (
             <span className="flex items-center gap-2">
-              Color: <ColorBox className="inline-block align-middle w-4 h-4 rounded border border-border" color={rgbaToCSSHex(hover.rgba)} /> {rgbaToCSSHex(hover.rgba)}{mode === 'indexed' && hover.index !== undefined ? <span className="text-muted"> ({hover.index})</span> : null}
+              Color: <ColorBox className="inline-block align-middle w-4 h-4 rounded border border-border" color={rgbaToCSSHex(hover.rgba)} /> {rgbaToCSSHex(hover.rgba)}{colorMode === 'indexed' && hover.index !== undefined ? <span className="text-muted"> ({hover.index})</span> : null}
             </span>
           ) : (
             <span>Color: -</span>

@@ -9,7 +9,7 @@ import { parseCSSColor, rgbaToCSSHex } from '@/utils/color'
 import { useUIState } from '@/stores/useUiStore'
 
 export function PalettePanel() {
-  const mode = useAppStore(s => s.mode)
+  const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)
   const transparentIndex = useAppStore(s => s.transparentIndex)
   const addPaletteColor = useAppStore(s => s.addPaletteColor)
@@ -32,7 +32,7 @@ export function PalettePanel() {
   // Track last context menu position (for opening Edit color picker near pointer)
   const lastContextPos = useRef<{ x: number; y: number } | null>(null)
 
-  if (mode !== 'indexed') return null
+  if (colorMode !== 'indexed') return null
 
   const onAddBlackColor = () => {
     const idx = addPaletteColor(parseCSSColor('#000000') ?? 0)

@@ -16,7 +16,7 @@ type PersistPayload = {
   version: 1
   width: number
   height: number
-  mode: 'truecolor' | 'indexed'
+  colorMode: 'truecolor' | 'indexed'
   layers: Array<{
     id: string; visible: boolean; locked: boolean; data: number[];
   }>
@@ -36,7 +36,7 @@ function buildPayload(): PersistPayload {
     version: 1,
     width: s.width,
     height: s.height,
-    mode: s.mode,
+    colorMode: s.colorMode,
     layers: s.layers.map(l => ({
       id: l.id,
       visible: l.visible,

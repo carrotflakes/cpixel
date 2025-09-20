@@ -9,11 +9,11 @@ export function ColorSection() {
   const setColorIndex = useAppStore(s => s.setColorIndex)
   const setPaletteColor = useAppStore(s => s.setPaletteColor)
   const currentPaletteIndex = useAppStore(s => s.currentPaletteIndex)
-  const mode = useAppStore(s => s.mode)
+  const colorMode = useAppStore(s => s.colorMode)
   const recentIndexed = useAppStore(s => s.recentColorsIndexed)
   const recentTrue = useAppStore(s => s.recentColorsTruecolor)
   const palette = useAppStore(s => s.palette)
-  const recentColors = mode === 'indexed'
+  const recentColors = colorMode === 'indexed'
     ? recentIndexed.map(i => palette[i] ?? 0x00000000)
     : recentTrue
 
@@ -24,7 +24,7 @@ export function ColorSection() {
         <ColorButton
           color={color}
           onChange={(rgba) => {
-            if (mode === 'indexed' && currentPaletteIndex !== undefined) {
+            if (colorMode === 'indexed' && currentPaletteIndex !== undefined) {
               setPaletteColor(currentPaletteIndex, rgba)
             } else {
               setColor(rgba)
@@ -36,12 +36,12 @@ export function ColorSection() {
         <div className="flex items-center gap-1" aria-label="Recent colors">
           {recentColors.slice(0, 4).map((c, idx) => (
             <button
-              key={mode === 'indexed' ? `${recentIndexed[idx]}` : c}
+              key={colorMode === 'indexed' ? `${recentIndexed[idx]}` : c}
               className="h-5 w-5 rounded border border-border focus:outline-none"
               style={COLOR_BOX_STYLE}
-              title={mode === 'indexed' ? `Palette index ${recentIndexed[idx]}` : rgbaToCSSHex(c)}
+              title={colorMode === 'indexed' ? `Palette index ${recentIndexed[idx]}` : rgbaToCSSHex(c)}
               onClick={() => {
-                if (mode === 'indexed' && currentPaletteIndex !== undefined) {
+                if (colorMode === 'indexed' && currentPaletteIndex !== undefined) {
                   setColorIndex(recentIndexed[idx])
                 } else {
                   setColor(c)

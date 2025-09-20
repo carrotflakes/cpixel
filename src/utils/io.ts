@@ -8,7 +8,7 @@ export type NormalizedLayer = {
 export type NormalizedImport = {
   width: number
   height: number
-  mode: 'truecolor' | 'indexed'
+  colorMode: 'truecolor' | 'indexed'
   layers: NormalizedLayer[]
   activeLayerId: string
   palette: Uint32Array
@@ -27,7 +27,7 @@ export function normalizeImportedJSON(
   if (!isObj(data)) return null
   const obj = data as Record<string, unknown>
   if (obj.app !== 'cpixel') return null
-  const impMode: 'truecolor' | 'indexed' = obj.mode === 'indexed' ? 'indexed' : 'truecolor'
+  const impMode: 'truecolor' | 'indexed' = obj.colorMode === 'indexed' ? 'indexed' : 'truecolor'
   const width = Math.max(1, (typeof obj.width === 'number' ? (obj.width | 0) : 0))
   const height = Math.max(1, (typeof obj.height === 'number' ? (obj.height | 0) : 0))
   const targetSize = width * height
@@ -88,7 +88,7 @@ export function normalizeImportedJSON(
   return {
     width,
     height,
-    mode: impMode,
+    colorMode: impMode,
     layers: nextLayers,
     activeLayerId,
     palette: nextPalette,

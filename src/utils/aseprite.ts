@@ -195,15 +195,15 @@ export async function decodeAseprite(buf: ArrayBuffer, opts?: { preserveIndexed?
 
 export function aseToCpixel(imported: AseImportResult) {
   if (imported.colorDepth === 8 && imported.layers.some(l => l.indices)) {
-    return { width: imported.width, height: imported.height, mode: 'indexed' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.indices ?? new Uint8Array(imported.width * imported.height) })), palette: imported.palette ?? new Uint32Array([0x00000000]), transparentIndex: imported.transparentIndex ?? 0 }
+    return { width: imported.width, height: imported.height, colorMode: 'indexed' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.indices ?? new Uint8Array(imported.width * imported.height) })), palette: imported.palette ?? new Uint32Array([0x00000000]), transparentIndex: imported.transparentIndex ?? 0 }
   }
-  return { width: imported.width, height: imported.height, mode: 'truecolor' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.pixels ?? new Uint32Array(imported.width * imported.height) })) }
+  return { width: imported.width, height: imported.height, colorMode: 'truecolor' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.pixels ?? new Uint32Array(imported.width * imported.height) })) }
 }
 
 // ------------------------- Encoding (export) ---------------------------------
 
 type CpixelLikeState = Readonly<{
-  width: number; height: number; mode: 'indexed' | 'truecolor';
+  width: number; height: number; colorMode: 'indexed' | 'truecolor';
   layers: ReadonlyArray<{ id: string; visible: boolean; data: Uint32Array | Uint8Array }>
   palette: Uint32Array; transparentIndex: number;
 }>
@@ -212,10 +212,10 @@ function writeU16(buf: Uint8Array, off: number, v: number) { buf[off] = v & 0xff
 function writeU32(buf: Uint8Array, off: number, v: number) { buf[off] = v & 0xff; buf[off + 1] = (v >>> 8) & 0xff; buf[off + 2] = (v >>> 16) & 0xff; buf[off + 3] = (v >>> 24) & 0xff }
 
 export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
-  const { width, height, mode, layers, palette, transparentIndex } = state
-  const colorDepth = mode === 'indexed' ? 8 : 32
+  const { width, height, colorMode, layers, palette, transparentIndex } = state
+  const colorDepth = colorMode === 'indexed' ? 8 : 32
   const layerCount = layers.length
-  const includePalette = mode === 'indexed'
+  const includePalette = colorMode === 'indexed'
   const chunkCount = layerCount /* layer chunks */ + layerCount /* cel chunks */ + (includePalette ? 1 : 0)
 
   // Prebuild chunks into temporary arrays
@@ -278,7 +278,7 @@ export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
     const pixelsW = width
     const pixelsH = height
     let pixelData: Uint8Array
-    if (mode === 'indexed') {
+    if (colorMode === 'indexed') {
       const src = layer.data instanceof Uint8Array ? layer.data : new Uint8Array(width * height)
       pixelData = src // already 1 byte per pixel
     } else {
@@ -331,9 +331,9 @@ export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
   writeU16(out, o, 1); o += 2                      // speed (deprecated)
   writeU32(out, o, 0); o += 4                      // reserved
   writeU32(out, o, 0); o += 4                      // reserved
-  out[o++] = (mode === 'indexed') ? (transparentIndex & 0xff) : 0 // transparent palette index
+  out[o++] = (colorMode === 'indexed') ? (transparentIndex & 0xff) : 0 // transparent palette index
   o += 3                                           // ignore
-  writeU16(out, o, (mode === 'indexed') ? palette.length : 256); o += 2 // number of colors (old field)
+  writeU16(out, o, (colorMode === 'indexed') ? palette.length : 256); o += 2 // number of colors (old field)
   out[o++] = 1; out[o++] = 1                      // pixel ratio w/h
   writeU16(out, o, 0); o += 2                     // grid x
   writeU16(out, o, 0); o += 2                     // grid y

@@ -8,7 +8,7 @@ export function generatePaletteFromComposite(
   layers: LayerLike[],
   width: number,
   height: number,
-  mode: 'truecolor' | 'indexed',
+  colorMode: 'truecolor' | 'indexed',
   palette: Uint32Array,
   transparentIndex: number,
   maxColors: number = 256,
@@ -18,7 +18,7 @@ export function generatePaletteFromComposite(
   const freq = new Map<number, number>()
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const rgba = compositePixel(layers, x, y, mode, palette, transparentIndex, width, height) >>> 0
+      const rgba = compositePixel(layers, x, y, colorMode, palette, transparentIndex, width, height) >>> 0
       if ((rgba & 0xff) === 0) continue // skip fully transparent
       freq.set(rgba, (freq.get(rgba) || 0) + 1)
     }

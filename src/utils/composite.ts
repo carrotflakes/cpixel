@@ -26,7 +26,7 @@ export function compositePixel(
   layers: LayerLike[],
   x: number,
   y: number,
-  mode: 'truecolor' | 'indexed',
+  colorMode: 'truecolor' | 'indexed',
   palette: Uint32Array,
   transparentIndex: number,
   width = 64,
@@ -37,7 +37,7 @@ export function compositePixel(
   let out = 0x00000000
   for (const layer of layers) {
     if (!layer.visible) continue
-    const src = mode === 'truecolor'
+    const src = colorMode === 'truecolor'
       ? layer.data[i] ?? 0x00000000
       : layer.data[i] === transparentIndex ? 0x00000000 : palette[layer.data[i] ?? 0] ?? 0x00000000
     out = over(src, out)
@@ -68,7 +68,7 @@ export function findTopPaletteIndex(
 // Composite all pixels into an ImageData
 export function compositeImageData(
   layers: LayerLike[],
-  mode: 'truecolor' | 'indexed',
+  colorMode: 'truecolor' | 'indexed',
   palette: Uint32Array,
   transparentIndex: number,
   img: ImageData,
@@ -77,7 +77,7 @@ export function compositeImageData(
   const height = img.height
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const out = compositePixel(layers, x, y, mode, palette, transparentIndex, width, height)
+      const out = compositePixel(layers, x, y, colorMode, palette, transparentIndex, width, height)
       const i = (y * width + x) * 4
       img.data[i + 0] = (out >>> 24) & 0xff
       img.data[i + 1] = (out >>> 16) & 0xff

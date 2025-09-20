@@ -52,7 +52,7 @@ export type AppState = {
   currentPaletteIndex?: number
   recentColorsTruecolor: number[]
   recentColorsIndexed: number[] // palette indices
-  mode: 'truecolor' | 'indexed'
+  colorMode: 'truecolor' | 'indexed'
   palette: Uint32Array
   transparentIndex: number
   tool: ToolType
@@ -88,7 +88,7 @@ export type AppState = {
   drawRect: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   drawEllipse: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   fillBucket: (x: number, y: number, rgbaOrIndex: number, contiguous: boolean) => void
-  setMode: (m: 'truecolor' | 'indexed') => void
+  setColorMode: (m: 'truecolor' | 'indexed') => void
   translateAllLayers: (base: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[], dx: number, dy: number) => void
   selection: {
     mask?: Uint8Array
@@ -145,7 +145,7 @@ export type AppState = {
 type HistoryEntry = {
   width?: { before: number; after: number }
   height?: { before: number; after: number }
-  mode?: { before: 'truecolor' | 'indexed'; after: 'truecolor' | 'indexed' }
+  colorMode?: { before: 'truecolor' | 'indexed'; after: 'truecolor' | 'indexed' }
   activeLayerId?: { before: string; after: string }
   transparentIndex?: { before: number; after: number }
   palette?: { before: Uint32Array; after: Uint32Array }
@@ -169,7 +169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentPaletteIndex: 1,
   recentColorsTruecolor: [0x000000, 0xffffff],
   recentColorsIndexed: [],
-  mode: 'truecolor',
+  colorMode: 'truecolor',
   tool: 'brush',
   shapeTool: 'rect',
   selectTool: 'select-rect',
@@ -193,7 +193,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFileMeta: (fileMeta) => set(() => ({ fileMeta })),
   addLayer: () => set((s) => {
     const id = newLayerId(s.layers)
-    const layer: Layer = s.mode === 'truecolor'
+    const layer: Layer = s.colorMode === 'truecolor'
       ? { id, visible: true, locked: false, data: new Uint32Array(s.width * s.height) }
       : { id, visible: true, locked: false, data: new Uint8Array(s.width * s.height) }
     return nextPartialState(s, { layers: [...s.layers, layer], activeLayerId: id })
@@ -211,7 +211,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (i < 0) return {}
     const src = s.layers[i]
     const nid = newLayerId(s.layers)
-    const dup: Layer = s.mode === 'truecolor'
+    const dup: Layer = s.colorMode === 'truecolor'
       ? { id: nid, visible: true, locked: false, data: new Uint32Array(src.data) }
       : { id: nid, visible: true, locked: false, data: new Uint8Array(src.data) }
     const next = s.layers.slice()
@@ -252,7 +252,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setBrushPattern: (size, mask) => set(() => ({ brushPattern: { size: Math.max(1, size | 0), mask } })),
   toggleShapeFill: () => set((s) => ({ shapeFill: !s.shapeFill })),
   setColor: (rgba) => set((s) => {
-    if (s.mode === 'indexed') {
+    if (s.colorMode === 'indexed') {
       // In indexed, pick nearest palette index and sync color/index
       const idx = rgba === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
       const color = s.palette[idx] ?? 0
@@ -267,7 +267,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   pushRecentColor: () => set((s) => {
     const MAX_RECENT = 32
-    if (s.mode === 'indexed') {
+    if (s.colorMode === 'indexed') {
       // store palette index; if no currentPaletteIndex, derive nearest
       let idx = s.currentPaletteIndex
       if (idx === undefined) {
@@ -297,7 +297,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   currentColor: () => {
     const s = get()
-    if (s.mode === 'truecolor') return s.color
+    if (s.colorMode === 'truecolor') return s.color
     return s.palette[s.currentPaletteIndex ?? 0] ?? 0
   },
   removePaletteIndex: (idx) => set((s) => {
@@ -369,7 +369,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     return nextPartialState(s, patch)
   }),
   applyPalettePreset: (colors, ti = 0) => set((s) => {
-    if (s.mode === 'truecolor')
+    if (s.colorMode === 'truecolor')
       throw new Error('applyPalettePreset should not be called in truecolor mode')
 
     // Limit to 256 colors
@@ -409,7 +409,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     next[s.palette.length] = rgba >>> 0
     set((s) => {
       // If in indexed mode, select the newly added color
-      if (s.mode === 'indexed') {
+      if (s.colorMode === 'indexed') {
         const idx = next.length - 1
         return nextPartialState(s, { palette: next, currentPaletteIndex: idx, color: next[idx] ?? 0 })
       }
@@ -456,7 +456,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (layer.locked) return {}
       const layers = s.layers.slice()
       const size = Math.max(1, (s.tool === 'eraser' ? s.eraserSize : s.brushSize) | 0)
-      if (s.mode === 'truecolor') {
+      if (s.colorMode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
         const out = (s.tool === 'brush' && s.brushSubMode === 'pattern')
           ? stampTruecolorPattern(layer.data, W, H, x, y, size, rgbaOrIndex >>> 0, s.brushPattern.size, s.brushPattern.mask, s.selection?.mask)
@@ -490,7 +490,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!inBounds(x0, y0) && !inBounds(x1, y1)) return {}
       const layers = s.layers.slice()
       const size = Math.max(1, (s.tool === 'eraser' ? s.eraserSize : s.brushSize) | 0)
-      if (s.mode === 'truecolor') {
+      if (s.colorMode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
         const out = (s.tool === 'brush' && s.brushSubMode === 'pattern')
           ? drawLineBrushTruecolorPattern(layer.data, W, H, x0, y0, x1, y1, size, rgbaOrIndex >>> 0, s.brushPattern.size, s.brushPattern.mask, s.selection?.mask)
@@ -525,7 +525,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (layer.locked) return {}
       if (s.selection?.floating) return {}
       const layers = s.layers.slice()
-      if (s.mode === 'truecolor') {
+      if (s.colorMode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
         const out = (s.shapeFill
           ? drawRectFilledTruecolor(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
@@ -556,7 +556,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (layer.locked) return {}
       if (s.selection?.floating) return {}
       const layers = s.layers.slice()
-      if (s.mode === 'truecolor') {
+      if (s.colorMode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
         const out = (s.shapeFill
           ? drawEllipseFilledTruecolor(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
@@ -591,7 +591,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const layer = s.layers[li]
       if (layer.locked) return {}
       const layers = s.layers.slice()
-      if (s.mode === 'truecolor') {
+      if (s.colorMode === 'truecolor') {
         if (!(layer.data instanceof Uint32Array)) return {}
         const out = floodFillTruecolor(layer.data, W, H, x, y, rgbaOrIndex, contiguous, mask)
         if (equalU32(out, layer.data)) return {}
@@ -607,15 +607,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
     get().pushRecentColor()
   },
-  setMode: (m) => set((s) => {
-    if (s.mode === m) return {}
+  setColorMode: (m) => set((s) => {
+    if (s.colorMode === m) return {}
     if (m === 'indexed') {
       // Auto-generate a palette from current composited image (transparent at index 0)
       const autoPalette = generatePaletteFromComposite(
         s.layers.map(l => ({ visible: l.visible, data: l.data })),
         s.width,
         s.height,
-        s.mode,
+        s.colorMode,
         s.palette,
         s.transparentIndex,
         256,
@@ -644,7 +644,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Sync current palette index nearest to current color
       const rgba = s.color
       const curIdx = (rgba >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(autoPalette, rgba, transparentIndex)
-      return { mode: 'indexed', layers, currentPaletteIndex: curIdx, color: autoPalette[curIdx] ?? 0, palette: autoPalette, transparentIndex, recentColorsIndexed: [] }
+      return { colorMode: 'indexed', layers, currentPaletteIndex: curIdx, color: autoPalette[curIdx] ?? 0, palette: autoPalette, transparentIndex, recentColorsIndexed: [] }
     } else {
       // convert all layers: indices -> truecolor
       const layers = s.layers.map(l => {
@@ -656,7 +656,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
         return { id: l.id, visible: l.visible, locked: l.locked, data }
       })
-      return { mode: 'truecolor', layers }
+      return { colorMode: 'truecolor', layers }
     }
   }),
   // Selection APIs
@@ -676,7 +676,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const layer = s.layers[li]
     if (layer.locked) return {}
     // bounds width/height available via selectionBounds when needed
-    if (s.mode === 'truecolor') {
+    if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
       const float = extractFloatingTruecolor(layer.data, sel.mask, sel.bounds, W)
       const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
@@ -713,7 +713,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const bh = sel.bounds.bottom - sel.bounds.top + 1
     const dstLeft = sel.bounds.left + dx
     const dstTop = sel.bounds.top + dy
-    if (s.mode === 'truecolor') {
+    if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
       const out = applyFloatingToTruecolorLayer(layer.data, sel.floating, dstLeft, dstTop, bw, bh, W, H)
       const layers = s.layers.slice()
@@ -752,7 +752,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const bh = sel.bounds.bottom - sel.bounds.top + 1
     const patch: Partial<AppState> = {}
     if (sel.floating) {
-      if (s.mode === 'truecolor') {
+      if (s.colorMode === 'truecolor') {
         patch.clipboard = { kind: 'rgba', pixels: sel.floating.slice(0), width: bw, height: bh }
       } else if (sel.floatingIndices) {
         patch.clipboard = { kind: 'indexed', indices: sel.floatingIndices.slice(0), width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
@@ -773,7 +773,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
-    if (s.mode === 'truecolor') {
+    if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
       const float = extractFloatingTruecolor(layer.data, sel.mask, sel.bounds, W)
       patch.clipboard = { kind: 'rgba', pixels: float, width: bw, height: bh }
@@ -803,7 +803,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined }
     }
     if (sel.floating) {
-      if (s.mode === 'truecolor') {
+      if (s.colorMode === 'truecolor') {
         patch.clipboard = { kind: 'rgba', pixels: sel.floating.slice(0), width: bw, height: bh }
       } else if (sel.floatingIndices) {
         patch.clipboard = { kind: 'indexed', indices: sel.floatingIndices.slice(0), width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: s.transparentIndex }
@@ -825,7 +825,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
-    if (s.mode === 'truecolor') {
+    if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
       const float = extractFloatingTruecolor(layer.data, sel.mask, sel.bounds, W)
       const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
@@ -911,7 +911,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const layer = s.layers[li]
     if (layer.locked) return {}
     const layers = s.layers.slice()
-    if (s.mode === 'truecolor') {
+    if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
       const rgba = s.color
       const out = fillSelectedTruecolor(layer.data, sel.mask, sel.bounds, W, rgba >>> 0)
@@ -937,7 +937,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const layer = s.layers[li]
     if (layer.locked) return {}
     const layers = s.layers.slice()
-    if (s.mode === 'truecolor') {
+    if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
       const out = clearSelectedTruecolor(layer.data, sel.mask, sel.bounds, W)
       if (equalU32(out, layer.data)) return {}
@@ -1025,19 +1025,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (li < 0) return {}
     const layers = s.layers.slice()
     const layer = layers[li]
-    if (s.mode === 'truecolor') layers[li] = { ...layer, data: new Uint32Array(W * H) }
+    if (s.colorMode === 'truecolor') layers[li] = { ...layer, data: new Uint32Array(W * H) }
     else layers[li] = { ...layer, data: new Uint8Array(W * H) }
     return nextPartialState(s, { layers })
   }),
   exportPNG: (scale?: number) => {
-    const { mode, layers, palette, transparentIndex, width: W, height: H } = get()
+    const { colorMode, layers, palette, transparentIndex, width: W, height: H } = get()
     const s = Math.max(1, Math.min(64, Math.floor(scale || 1))) // clamp scale 1-64
     const base = document.createElement('canvas')
     base.width = W
     base.height = H
     const bctx = base.getContext('2d')!
     const img = new ImageData(W, H)
-    compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data })), mode, palette, transparentIndex, img)
+    compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data })), colorMode, palette, transparentIndex, img)
     bctx.putImageData(img, 0, 0)
 
     let outCanvas = base
@@ -1058,13 +1058,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   },
   exportJSON: () => {
-    const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = get()
+    const { colorMode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = get()
     const payload = {
       app: 'cpixel' as const,
       version: 1 as const,
       width,
       height,
-      mode,
+      colorMode,
       layers: layers.map(l => ({
         id: l.id,
         visible: l.visible,
@@ -1087,13 +1087,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   },
   exportAse: async () => {
-    const { mode, layers, palette, transparentIndex, width, height } = get()
+    const { colorMode, layers, palette, transparentIndex, width, height } = get()
     try {
       const { encodeAseprite } = await import('../utils/aseprite.ts')
       const buffer = encodeAseprite({
         width,
         height,
-        mode,
+        colorMode,
         layers,
         palette,
         transparentIndex,
@@ -1144,7 +1144,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       width: W,
       height: H,
-      mode: 'truecolor',
+      colorMode: 'truecolor',
       layers: [{ id: 'L1', visible: true, locked: false, data }],
       activeLayerId: 'L1',
       _undo: [],
@@ -1173,14 +1173,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
         fileMeta,
       }
-      if (converted.mode === 'indexed') {
-        statePatch.mode = 'indexed'
+      if (converted.colorMode === 'indexed') {
+        statePatch.colorMode = 'indexed'
         statePatch.palette = converted.palette
         statePatch.transparentIndex = converted.transparentIndex ?? 0
         statePatch.currentPaletteIndex = converted.transparentIndex ?? 0
         statePatch.color = 0x00000000
       } else {
-        statePatch.mode = 'truecolor'
+        statePatch.colorMode = 'truecolor'
       }
       set(statePatch)
     } catch (e) {
@@ -1199,19 +1199,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     return nextPartialState(s, {
       width: newW,
       height: newH,
-      layers: resizeLayers(s.layers, s.mode, oldW, oldH, newW, newH),
+      layers: resizeLayers(s.layers, s.colorMode, oldW, oldH, newW, newH),
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     })
   }),
   flipHorizontal: () => set((s) => {
     return nextPartialState(s, {
-      layers: flipLayersHorizontal(s.layers, s.mode, s.width, s.height),
+      layers: flipLayersHorizontal(s.layers, s.colorMode, s.width, s.height),
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     })
   }),
   flipVertical: () => set((s) => {
     return nextPartialState(s, {
-      layers: flipLayersVertical(s.layers, s.mode, s.width, s.height),
+      layers: flipLayersVertical(s.layers, s.colorMode, s.width, s.height),
       selection: { mask: undefined, bounds: undefined, offsetX: 0, offsetY: 0, floating: undefined, floatingIndices: undefined },
     })
   }),
@@ -1259,7 +1259,7 @@ function buildDiff(before: AppState, after: AppState): HistoryEntry | null {
   const entry: HistoryEntry = {}
   if (before.width !== after.width) entry.width = { before: before.width, after: after.width }
   if (before.height !== after.height) entry.height = { before: before.height, after: after.height }
-  if (before.mode !== after.mode) entry.mode = { before: before.mode, after: after.mode }
+  if (before.colorMode !== after.colorMode) entry.colorMode = { before: before.colorMode, after: after.colorMode }
   if (before.activeLayerId !== after.activeLayerId) entry.activeLayerId = { before: before.activeLayerId, after: after.activeLayerId }
   if (before.transparentIndex !== after.transparentIndex) entry.transparentIndex = { before: before.transparentIndex, after: after.transparentIndex }
   if (!equalU32(before.palette, after.palette)) entry.palette = { before: before.palette.slice(0), after: after.palette.slice(0) }
@@ -1307,13 +1307,13 @@ function applyHistoryEntry(state: AppState, entry: HistoryEntry, dir: 'undo' | '
   const pick = <T>(pair?: { before: T; after: T }) => pair ? (dir === 'undo' ? pair.before : pair.after) : undefined
   const width = pick(entry.width)
   const height = pick(entry.height)
-  const mode = pick(entry.mode)
+  const colorMode = pick(entry.colorMode)
   const activeLayerId = pick(entry.activeLayerId)
   const transparentIndex = pick(entry.transparentIndex)
   const palette = pick(entry.palette)
   if (width !== undefined) patch.width = width
   if (height !== undefined) patch.height = height
-  if (mode !== undefined) patch.mode = mode
+  if (colorMode !== undefined) patch.colorMode = colorMode
   if (activeLayerId !== undefined) patch.activeLayerId = activeLayerId
   if (transparentIndex !== undefined) patch.transparentIndex = transparentIndex
   if (palette !== undefined) patch.palette = palette.slice(0)

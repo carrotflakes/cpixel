@@ -10,12 +10,12 @@ export type LayerLike = {
  */
 export function flipLayersHorizontal(
   layers: LayerLike[],
-  mode: 'truecolor' | 'indexed',
+  colorMode: 'truecolor' | 'indexed',
   width: number,
   height: number,
 ) {
   return layers.map((layer) => {
-    if (mode === 'truecolor') {
+    if (colorMode === 'truecolor') {
       const src = layer.data instanceof Uint32Array ? layer.data : new Uint32Array(width * height)
       const dst = new Uint32Array(width * height)
       
@@ -50,12 +50,12 @@ export function flipLayersHorizontal(
  */
 export function flipLayersVertical(
   layers: LayerLike[],
-  mode: 'truecolor' | 'indexed',
+  colorMode: 'truecolor' | 'indexed',
   width: number,
   height: number,
 ) {
   return layers.map((layer) => {
-    if (mode === 'truecolor') {
+    if (colorMode === 'truecolor') {
       const src = layer.data instanceof Uint32Array ? layer.data : new Uint32Array(width * height)
       const dst = new Uint32Array(width * height)
       

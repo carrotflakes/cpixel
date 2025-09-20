@@ -12,8 +12,7 @@ import { LuCheck, LuChevronRight, LuDownload, LuFlipHorizontal, LuFlipVertical, 
 
 export function MoreMenu() {
   // store selectors
-  const mode = useAppStore(s => s.mode)
-  const setMode = useAppStore(s => s.setMode)
+  const colorMode = useAppStore(s => s.colorMode)
   const curW = useAppStore(s => s.width)
   const curH = useAppStore(s => s.height)
   const fileMeta = useAppStore(s => s.fileMeta)
@@ -114,12 +113,12 @@ export function MoreMenu() {
                     <LuChevronRight className="ml-auto" aria-hidden />
                   </DropdownMenu.SubTrigger>
                   <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                    <DropdownMenu.Item className={itemCls} onSelect={() => { setMode('truecolor'); setOpen(false) }}>
-                      {mode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().setColorMode('truecolor'); setOpen(false) }}>
+                      {colorMode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
                       <span>Truecolor</span>
                     </DropdownMenu.Item>
-                    <DropdownMenu.Item className={itemCls} onSelect={() => { setMode('indexed'); setOpen(false) }}>
-                      {mode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().setColorMode('indexed'); setOpen(false) }}>
+                      {colorMode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
                       <span>Indexed</span>
                     </DropdownMenu.Item>
                   </DropdownMenu.SubContent>
@@ -366,13 +365,13 @@ function pickAndImportAse() {
 }
 
 async function saveProjectToGoogleDrive(filename: string, fileId?: string): Promise<{ id: string; name: string } | void> {
-  const { mode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = useAppStore.getState()
+  const { colorMode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = useAppStore.getState()
   const payload = {
     app: 'cpixel' as const,
     version: 1 as const,
     width,
     height,
-    mode,
+    colorMode,
     layers: layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: Array.from(l.data) })),
     activeLayerId,
     palette: Array.from(palette ?? new Uint32Array(0)),

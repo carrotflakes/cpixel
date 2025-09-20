@@ -301,16 +301,16 @@ function PresetPalette({
   const [presetId, setPresetId] = useUIState('colorPickerPresetId', PALETTE_PRESETS[0].id)
   const rct = useAppStore(s => s.recentColorsTruecolor)
   const rci = useAppStore(s => s.recentColorsIndexed)
-  const mode = useAppStore(s => s.mode)
+  const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)
   const history = useMemo(() => ({
     id: 'history',
     name: 'History',
-    colors: mode === 'indexed'
+    colors: colorMode === 'indexed'
       ? rci.map(i => palette[i] ?? 0x00000000)
       : rct,
     transparentIndex: -1,
-  }), [mode, rct, rci, palette])
+  }), [colorMode, rct, rci, palette])
 
   return (
     <>
