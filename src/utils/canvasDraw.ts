@@ -1,3 +1,5 @@
+import { computeTransformHandles } from './transform'
+
 export function ensureHiDPICanvas(cvs: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
   const dpr = Math.max(1, window.devicePixelRatio || 1)
   const rect = cvs.getBoundingClientRect()
@@ -222,26 +224,57 @@ export function drawBoundsOutline(
   phase: number = 0,
 ) {
   const s = size
-  const cx = transform.cx * s
-  const cy = transform.cy * s
+
+  const rotationOffset = 16 / Math.max(s, 0.0000001)
+  const handles = computeTransformHandles(transform, w, h, rotationOffset)
+
   ctx.save()
-  ctx.translate(cx, cy)
-  ctx.rotate(transform.angle)
-  ctx.scale(transform.scaleX, transform.scaleY)
-  ctx.translate(-cx, -cy)
-
-  const x = transform.cx - w / 2
-  const y = transform.cy - h / 2
-
   ctx.lineWidth = 1
-
+  function drawRect() {
+    ctx.beginPath()
+    ctx.moveTo(handles.corners[0].x * s, handles.corners[0].y * s)
+    for (let i = 1; i < handles.corners.length; i++) {
+      ctx.lineTo(handles.corners[i].x * s, handles.corners[i].y * s)
+    }
+    ctx.closePath()
+    ctx.stroke()
+  }
   ctx.strokeStyle = '#000'
-  ctx.strokeRect(x * s + 0.5, y * s + 0.5, w * s - 1, h * s - 1)
-
+  drawRect()
   ctx.strokeStyle = '#fff'
   ctx.setLineDash([4, 4])
   ctx.lineDashOffset = -phase
-  ctx.strokeRect(x * s + 0.5, y * s + 0.5, w * s - 1, h * s - 1)
+  drawRect()
+  ctx.restore()
+
+  const handleSize = Math.min(12, Math.max(6, s * 0.7))
+  const half = handleSize / 2
+
+  ctx.save()
+  ctx.lineWidth = 1
+  ctx.fillStyle = '#fff'
+  ctx.strokeStyle = '#000'
+
+  for (const corner of handles.corners) {
+    const hx = corner.x * s
+    const hy = corner.y * s
+    ctx.beginPath()
+    ctx.rect(hx - half, hy - half, handleSize, handleSize)
+    ctx.fill()
+    ctx.stroke()
+  }
+
+  // Connector line to rotation handle
+  ctx.beginPath()
+  ctx.moveTo(handles.topCenter.x * s, handles.topCenter.y * s)
+  ctx.lineTo(handles.rotation.x * s, handles.rotation.y * s)
+  ctx.stroke()
+
+  const rotRadius = handleSize * 0.6
+  ctx.beginPath()
+  ctx.arc(handles.rotation.x * s, handles.rotation.y * s, rotRadius, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
 
   ctx.restore()
 }

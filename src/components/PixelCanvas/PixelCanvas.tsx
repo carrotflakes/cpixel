@@ -142,10 +142,16 @@ export function PixelCanvas() {
         img.data[p + 3] = rgba & 0xff
       }
       fctx.putImageData(img, 0, 0)
+      const s = view.scale
       const x = mode.transform.cx - mode.width / 2
       const y = mode.transform.cy - mode.height / 2
-      const s = view.scale
+      ctx.save()
+      ctx.translate(mode.transform.cx * s, mode.transform.cy * s)
+      ctx.rotate(mode.transform.angle)
+      ctx.scale(mode.transform.scaleX, mode.transform.scaleY)
+      ctx.translate(-mode.transform.cx * s, -mode.transform.cy * s)
       ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, x * s, y * s, bw * s, bh * s)
+      ctx.restore()
       drawBoundsOutline(ctx, mode.width, mode.height, mode.transform, s, antsPhase)
     } else {
       if (selection) {
@@ -195,6 +201,11 @@ export function PixelCanvas() {
           className="pointer-events-auto absolute z-100 flex flex-wrap bg-surface/70 backdrop-blur border border-border rounded  shadow text-xs sm:text-sm"
           style={{ left: '50%', top: 8, transform: 'translateX(-50%)' }}
         >
+          <button
+            onClick={() => useAppStore.getState().beginSelectionDrag()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="Transform selection"
+          >Transform</button>
           <button
             onClick={() => useAppStore.getState().cutSelection()}
             className="px-3 py-1 rounded hover:bg-surface-muted"

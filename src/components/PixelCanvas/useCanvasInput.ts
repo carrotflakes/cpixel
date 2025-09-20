@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useAppStore, MIN_SCALE, MAX_SCALE, ToolType } from '@/stores/store'
 import { clamp, clampView } from '@/utils/view'
 import { compositePixel, findTopPaletteIndex, LayerLike } from '@/utils/composite'
+import { computeTransformHandles, inverseTransformPoint, pointInTransformedRect, CornerHandleId, Transform2D } from '@/utils/transform'
 import { isPointInMask, polygonToMask, magicWandMask } from '@/utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
@@ -14,6 +15,23 @@ type ShapePreview = {
   curX: number
   curY: number
 }
+
+type TransformDragState =
+  | { kind: 'translate'; lastX: number; lastY: number }
+  | {
+    kind: 'scale'
+    handle: CornerHandleId
+    initial: { transform: Transform2D; width: number; height: number }
+    handleLocal: { x: number; y: number }
+  }
+  | {
+    kind: 'rotate'
+    initial: { transform: Transform2D }
+    lastPointerAngle: number
+    delta: number
+  }
+
+const MIN_TRANSFORM_SCALE = 0.05
 
 export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const mode = useAppStore(s => s.mode)
@@ -63,6 +81,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const firstTouch = useRef<{ pointerId: number, x: number; y: number; clientX: number; clientY: number; button: number; shiftKey: boolean; ctrlKey: boolean } | null>(null)
   const toolPointerId = useRef<number | null>(null)
   const curTool = useRef<ToolType | 'transform'>('brush')
+  const transformDrag = useRef<TransformDragState | null>(null)
 
   useKeyboardShortcuts(canvasRef)
   useCanvasPanZoom(canvasRef, view, setView, W, H)
@@ -74,6 +93,16 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const vy = view.y + (rect.height - H * view.scale) / 2
     const x = Math.floor((clientX - rect.left - vx) / view.scale)
     const y = Math.floor((clientY - rect.top - vy) / view.scale)
+    return { x, y }
+  }
+  const pickPointPrecise = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    const vx = view.x + (rect.width - W * view.scale) / 2
+    const vy = view.y + (rect.height - H * view.scale) / 2
+    const x = (clientX - rect.left - vx) / view.scale
+    const y = (clientY - rect.top - vy) / view.scale
     return { x, y }
   }
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
@@ -119,6 +148,47 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const addPointer = (e: { pointerId: number, clientX: number, clientY: number }) => {
     if (!touchState.current.pointers.some(p => p.id === e.pointerId))
       touchState.current.pointers.push({ id: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY })
+  }
+
+  const startTransformAt = (precise: { x: number; y: number }) => {
+    if (mode?.type !== 'transform') return false
+    const s = view.scale
+    const handleOffset = 16 / Math.max(s, 0.0000001)
+    const handles = computeTransformHandles(mode.transform, mode.width, mode.height, handleOffset)
+    const handleSize = Math.min(12, Math.max(6, s * 0.7))
+    const cornerHit = handleSize * 0.6
+    const rotationHit = handleSize
+    const dist = (hx: number, hy: number) => Math.hypot((precise.x - hx) * s, (precise.y - hy) * s)
+
+    if (dist(handles.rotation.x, handles.rotation.y) <= rotationHit) {
+      const angle = Math.atan2(precise.y - mode.transform.cy, precise.x - mode.transform.cx)
+      transformDrag.current = {
+        kind: 'rotate',
+        initial: { transform: { ...mode.transform } },
+        lastPointerAngle: angle,
+        delta: 0,
+      }
+      return true
+    }
+
+    for (const corner of handles.corners) {
+      if (dist(corner.x, corner.y) <= cornerHit) {
+        transformDrag.current = {
+          kind: 'scale',
+          handle: corner.id,
+          initial: { transform: { ...mode.transform }, width: mode.width, height: mode.height },
+          handleLocal: { x: corner.localX, y: corner.localY },
+        }
+        return true
+      }
+    }
+
+    if (pointInTransformedRect(mode.transform, mode.width, mode.height, precise.x, precise.y)) {
+      transformDrag.current = { kind: 'translate', lastX: precise.x, lastY: precise.y }
+      return true
+    }
+
+    return false
   }
 
   const startTool_ = (e: { x?: number, y?: number, clientX?: number, clientY?: number, button: number, shiftKey: boolean }) => {
@@ -168,8 +238,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       }
     }
     if (curTool.current === 'transform' && mode?.type === 'transform') {
-      selectionDrag.current = { active: true, startX: x, startY: y }
-      return true
+      if (e.clientX !== undefined && e.clientY !== undefined) {
+        const precise = pickPointPrecise(e.clientX, e.clientY)
+        if (precise && startTransformAt(precise)) return true
+      }
+      return false
     }
     if (isShapeTool()) {
       startShapeAt(x, y)
@@ -373,6 +446,103 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       case "tool":
         if (e.pointerId !== toolPointerId.current) return
 
+        if (mode?.type === 'transform' && transformDrag.current) {
+          const precise = pickPointPrecise(e.clientX, e.clientY)
+          if (!precise) return
+          const drag = transformDrag.current
+          if (drag.kind === 'translate') {
+            const dx = precise.x - drag.lastX
+            const dy = precise.y - drag.lastY
+            if (dx === 0 && dy === 0) return
+            drag.lastX = precise.x
+            drag.lastY = precise.y
+            useAppStore.setState(s => {
+              if (s.mode?.type !== 'transform') return {}
+              return {
+                mode: {
+                  ...s.mode,
+                  transform: {
+                    ...s.mode.transform,
+                    cx: s.mode.transform.cx + dx,
+                    cy: s.mode.transform.cy + dy,
+                  },
+                },
+              }
+            })
+            return
+          }
+          if (drag.kind === 'scale') {
+            const init = drag.initial.transform
+            const point = inverseTransformPoint(init, precise.x, precise.y)
+            const dx = point.x - init.cx
+            const dy = point.y - init.cy
+            const computeRatio = (value: number, base: number) => {
+              if (Math.abs(base) < 1e-6) return 1
+              let ratio = value / base
+              if (!Number.isFinite(ratio) || Number.isNaN(ratio)) ratio = 1
+              const magnitude = Math.max(MIN_TRANSFORM_SCALE, Math.abs(ratio))
+              const sign = Math.sign(ratio) || 1
+              return sign * magnitude
+            }
+            let ratioX = computeRatio(dx, drag.handleLocal.x)
+            let ratioY = computeRatio(dy, drag.handleLocal.y)
+            if (e.shiftKey) {
+              const dominant = Math.abs(ratioX) > Math.abs(ratioY) ? ratioX : ratioY
+              const mag = Math.max(MIN_TRANSFORM_SCALE, Math.abs(dominant))
+              const signX = Math.sign(ratioX) || Math.sign(dominant) || 1
+              const signY = Math.sign(ratioY) || Math.sign(dominant) || 1
+              ratioX = signX * mag
+              ratioY = signY * mag
+            }
+            const nextScaleX = init.scaleX * ratioX
+            const nextScaleY = init.scaleY * ratioY
+            useAppStore.setState(s => {
+              if (s.mode?.type !== 'transform') return {}
+              const prev = s.mode.transform
+              if (Math.abs(prev.scaleX - nextScaleX) < 1e-4 && Math.abs(prev.scaleY - nextScaleY) < 1e-4) return {}
+              return {
+                mode: {
+                  ...s.mode,
+                  transform: {
+                    ...prev,
+                    scaleX: nextScaleX,
+                    scaleY: nextScaleY,
+                  },
+                },
+              }
+            })
+            return
+          }
+          if (drag.kind === 'rotate') {
+            const init = drag.initial.transform
+            const angle = Math.atan2(precise.y - init.cy, precise.x - init.cx)
+            let delta = angle - drag.lastPointerAngle
+            if (delta > Math.PI) delta -= Math.PI * 2
+            else if (delta < -Math.PI) delta += Math.PI * 2
+            drag.delta += delta
+            drag.lastPointerAngle = angle
+            const nextAngle = init.angle + drag.delta
+            const appliedAngle = e.shiftKey ? (() => {
+              const step = Math.PI / 12
+              return Math.round(nextAngle / step) * step
+            })() : nextAngle
+            useAppStore.setState(s => {
+              if (s.mode?.type !== 'transform') return {}
+              if (Math.abs(s.mode.transform.angle - appliedAngle) < 1e-4) return {}
+              return {
+                mode: {
+                  ...s.mode,
+                  transform: {
+                    ...s.mode.transform,
+                    angle: appliedAngle,
+                  },
+                },
+              }
+            })
+            return
+          }
+        }
+
         if (moveDrag.current?.active) {
           const dx = x - moveDrag.current.startX
           const dy = y - moveDrag.current.startY
@@ -428,6 +598,10 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const endTool = () => {
     panState.current.panning = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair'
+    if (transformDrag.current) {
+      transformDrag.current = null
+      return
+    }
     if (selectionDrag.current.active) {
       selectionDrag.current.active = false
       return

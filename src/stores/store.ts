@@ -8,10 +8,11 @@ import { normalizeImportedJSON } from '@/utils/io.ts'
 import { drawEllipseFilledIndexed, drawEllipseFilledTruecolor, drawEllipseOutlineIndexed, drawEllipseOutlineTruecolor, drawLineBrushIndexed, drawLineBrushTruecolor, drawLineBrushIndexedPattern, drawLineBrushTruecolorPattern, drawRectFilledIndexed, drawRectFilledTruecolor, drawRectOutlineIndexed, drawRectOutlineTruecolor, stampIndexed, stampTruecolor, stampIndexedPattern, stampTruecolorPattern } from '@/utils/paint.ts'
 import { generatePaletteFromComposite } from '@/utils/palette.ts'
 import { resizeLayers } from '@/utils/resize.ts'
-import { applyFloatingToIndexedLayer, applyFloatingToTruecolorLayer, clearSelectedIndexed, clearSelectedTruecolor, extractFloatingIndexed, extractFloatingTruecolor, fillSelectedIndexed, fillSelectedTruecolor, rectToMask } from '@/utils/selection.ts'
+import { applyFloatingIndicesToIndexedLayer, applyFloatingToIndexedLayer, applyFloatingToTruecolorLayer, clearSelectedIndexed, clearSelectedTruecolor, extractFloatingIndexed, extractFloatingTruecolor, fillSelectedIndexed, fillSelectedTruecolor, rectToMask } from '@/utils/selection.ts'
 import { translateIndexed, translateTruecolor } from '@/utils/translate.ts'
 import { clamp } from '@/utils/view.ts'
 import { useLogStore } from '@/stores/logStore.ts'
+import { sampleTransformedPatch } from '@/utils/transform.ts'
 
 const WIDTH = 64
 const HEIGHT = 64
@@ -717,47 +718,29 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   }),
   endTransform: () => set((s) => {
-    const transform = s.mode
-    if (transform?.type !== 'transform') return {}
+    const mode = s.mode
+    if (mode?.type !== 'transform') return {}
     const W = s.width, H = s.height
     const li = s.layers.findIndex(l => l.id === s.activeLayerId)
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
-    const bw = transform.width
-    const bh = transform.height
-    const dstLeft = Math.round(transform.transform.cx - transform.width / 2)
-    const dstTop = Math.round(transform.transform.cy - transform.height / 2)
+    const patch = sampleTransformedPatch(mode.transform, mode.width, mode.height, mode.data, mode.dataIdx, s.transparentIndex)
+
+    let nextData: Uint32Array | Uint8Array
     if (s.colorMode === 'truecolor') {
       if (!(layer.data instanceof Uint32Array)) return {}
-      const out = applyFloatingToTruecolorLayer(layer.data, transform.data, dstLeft, dstTop, bw, bh, W, H)
-      const layers = s.layers.slice()
-      layers[li] = { ...layer, data: out }
-      return nextPartialState({ ...s, layers: s.layers.map(l => l.id === s.activeLayerId ? transform.orgLayer : l) }, { mode: null, layers, selection: undefined })
+      nextData = applyFloatingToTruecolorLayer(layer.data, patch.rgba, patch.left, patch.top, patch.width, patch.height, W, H)
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
-      let out: Uint8Array
-      if (transform.dataIdx) {
-        // Direct indices path (exact copy)
-        out = new Uint8Array(layer.data)
-        for (let y = 0; y < bh; y++) {
-          for (let x = 0; x < bw; x++) {
-            const pi = transform.dataIdx[y * bw + x] & 0xff
-            if (pi === (s.transparentIndex & 0xff)) continue
-            const X = dstLeft + x
-            const Y = dstTop + y
-            if (X < 0 || Y < 0 || X >= W || Y >= H) continue
-            out[Y * W + X] = pi
-          }
-        }
-      } else {
-        // Fallback: derive indices from RGBA (legacy)
-        out = applyFloatingToIndexedLayer(layer.data, transform.data, s.palette, s.transparentIndex, dstLeft, dstTop, bw, bh, W, H)
-      }
-      const layers = s.layers.slice()
-      layers[li] = { ...layer, data: out }
-      return nextPartialState({ ...s, layers: s.layers.map(l => l.id === s.activeLayerId ? transform.orgLayer : l) }, { mode: null, layers, selection: undefined })
+      nextData = patch.indices
+        ? applyFloatingIndicesToIndexedLayer(layer.data, patch.indices, s.transparentIndex, patch.left, patch.top, patch.width, patch.height, W, H)
+        : applyFloatingToIndexedLayer(layer.data, patch.rgba, s.palette, s.transparentIndex, patch.left, patch.top, patch.width, patch.height, W, H)
     }
+
+    const layers = s.layers.slice()
+    layers[li] = { ...layer, data: nextData }
+    return nextPartialState({ ...s, layers: s.layers.map(l => l.id === s.activeLayerId ? mode.orgLayer : l) }, { mode: null, layers, selection: undefined })
   }),
   // Clipboard operations
   copySelection: () => set((s) => {
