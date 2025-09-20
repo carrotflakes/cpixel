@@ -33,6 +33,11 @@ export function useKeyboardShortcuts(
         else { undo(); e.preventDefault(); }
         return
       }
+      if (k === 'a') {
+        useAppStore.getState().setSelectionRect(0, 0, useAppStore.getState().width - 1, useAppStore.getState().height - 1)
+        e.preventDefault()
+        return
+      }
       // Copy / Cut / Paste for selections
       if (k === 'c') {
         if (selection) {

@@ -667,10 +667,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   // Selection APIs
   setSelectionRect: (x0, y0, x1, y1) => set((s) => {
-    const { mask, bounds } = rectToMask(s.width, s.height, x0, y0, x1, y1)
+    if (s.mode !== null) return {}
+    const selection = rectToMask(s.width, s.height, x0, y0, x1, y1)
+    return { selection }
+  }),
+  setSelectionMask: (mask, bounds) => set((s) => {
+    if (s.mode !== null) return {}
     return { selection: { mask, bounds } }
   }),
-  setSelectionMask: (mask, bounds) => set(() => ({ selection: { mask, bounds } })),
   clearSelection: () => set({ selection: undefined }),
   beginSelectionDrag: () => set((s) => {
     if (s.mode !== null) return {}
