@@ -24,8 +24,8 @@ export function LayersPanel() {
   if (collapsed) {
     return (
       <div className="absolute right-2 top-2 z-[500] rounded-md border border-border bg-elevated/70 backdrop-blur shadow">
-        <div className="flex items-center justify-between px-4 py-2" onClick={() => setCollapsed(!collapsed)}>
-          <div className="text-xs font-medium">Layers</div>
+        <div className="flex items-center justify-between px-4 py-2 cursor-pointer" onClick={() => setCollapsed(!collapsed)}>
+          <div className="text-sm text-muted">Layers</div>
         </div>
       </div>
     )
@@ -34,7 +34,7 @@ export function LayersPanel() {
   return (
     <div className="absolute right-2 top-2 z-[500] w-42 rounded-md border border-border bg-elevated/70 backdrop-blur shadow">
       <div className="flex items-center justify-between px-2 py-1 border-b border-border">
-        <div className="text-xs font-medium cursor-pointer" onClick={() => setCollapsed(!collapsed)}>Layers</div>
+        <div className="text-sm text-muted cursor-pointer" onClick={() => setCollapsed(!collapsed)}>Layers</div>
         <div className="flex items-center gap-1">
           <button className="p-1 hover:bg-surface-muted rounded" title="Add" onClick={() => addLayer()}><LuPlus /></button>
           <button className="p-1 hover:bg-surface-muted rounded" title="Duplicate" onClick={() => active && duplicateLayer(active)}><LuCopy /></button>
@@ -54,8 +54,8 @@ export function LayersPanel() {
                   <LayerPreview layer={l} />
                   <div className="flex-1 truncate">{l.id}</div>
                   <div className="flex flex-col">
-                    <button className="p-1 rounded disabled:opacity-50" title="Down" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.min(layers.length - 1, idx + 1)) }}><LuArrowUp /></button>
-                    <button className="p-1 rounded disabled:opacity-50" title="Up" disabled={i === layers.length - 1} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.max(0, idx - 1)) }}><LuArrowDown /></button>
+                    <button className="p-1 rounded disabled:opacity-50" title="Up" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.min(layers.length - 1, idx + 1)) }}><LuArrowUp /></button>
+                    <button className="p-1 rounded disabled:opacity-50" title="Down" disabled={i === layers.length - 1} onClick={(e) => { e.stopPropagation(); moveLayer(l.id, Math.max(0, idx - 1)) }}><LuArrowDown /></button>
                   </div>
                 </div>
               </RCMenuTrigger>
