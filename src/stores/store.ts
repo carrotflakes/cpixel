@@ -914,7 +914,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return nextPartialState(s, { layers })
     }
   }),
-  setHoverInfo: (h) => set({ hover: h ? { x: h.x, y: h.y, rgba: h.rgba, index: h.index } : undefined }),
+  setHoverInfo: (hover) => set({ hover }),
   beginStroke: () => set((s) => {
     if (s.mode !== null) return {}
     const base: Record<string, Uint32Array | Uint8Array> = {}
@@ -994,7 +994,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   exportPNG: (scale?: number) => {
     const { colorMode, layers, palette, transparentIndex, width: W, height: H } = get()
-    const s = Math.max(1, Math.min(64, Math.floor(scale || 1))) // clamp scale 1-64
+    const s = Math.max(1, Math.floor(scale || 1))
     const base = document.createElement('canvas')
     base.width = W
     base.height = H
@@ -1098,11 +1098,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const data = new Uint32Array(W * H)
     const src = img.data
     for (let i = 0, p = 0; i < src.length; i += 4, p++) {
-      const r = src[i + 0] | 0
-      const g = src[i + 1] | 0
-      const b = src[i + 2] | 0
-      const a = src[i + 3] | 0
-      data[p] = ((r & 0xff) << 24) | ((g & 0xff) << 16) | ((b & 0xff) << 8) | (a & 0xff)
+      const r = src[i + 0]
+      const g = src[i + 1]
+      const b = src[i + 2]
+      const a = src[i + 3]
+      data[p] = (r << 24) | (g << 16) | (b << 8) | a
     }
     set({
       width: W,
@@ -1128,7 +1128,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         width: converted.width,
         height: converted.height,
         layers: layersBottomFirst.length > 0 ? layersBottomFirst : [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(converted.width * converted.height) }],
-        activeLayerId: layersBottomFirst[layersBottomFirst.length - 1]?.id || 'L1', // top-most
+        activeLayerId: layersBottomFirst[layersBottomFirst.length - 1]?.id ?? 'L1', // top-most
         _undo: [],
         _redo: [],
         canUndo: false,
@@ -1139,8 +1139,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (converted.colorMode === 'indexed') {
         statePatch.colorMode = 'indexed'
         statePatch.palette = converted.palette
-        statePatch.transparentIndex = converted.transparentIndex ?? 0
-        statePatch.currentPaletteIndex = converted.transparentIndex ?? 0
+        statePatch.transparentIndex = converted.transparentIndex
+        statePatch.currentPaletteIndex = converted.transparentIndex
         statePatch.color = 0x00000000
       } else {
         statePatch.colorMode = 'rgba'
@@ -1207,13 +1207,15 @@ function nextPartialState(state: AppState, patch: Partial<AppState>): Partial<Ap
     }
   }
 
+  if (entry === null) return patch // no changes
+
   return {
     ...patch,
-    _undo: entry ? [...state._undo, entry] : state._undo,
-    _redo: entry ? [] : state._redo,
-    canUndo: entry ? true : state.canUndo,
-    canRedo: entry ? false : state.canRedo,
-    dirty: entry ? true : state.dirty,
+    _undo: [...state._undo, entry],
+    _redo: [],
+    canUndo: true,
+    canRedo: false,
+    dirty: true,
   }
 }
 
