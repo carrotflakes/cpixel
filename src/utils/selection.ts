@@ -210,16 +210,33 @@ export function magicWandMask(
   const mask = new Uint8Array(W * H)
   let left = startX, right = startX, top = startY, bottom = startY
 
-  // Non-contiguous: select all pixels with the same color
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (getColor(x, y) === target) {
-        mask[y * W + x] = 1
-        if (x < left) left = x
-        if (x > right) right = x
-        if (y < top) top = y
-        if (y > bottom) bottom = y
-      }
+  const qx = new Int16Array(W * H)
+  const qy = new Int16Array(W * H)
+  let qs = 0, qe = 0
+  qx[qe] = startX; qy[qe] = startY; qe++
+  mask[startY * W + startX] = 1
+  while (qs < qe) {
+    const x = qx[qs]; const y = qy[qs]; qs++
+    if (x < left) left = x
+    if (x > right) right = x
+    if (y < top) top = y
+    if (y > bottom) bottom = y
+    // 4-neighbors
+    if (x > 0) {
+      const nx = x - 1, ny = y, i = ny * W + nx
+      if (!mask[i] && getColor(nx, ny) === target) { mask[i] = 1; qx[qe] = nx; qy[qe] = ny; qe++ }
+    }
+    if (x + 1 < W) {
+      const nx = x + 1, ny = y, i = ny * W + nx
+      if (!mask[i] && getColor(nx, ny) === target) { mask[i] = 1; qx[qe] = nx; qy[qe] = ny; qe++ }
+    }
+    if (y > 0) {
+      const nx = x, ny = y - 1, i = ny * W + nx
+      if (!mask[i] && getColor(nx, ny) === target) { mask[i] = 1; qx[qe] = nx; qy[qe] = ny; qe++ }
+    }
+    if (y + 1 < H) {
+      const nx = x, ny = y + 1, i = ny * W + nx
+      if (!mask[i] && getColor(nx, ny) === target) { mask[i] = 1; qx[qe] = nx; qy[qe] = ny; qe++ }
     }
   }
   return { mask, bounds: { left, top, right, bottom } }

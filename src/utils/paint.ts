@@ -1,31 +1,54 @@
 import { rasterizeLine } from './lines'
 
-// Stamp a square brush onto a rgba layer. Returns original src if no change.
-export function stampRgba(
-  src: Uint32Array,
+// Stamp a square brush. Returns original src if no change.
+export function stamp<T extends Uint32Array | Uint8Array>(
+  src: T,
   W: number,
   H: number,
   x: number,
   y: number,
-  size: number,
-  rgba: number,
+  brushSize: number,
+  value: number,
   selectionMask?: Uint8Array,
-): Uint32Array {
-  const out = new Uint32Array(src)
-  const half = Math.floor(size / 2)
+  pattern?: { size: number; mask: Uint8Array },
+): T {
+  const p = pattern
+  const mask = selectionMask
+    ? (p
+      ? (x: number, y: number) => selectionMask[y * W + x] !== 0 && p.mask[((y % p.size + p.size) % p.size) * p.size + ((x % p.size + p.size) % p.size)] !== 0
+      : (x: number, y: number) => selectionMask[y * W + x] !== 0)
+    : (p
+      ? (x: number, y: number) => p.mask[((y % p.size + p.size) % p.size) * p.size + ((x % p.size + p.size) % p.size)] !== 0
+      : undefined
+    )
+  return stampGeneric(src, W, H, x, y, brushSize, value, mask)
+}
+
+export function stampGeneric<T extends Uint32Array | Uint8Array>(
+  src: T,
+  W: number,
+  H: number,
+  x: number,
+  y: number,
+  brushSize: number,
+  value: number,
+  mask?: (x: number, y: number) => boolean,
+): T {
+  const out = src.slice() as T
+  const half = Math.floor(brushSize / 2)
   const left = x - half
   const top = y - half
   let changed = false
-  for (let py = 0; py < size; py++) {
+  for (let py = 0; py < brushSize; py++) {
     const yy = top + py
     if (yy < 0 || yy >= H) continue
-    for (let px = 0; px < size; px++) {
+    for (let px = 0; px < brushSize; px++) {
       const xx = left + px
       if (xx < 0 || xx >= W) continue
+      if (mask && !mask(xx, yy)) continue
       const i = yy * W + xx
-      if (selectionMask && !selectionMask[i]) continue
-      if (out[i] !== (rgba >>> 0)) {
-        out[i] = rgba >>> 0
+      if (out[i] !== value) {
+        out[i] = value
         changed = true
       }
     }
@@ -33,244 +56,57 @@ export function stampRgba(
   return changed ? out : src
 }
 
-// Stamp a square brush with a tiled NxN binary pattern mask (1=paint, 0=skip)
-export function stampRgbaPattern(
-  src: Uint32Array,
-  W: number,
-  H: number,
-  x: number,
-  y: number,
-  size: number,
-  rgba: number,
-  patternSize: number,
-  patternMask: Uint8Array,
-  selectionMask?: Uint8Array,
-): Uint32Array {
-  const out = new Uint32Array(src)
-  const half = Math.floor(size / 2)
-  const left = x - half
-  const top = y - half
-  const n = Math.max(1, patternSize | 0)
-  let changed = false
-  for (let py = 0; py < size; py++) {
-    const yy = top + py
-    if (yy < 0 || yy >= H) continue
-    const my = ((yy % n) + n) % n
-    for (let px = 0; px < size; px++) {
-      const xx = left + px
-      if (xx < 0 || xx >= W) continue
-      const i = yy * W + xx
-      if (selectionMask && !selectionMask[i]) continue
-      const mx = ((xx % n) + n) % n
-      if (!patternMask[my * n + mx]) continue
-      if (out[i] !== (rgba >>> 0)) { out[i] = rgba >>> 0; changed = true }
-    }
-  }
-  return changed ? out : src
-}
-
-export function stampIndexed(
-  src: Uint8Array,
-  W: number,
-  H: number,
-  x: number,
-  y: number,
-  size: number,
-  index: number,
-  selectionMask?: Uint8Array,
-): Uint8Array {
-  const out = new Uint8Array(src)
-  const half = Math.floor(size / 2)
-  const left = x - half
-  const top = y - half
-  const v = index & 0xff
-  let changed = false
-  for (let py = 0; py < size; py++) {
-    const yy = top + py
-    if (yy < 0 || yy >= H) continue
-    for (let px = 0; px < size; px++) {
-      const xx = left + px
-      if (xx < 0 || xx >= W) continue
-      const i = yy * W + xx
-      if (selectionMask && !selectionMask[i]) continue
-      if (out[i] !== v) { out[i] = v; changed = true }
-    }
-  }
-  return changed ? out : src
-}
-
-export function stampIndexedPattern(
-  src: Uint8Array,
-  W: number,
-  H: number,
-  x: number,
-  y: number,
-  size: number,
-  index: number,
-  patternSize: number,
-  patternMask: Uint8Array,
-  selectionMask?: Uint8Array,
-): Uint8Array {
-  const out = new Uint8Array(src)
-  const half = Math.floor(size / 2)
-  const left = x - half
-  const top = y - half
-  const v = index & 0xff
-  const n = Math.max(1, patternSize | 0)
-  let changed = false
-  for (let py = 0; py < size; py++) {
-    const yy = top + py
-    if (yy < 0 || yy >= H) continue
-    const my = ((yy % n) + n) % n
-    for (let px = 0; px < size; px++) {
-      const xx = left + px
-      if (xx < 0 || xx >= W) continue
-      const i = yy * W + xx
-      if (selectionMask && !selectionMask[i]) continue
-      const mx = ((xx % n) + n) % n
-      if (!patternMask[my * n + mx]) continue
-      if (out[i] !== v) { out[i] = v; changed = true }
-    }
-  }
-  return changed ? out : src
-}
-
-export function drawLineBrushRgba(
-  src: Uint32Array,
+export function drawLineBrush<T extends Uint32Array | Uint8Array>(
+  src: T,
   W: number,
   H: number,
   x0: number,
   y0: number,
   x1: number,
   y1: number,
-  size: number,
-  rgba: number,
+  brushSize: number,
+  value: number,
   selectionMask?: Uint8Array,
-): Uint32Array {
-  const out = new Uint32Array(src)
-  let changed = false
-  const half = Math.floor(size / 2)
-  const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
-  rasterizeLine(x0, y0, x1, y1, (cx, cy) => {
-    for (let py = 0; py < size; py++) {
-      const yy = cy - half + py
-      if (!inBounds(cx, yy)) continue
-      for (let px = 0; px < size; px++) {
-        const xx = cx - half + px
-        if (!inBounds(xx, yy)) continue
-        const i = yy * W + xx
-        if (selectionMask && !selectionMask[i]) continue
-        if (out[i] !== (rgba >>> 0)) { out[i] = rgba >>> 0; changed = true }
-      }
-    }
-  })
-  return changed ? out : src
+  pattern?: { size: number; mask: Uint8Array },
+): T {
+  const p = pattern
+  const mask = selectionMask
+    ? (p
+      ? (x: number, y: number) => selectionMask[y * W + x] !== 0 && p.mask[((y % p.size + p.size) % p.size) * p.size + ((x % p.size + p.size) % p.size)] !== 0
+      : (x: number, y: number) => selectionMask[y * W + x] !== 0)
+    : (p
+      ? (x: number, y: number) => p.mask[((y % p.size + p.size) % p.size) * p.size + ((x % p.size + p.size) % p.size)] !== 0
+      : undefined
+    )
+  return drawLineGeneric(src, W, H, x0, y0, x1, y1, brushSize, value, mask)
 }
 
-export function drawLineBrushRgbaPattern(
-  src: Uint32Array,
+export function drawLineGeneric<T extends Uint32Array | Uint8Array>(
+  src: T,
   W: number,
   H: number,
   x0: number,
   y0: number,
   x1: number,
   y1: number,
-  size: number,
-  rgba: number,
-  patternSize: number,
-  patternMask: Uint8Array,
-  selectionMask?: Uint8Array,
-): Uint32Array {
-  const out = new Uint32Array(src)
-  let changed = false
-  const half = Math.floor(size / 2)
-  const n = Math.max(1, patternSize | 0)
-  const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
-  rasterizeLine(x0, y0, x1, y1, (cx, cy) => {
-    for (let py = 0; py < size; py++) {
-      const yy = cy - half + py
-      if (!inBounds(cx, yy)) continue
-      const my = ((yy % n) + n) % n
-      for (let px = 0; px < size; px++) {
-        const xx = cx - half + px
-        if (!inBounds(xx, yy)) continue
-        const i = yy * W + xx
-        if (selectionMask && !selectionMask[i]) continue
-        const mx = ((xx % n) + n) % n
-        if (!patternMask[my * n + mx]) continue
-        if (out[i] !== (rgba >>> 0)) { out[i] = rgba >>> 0; changed = true }
-      }
-    }
-  })
-  return changed ? out : src
-}
-
-export function drawLineBrushIndexed(
-  src: Uint8Array,
-  W: number,
-  H: number,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  size: number,
-  index: number,
-  selectionMask?: Uint8Array,
-): Uint8Array {
-  const out = new Uint8Array(src)
-  const half = Math.floor(size / 2)
-  const v = index & 0xff
+  brushSize: number,
+  value: number,
+  mask?: (x: number, y: number) => boolean,
+): T {
+  const out = src.slice() as T
+  const half = Math.floor(brushSize / 2)
   let changed = false
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
   rasterizeLine(x0, y0, x1, y1, (cx, cy) => {
-    for (let py = 0; py < size; py++) {
+    for (let py = 0; py < brushSize; py++) {
       const yy = cy - half + py
       if (!inBounds(cx, yy)) continue
-      for (let px = 0; px < size; px++) {
+      for (let px = 0; px < brushSize; px++) {
         const xx = cx - half + px
         if (!inBounds(xx, yy)) continue
+        if (mask && !mask(xx, yy)) continue
         const i = yy * W + xx
-        if (selectionMask && !selectionMask[i]) continue
-        if (out[i] !== v) { out[i] = v; changed = true }
-      }
-    }
-  })
-  return changed ? out : src
-}
-
-export function drawLineBrushIndexedPattern(
-  src: Uint8Array,
-  W: number,
-  H: number,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  size: number,
-  index: number,
-  patternSize: number,
-  patternMask: Uint8Array,
-  selectionMask?: Uint8Array,
-): Uint8Array {
-  const out = new Uint8Array(src)
-  const half = Math.floor(size / 2)
-  const v = index & 0xff
-  const n = Math.max(1, patternSize | 0)
-  let changed = false
-  const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
-  rasterizeLine(x0, y0, x1, y1, (cx, cy) => {
-    for (let py = 0; py < size; py++) {
-      const yy = cy - half + py
-      if (!inBounds(cx, yy)) continue
-      const my = ((yy % n) + n) % n
-      for (let px = 0; px < size; px++) {
-        const xx = cx - half + px
-        if (!inBounds(xx, yy)) continue
-        const i = yy * W + xx
-        if (selectionMask && !selectionMask[i]) continue
-        const mx = ((xx % n) + n) % n
-        if (!patternMask[my * n + mx]) continue
-        if (out[i] !== v) { out[i] = v; changed = true }
+        if (out[i] !== value) { out[i] = value; changed = true }
       }
     }
   })

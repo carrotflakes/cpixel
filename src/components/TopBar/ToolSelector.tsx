@@ -24,7 +24,7 @@ export function ToolSelector() {
 
   // Brush size menu
   const [brushOpen, setBrushOpen] = useState(false)
-  const brushSize = useAppStore(s => s.brushSize)
+  const brushSize = useAppStore(s => s.brush.size)
   const eraserSize = useAppStore(s => s.eraserSize)
   const setEraserSize = useAppStore(s => s.setEraserSize)
   const W = useAppStore(s => s.width)
@@ -215,11 +215,9 @@ const SELECT_TOOLS = [
 const PRESET_SIZES = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32]
 
 function BrushMenu({ maxDim }: { maxDim: number }) {
-  const brushSize = useAppStore(s => s.brushSize)
+  const brush = useAppStore(s => s.brush)
   const setBrushSize = useAppStore(s => s.setBrushSize)
-  const brushSubMode = useAppStore(s => s.brushSubMode)
   const setBrushSubMode = useAppStore(s => s.setBrushSubMode)
-  const brushPattern = useAppStore(s => s.brushPattern)
   const setBrushPattern = useAppStore(s => s.setBrushPattern)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -227,7 +225,7 @@ function BrushMenu({ maxDim }: { maxDim: number }) {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const { size } = brushPattern
+    const { size, mask } = brush.pattern
     const cellSize = 10
     canvas.width = size * cellSize + 1
     canvas.height = size * cellSize + 1
@@ -237,36 +235,36 @@ function BrushMenu({ maxDim }: { maxDim: number }) {
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const idx = y * size + x
-        const on = brushPattern.mask[idx] === 1
+        const on = mask[idx] === 1
         ctx.fillStyle = on ? 'black' : 'white'
         ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize)
         ctx.strokeStyle = '#ccc'
         ctx.strokeRect(x * cellSize + 0.5, y * cellSize + 0.5, cellSize + 0.5, cellSize + 0.5)
       }
     }
-  }, [brushSubMode, brushPattern])
+  }, [brush])
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
-    const { size } = brushPattern
+    const { size } = brush.pattern
     const x = Math.floor((e.clientX - rect.left) * size / rect.width)
     const y = Math.floor((e.clientY - rect.top) * size / rect.height)
     if (x < 0 || x >= size || y < 0 || y >= size) return
     const idx = y * size + x
-    const newMask = new Uint8Array(brushPattern.mask)
+    const newMask = new Uint8Array(brush.pattern.mask)
     newMask[idx] = newMask[idx] === 1 ? 0 : 1
     setBrushPattern(size, newMask)
   }
 
   return (<div className="px-3 py-2 flex flex-col gap-2">
-    <div className="flex gap-2 text-sm">Brush Size: {brushSize}</div>
+    <div className="flex gap-2 text-sm">Brush Size: {brush.size}</div>
     <input
       type="range"
       min={1}
       max={maxDim}
-      value={brushSize}
+      value={brush.size}
       onChange={e => setBrushSize(Number(e.target.value))}
       aria-label="Brush size"
     />
@@ -275,7 +273,7 @@ function BrushMenu({ maxDim }: { maxDim: number }) {
         <button
           key={sz}
           onClick={() => { setBrushSize(sz) }}
-          className={`px-2 py-1 rounded border text-xs ${brushSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
+          className={`px-2 py-1 rounded border text-xs ${brush.size === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
         >{sz}</button>
       ))}
     </div>
@@ -284,16 +282,16 @@ function BrushMenu({ maxDim }: { maxDim: number }) {
         <span>Brush Mode</span>
         <div className="inline-flex rounded overflow-hidden border border-border">
           <button
-            className={`px-2 py-1 text-xs ${brushSubMode === 'normal' ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted'}`}
+            className={`px-2 py-1 text-xs ${brush.subMode === 'normal' ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted'}`}
             onClick={() => setBrushSubMode('normal')}
           >Normal</button>
           <button
-            className={`px-2 py-1 text-xs border-l border-border ${brushSubMode === 'pattern' ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted'}`}
+            className={`px-2 py-1 text-xs border-l border-border ${brush.subMode === 'pattern' ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted'}`}
             onClick={() => setBrushSubMode('pattern')}
           >Pattern</button>
         </div>
       </div>
-      {brushSubMode === 'pattern' && (
+      {brush.subMode === 'pattern' && (
         <div className="flex gap-2 justify-between">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-sm">
@@ -327,13 +325,13 @@ function BrushMenu({ maxDim }: { maxDim: number }) {
                 type="number"
                 min={1}
                 max={16}
-                value={brushPattern.size}
+                value={brush.pattern.size}
                 onChange={(e) => {
                   const n = Math.max(1, Math.min(16, Number(e.target.value) | 0))
                   const mask = new Uint8Array(n * n)
                   for (let y = 0; y < n; y++)
                     for (let x = 0; x < n; x++)
-                      mask[y * n + x] = (x < brushPattern.size && y < brushPattern.size) ? brushPattern.mask[y * brushPattern.size + x] : 0
+                      mask[y * n + x] = (x < brush.pattern.size && y < brush.pattern.size) ? brush.pattern.mask[y * brush.pattern.size + x] : 0
                   setBrushPattern(n, mask)
                 }}
                 className="w-16 px-2 py-1 bg-surface rounded border border-border text-right"
@@ -341,10 +339,10 @@ function BrushMenu({ maxDim }: { maxDim: number }) {
               />
             </div>
             <button className='px-2 py-1 rounded border border-border bg-surface hover:bg-surface-muted text-sm' onClick={() => {
-              const mask = new Uint8Array(brushPattern.mask)
+              const mask = new Uint8Array(brush.pattern.mask)
               for (let i = 0; i < mask.length; i++)
                 mask[i] = 1 - mask[i]
-              setBrushPattern(brushPattern.size, mask)
+              setBrushPattern(brush.pattern.size, mask)
             }}>Invert</button>
           </div>
           <canvas
