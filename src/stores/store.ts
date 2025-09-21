@@ -9,7 +9,7 @@ import { drawEllipseFilledIndexed, drawEllipseFilledRgba, drawEllipseOutlineInde
 import { generatePaletteFromComposite } from '@/utils/palette.ts'
 import { resizeLayers } from '@/utils/resize.ts'
 import { applyFloatingIndicesToIndexedLayer, applyFloatingToIndexedLayer, applyFloatingToRgbaLayer, clearSelectedIndexed, clearSelectedRgba, extractFloatingIndexed, extractFloatingRgba, fillSelectedIndexed, fillSelectedRgba, rectToMask } from '@/utils/selection.ts'
-import { translateIndexed, translateRgba } from '@/utils/translate.ts'
+import { translate } from '@/utils/translate.ts'
 import { clamp } from '@/utils/view.ts'
 import { useLogStore } from '@/stores/logStore.ts'
 import { sampleTransformedPatch } from '@/utils/transform.ts'
@@ -436,13 +436,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (dx === 0 && dy === 0) return {}
     const W = s.width, H = s.height
     const ti = s.transparentIndex
-    const layers = base.map(l => {
-      if (l.data instanceof Uint32Array) {
-        return { ...l, data: translateRgba(l.data, W, H, dx, dy) }
-      } else {
-        return { ...l, data: translateIndexed(l.data, W, H, dx, dy, ti) }
-      }
-    })
+    const layers = base.map(l => ({ ...l, data: translate(l.data, W, H, dx, dy, l.data instanceof Uint32Array ? 0x00000000 : ti) }))
     return { layers }
   }),
   setAt: (x, y, rgbaOrIndex) => {
