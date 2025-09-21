@@ -5,10 +5,10 @@ Simple pixel-art editor.
 ## Features
 
 - Drawing tools: Brush, Eraser, Fill (Bucket), Eyedropper, Line, Rectangle, Selection (Rect/Lasso/Magic Wand)
-- Color modes: Indexed (palette, max 256) and Truecolor
+- Color modes: RGBA and Indexed (palette, max 256)
 - Multiple Layers Support
 - Undo / Redo (Stroke-by-Stroke)
-- Import/Export: PNG (composited) / Aseprite (partial)
+- Import/Export: PNG (composited, scalable export 1-64x) / Aseprite (partial)
 - Google Drive Integration Saving/Loading
 - Platform: supports PC, tablet, and smartphone
 
@@ -39,3 +39,11 @@ To enable saving/loading JSON to Google Drive:
 - Scope used: drive.file (app-created files).
 
 In the app, open More → Google Drive to sign in, Open, or Save.
+
+## Copyright
+
+Copyright (c) 2025 carrotflakes
+
+## License
+
+Licensed under the MIT License.
