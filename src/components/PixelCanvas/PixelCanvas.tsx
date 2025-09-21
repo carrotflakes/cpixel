@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useAppStore } from '@/stores/store'
 import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas, drawSelectionOutline, drawBoundsOutline } from '@/utils/canvasDraw'
 import { compositeImageData } from '@/utils/composite'
+import { snappedTransform } from '@/utils/transform'
 
 const GRID_THRESHOLD = 8
 
@@ -142,17 +143,18 @@ export function PixelCanvas() {
         img.data[p + 3] = rgba & 0xff
       }
       fctx.putImageData(img, 0, 0)
+      const transform = snappedTransform(mode)
       const s = view.scale
-      const x = mode.transform.cx - mode.width / 2
-      const y = mode.transform.cy - mode.height / 2
+      const x = transform.cx - mode.width / 2
+      const y = transform.cy - mode.height / 2
       ctx.save()
-      ctx.translate(mode.transform.cx * s, mode.transform.cy * s)
-      ctx.rotate(mode.transform.angle)
-      ctx.scale(mode.transform.scaleX, mode.transform.scaleY)
-      ctx.translate(-mode.transform.cx * s, -mode.transform.cy * s)
+      ctx.translate(transform.cx * s, transform.cy * s)
+      ctx.rotate(transform.angle)
+      ctx.scale(transform.scaleX, transform.scaleY)
+      ctx.translate(-transform.cx * s, -transform.cy * s)
       ctx.drawImage(floatCanvasRef.current, 0, 0, bw, bh, x * s, y * s, bw * s, bh * s)
       ctx.restore()
-      drawBoundsOutline(ctx, mode.width, mode.height, mode.transform, s, antsPhase)
+      drawBoundsOutline(ctx, mode.width, mode.height, transform, s, antsPhase)
     } else {
       if (selection) {
         drawSelectionOverlay(ctx, selection.mask, W, H, view.scale)

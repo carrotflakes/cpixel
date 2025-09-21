@@ -173,3 +173,11 @@ export function sampleTransformedPatch(
   }
   return { left, top, width: outW, height: outH, rgba: outRGBA, indices: outIdx }
 }
+
+export function snappedTransform({width, height, snap, transform}: {width: number, height: number, snap: boolean, transform: Transform2D}) {
+  if (!snap) return transform
+  const snapped = { ...transform }
+  snapped.cx = Math.round(snapped.cx - width / 2) + width / 2
+  snapped.cy = Math.round(snapped.cy - height / 2) + height / 2
+  return snapped
+}

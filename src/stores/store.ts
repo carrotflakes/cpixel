@@ -50,6 +50,7 @@ export type AppState = {
     data: Uint32Array,
     dataIdx?: Uint8Array,
     transform: { cx: number, cy: number, angle: number, scaleX: number, scaleY: number },
+    snap: boolean,
   },
   width: number
   height: number
@@ -697,7 +698,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const cy = (sel.bounds.top + sel.bounds.bottom + 1) / 2
       const width = sel.bounds.right - sel.bounds.left + 1
       const height = sel.bounds.bottom - sel.bounds.top + 1
-      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 } }, selection: undefined }
+      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 }, snap: true }, selection: undefined }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       const pal = s.palette
@@ -714,7 +715,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const cy = (sel.bounds.top + sel.bounds.bottom + 1) / 2
       const width = sel.bounds.right - sel.bounds.left + 1
       const height = sel.bounds.bottom - sel.bounds.top + 1
-      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, dataIdx: floatIdx, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 } }, selection: undefined }
+      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, dataIdx: floatIdx, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 }, snap: true }, selection: undefined }
     }
   }),
   endTransform: () => set((s) => {
@@ -813,22 +814,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   pasteClipboard: () => set((s) => {
     const clip = s.clipboard
     if (!clip) return {}
-    // const bw = clip.width
-    // const bh = clip.height
-    // const float = buildFloatingFromClipboard(clip, bw, bh)
-    // let floatIdx: Uint8Array | undefined
-    // if (clip.kind === 'indexed') {
-    //   // Crop indices similarly (bw,bh already computed)
-    //   if (bw !== clip.width || bh !== clip.height) {
-    //     floatIdx = new Uint8Array(bw * bh)
-    //     for (let y = 0; y < bh; y++) {
-    //       const srcRow = y * clip.width
-    //       floatIdx.set(clip.data.subarray(srcRow, srcRow + bw), y * bw)
-    //     }
-    //   } else {
-    //     floatIdx = clip.data.slice(0)
-    //   }
-    // }
     let data: Uint32Array
     let dataIdx: Uint8Array | undefined = undefined
     if (clip.kind === 'rgba') {
@@ -850,7 +835,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       height: clip.height,
       data,
       dataIdx,
-      transform: { cx: s.width / 2, cy: s.height / 2, angle: 0, scaleX: 1, scaleY: 1 }
+      transform: { cx: s.width / 2, cy: s.height / 2, angle: 0, scaleX: 1, scaleY: 1 },
+      snap: true,
     } as const
     return { mode, tool: s.selectTool }
   }),

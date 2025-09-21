@@ -508,6 +508,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
                     scaleX: nextScaleX,
                     scaleY: nextScaleY,
                   },
+                  snap: false,
                 },
               }
             })
@@ -536,6 +537,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
                     ...s.mode.transform,
                     angle: appliedAngle,
                   },
+                  snap: false,
                 },
               }
             })
