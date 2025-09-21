@@ -72,7 +72,7 @@ export type AppState = {
   palette: Uint32Array
   transparentIndex: number
   tool: ToolType
-  shapeTool: 'rect' | 'ellipse'
+  shapeTool: 'line' | 'rect' | 'ellipse'
   selectTool: 'select-rect' | 'select-lasso' | 'select-wand'
   setColor: (c: number) => void
   setColorIndex: (i: number) => void
@@ -246,7 +246,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleLocked: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l) })),
   setTool: (t) => set(() => {
     const patch: Partial<AppState> = { tool: t }
-    if (t === 'rect' || t === 'ellipse') patch.shapeTool = t
+    if (t === 'line' || t === 'rect' || t === 'ellipse') patch.shapeTool = t
     if (t === 'select-rect' || t === 'select-lasso' || t === 'select-wand') patch.selectTool = t
     return patch
   }),

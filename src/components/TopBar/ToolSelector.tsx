@@ -36,6 +36,9 @@ export function ToolSelector() {
   // Shape options menu
   const [shapeOpen, setShapeOpen] = useState(false)
 
+  const shapeToolSelected = !!SHAPE_TOOLS.find(s => s.id === tool)
+  const selectToolSelected = !!SELECT_TOOLS.find(s => s.id === tool)
+
   return (
     <div className="flex items-center gap-2 ml-auto">
       <label className="hidden sm:inline text-sm text-muted">Tool</label>
@@ -116,22 +119,14 @@ export function ToolSelector() {
         >
           <LuPaintBucket aria-hidden />
         </button>
-        <button
-          className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${tool === 'line' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-          onClick={() => setTool('line')}
-          aria-pressed={tool === 'line'}
-          title="Line"
-        >
-          <LuSlash aria-hidden />
-        </button>
         <DropdownMenu.Root modal={false} open={shapeOpen} onOpenChange={(o) => { setShapeOpen(o); if (o) setTool(shapeTool) }}>
           <DropdownMenu.Trigger asChild>
             <button
-              className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${tool === 'rect' || tool === 'ellipse' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-              aria-pressed={tool === 'rect' || tool === 'ellipse'}
+              className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${shapeToolSelected ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+              aria-pressed={shapeToolSelected}
               aria-haspopup="menu"
               aria-expanded={shapeOpen}
-              title={`${shapeToolObj.name} (${shapeFill ? 'Filled' : 'Outline'})`}
+              title={tool === 'line' ? shapeToolObj.name : `${shapeToolObj.name} (${shapeFill ? 'Filled' : 'Outline'})`}
             >
               <ShapeIcon aria-hidden />
             </button>
@@ -164,8 +159,8 @@ export function ToolSelector() {
         <DropdownMenu.Root modal={false} open={selOpen} onOpenChange={(o) => { setSelOpen(o); if (o) setTool(selectTool) }}>
           <DropdownMenu.Trigger asChild>
             <button
-              className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${(tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand') ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-              aria-pressed={tool === 'select-rect' || tool === 'select-lasso' || tool === 'select-wand'}
+              className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${selectToolSelected ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+              aria-pressed={selectToolSelected}
               aria-haspopup="menu"
               aria-expanded={selOpen}
               title={selToolObj.name}
@@ -202,6 +197,7 @@ export function ToolSelector() {
 }
 
 const SHAPE_TOOLS = [
+  { id: 'line', name: 'Line', shortName: 'Line', icon: LuSlash },
   { id: 'rect', name: 'Rectangle', shortName: 'Rect', icon: LuSquare },
   { id: 'ellipse', name: 'Ellipse', shortName: 'Ellipse', icon: LuCircle },
 ] as const
