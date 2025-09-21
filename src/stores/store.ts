@@ -101,7 +101,7 @@ export type AppState = {
   drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   drawRect: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   drawEllipse: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
-  fillBucket: (x: number, y: number, rgbaOrIndex: number, contiguous: boolean) => void
+  fillBucket: (x: number, y: number, rgbaOrIndex: number) => void
   setColorMode: (m: 'rgba' | 'indexed') => void
   translateAllLayers: (base: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[], dx: number, dy: number) => void
   selection?: {
@@ -584,7 +584,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
     get().pushRecentColor()
   },
-  fillBucket: (x, y, rgbaOrIndex, contiguous) => {
+  fillBucket: (x, y, rgbaOrIndex) => {
     set((s) => {
       const W = s.width, H = s.height
       if (x < 0 || y < 0 || x >= W || y >= H) return {}
@@ -601,13 +601,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       const layers = s.layers.slice()
       if (s.colorMode === 'rgba') {
         if (!(layer.data instanceof Uint32Array)) return {}
-        const out = floodFillRgba(layer.data, W, H, x, y, rgbaOrIndex, contiguous, mask)
+        const out = floodFillRgba(layer.data, W, H, x, y, rgbaOrIndex, mask)
         if (equalU32(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }
       } else {
         if (!(layer.data instanceof Uint8Array)) return {}
-        const out = floodFillIndexed(layer.data, W, H, x, y, rgbaOrIndex, contiguous, s.transparentIndex, mask)
+        const out = floodFillIndexed(layer.data, W, H, x, y, rgbaOrIndex, mask)
         if (out === layer.data || equalU8(out, layer.data)) return {}
         layers[li] = { ...layer, data: out }
         return { layers }

@@ -223,7 +223,6 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         setSelectionMask(mask, bounds)
         return true
       } else if (curTool.current === 'select-wand') {
-        const contiguous = !e.shiftKey
         const colorGetter = (px: number, py: number) => {
           if (colorMode === 'rgba') {
             return compositePixel(layers, px, py, colorMode, palette, transparentIndex, W, H) >>> 0
@@ -232,7 +231,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             return idx & 0xff
           }
         }
-        const { mask, bounds } = magicWandMask(W, H, x, y, colorGetter, contiguous)
+        const { mask, bounds } = magicWandMask(W, H, x, y, colorGetter)
         setSelectionMask(mask, bounds)
         return true
       }
@@ -251,9 +250,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     if (e.button === -1 || e.button === 0 || e.button === 2) {
       beginStroke()
-      const contiguous = !e.shiftKey
       if (isBucketTool()) {
-        useAppStore.getState().fillBucket(x, y, paintFor(false), contiguous)
+        useAppStore.getState().fillBucket(x, y, paintFor(false))
       } else if (isBrushishTool()) {
         const erase = curTool.current === 'eraser'
         mouseStroke.current = { active: true, erase, lastX: x, lastY: y }
@@ -672,9 +670,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
           // Invoke tool that would have been started on pointerdown
           beginStroke()
-          const contiguous = !e.shiftKey
           if (isBucketTool()) {
-            useAppStore.getState().fillBucket(f.x, f.y, paintFor(false), contiguous)
+            useAppStore.getState().fillBucket(f.x, f.y, paintFor(false))
           } else if (isBrushishTool()) {
             const erase = curTool.current === 'eraser'
             mouseStroke.current = { active: true, erase, lastX: f.x, lastY: f.y }

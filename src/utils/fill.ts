@@ -8,7 +8,6 @@ export function floodFillRgba(
   x: number,
   y: number,
   replacement: number,
-  contiguous: boolean,
   mask?: Uint8Array,
 ): Uint32Array {
   const out = new Uint32Array(src)
@@ -17,10 +16,6 @@ export function floodFillRgba(
   const target = (src[i0] >>> 0)
   const repl = (replacement >>> 0)
   if (target === repl) return out
-  if (!contiguous) {
-    for (let i = 0; i < out.length; i++) if ((!mask || mask[i]) && (out[i] >>> 0) === target) out[i] = repl
-    return out
-  }
   const stack: number[] = [x, y]
   while (stack.length) {
     const cy = stack.pop() as number
@@ -45,20 +40,14 @@ export function floodFillIndexed(
   x: number,
   y: number,
   replacementIdx: number,
-  contiguous: boolean,
-  transparentIndex: number,
   mask?: Uint8Array,
 ): Uint8Array {
   const out = new Uint8Array(src)
   const i0 = y * w + x
   if (mask && !mask[i0]) return out // start outside selection: no-op
-  const targetIdx = (src[i0] ?? transparentIndex) & 0xff
-  const repl = replacementIdx & 0xff
+  const targetIdx = src[i0]
+  const repl = replacementIdx
   if (targetIdx === repl) return out
-  if (!contiguous) {
-    for (let i = 0; i < out.length; i++) if ((!mask || mask[i]) && (out[i] ?? transparentIndex) === targetIdx) out[i] = repl
-    return out
-  }
   const stack: number[] = [x, y]
   while (stack.length) {
     const cy = stack.pop() as number
@@ -66,7 +55,7 @@ export function floodFillIndexed(
     if (cx < 0 || cy < 0 || cx >= w || cy >= h) continue
     const i = cy * w + cx
     if (mask && !mask[i]) continue
-    if (((out[i] ?? transparentIndex) & 0xff) !== targetIdx) continue
+    if (out[i] !== targetIdx) continue
     out[i] = repl
     stack.push(cx + 1, cy)
     stack.push(cx - 1, cy)
