@@ -106,7 +106,7 @@ export function PixelCanvas() {
     }
     // hover highlight
     if (hover && hover.x >= 0 && hover.y >= 0 && hover.x < W && hover.y < H) {
-      const size = tool === 'eraser' ? eraserSize : brush.size
+      const size = tool === 'brush' ? brush.size : tool === 'eraser' ? eraserSize : 1
       drawHoverCell(ctx, hover.x, hover.y, view.scale, size)
     }
     // shape preview overlay
