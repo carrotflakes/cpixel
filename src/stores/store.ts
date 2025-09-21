@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { equalU32, equalU8 } from '@/utils/arrays.ts'
 import { nearestIndexInPalette } from '@/utils/color.ts'
-import { compositeImageData } from '@/utils/composite.ts'
+import { compositeImageData, over } from '@/utils/composite.ts'
 import { floodFillIndexed, floodFillRgba } from '@/utils/fill.ts'
 import { flipLayersHorizontal, flipLayersVertical } from '@/utils/flip.ts'
 import { normalizeImportedJSON } from '@/utils/io.ts'
@@ -91,6 +91,7 @@ export type AppState = {
   setActiveLayer: (id: string) => void
   toggleVisible: (id: string) => void
   toggleLocked: (id: string) => void
+  mergeLayerDown: (id: string) => void
   addPaletteColor: (rgba: number) => number
   setTransparentIndex: (idx: number) => void
   removePaletteIndex: (idx: number) => void
@@ -240,6 +241,39 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveLayer: (id) => set((s) => (s.layers.some(l => l.id === id) ? { activeLayerId: id } : {})),
   toggleVisible: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, visible: !l.visible } : l) })),
   toggleLocked: (id) => set((s) => ({ layers: s.layers.map(l => l.id === id ? { ...l, locked: !l.locked } : l) })),
+  mergeLayerDown: (id) => set((s) => {
+    if (s.mode !== null) return {}
+    const i = s.layers.findIndex(l => l.id === id)
+    if (i <= 0) return {}
+    const top = s.layers[i]
+    const below = s.layers[i - 1]
+    if (top.locked || below.locked) return {}
+    const W = s.width, H = s.height
+    const nextLayers = s.layers.slice()
+    if (s.colorMode === 'rgba') {
+      if (!(top.data instanceof Uint32Array) || !(below.data instanceof Uint32Array)) return {}
+      const src = top.data
+      const dst = below.data
+      const out = new Uint32Array(W * H)
+      for (let p = 0; p < out.length; p++) out[p] = over(src[p] >>> 0, dst[p] >>> 0)
+      nextLayers[i - 1] = { ...below, data: out }
+    } else {
+      if (!(top.data instanceof Uint8Array) || !(below.data instanceof Uint8Array)) return {}
+      const src = top.data
+      const dst = below.data
+      const out = new Uint8Array(W * H)
+      const ti = s.palette.transparentIndex
+      for (let p = 0; p < out.length; p++) {
+        const si = src[p]
+        out[p] = si === ti ? dst[p] : si
+      }
+      nextLayers[i - 1] = { ...below, data: out }
+    }
+    // remove the merged (top) layer
+    nextLayers.splice(i, 1)
+    const activeLayerId = nextLayers[i - 1]?.id ?? s.activeLayerId
+    return nextPartialState(s, { layers: nextLayers, activeLayerId })
+  }),
   setTool: (t) => set(() => {
     const patch: Partial<AppState> = { tool: t }
     if (t === 'line' || t === 'rect' || t === 'ellipse') patch.shapeTool = t

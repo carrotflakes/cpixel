@@ -4,7 +4,7 @@ export type LayerLike = {
 }
 
 // Alpha-over compositing of a single source pixel over a destination pixel (both RGBA packed as 0xRRGGBBAA)
-function over(src: number, dst: number): number {
+export function over(src: number, dst: number): number {
   const aS = src & 0xff
   if (aS === 0) return dst
   const rS = (src >>> 24) & 0xff
@@ -28,8 +28,8 @@ export function compositePixel(
   y: number,
   colorMode: 'rgba' | 'indexed',
   palette: { colors: Uint32Array, transparentIndex: number },
-  width = 64,
-  height = 64,
+  width: number,
+  height: number,
 ): number {
   if (x < 0 || y < 0 || x >= width || y >= height) return 0x00000000
   const i = y * width + x

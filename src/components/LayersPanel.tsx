@@ -18,6 +18,7 @@ export function LayersPanel() {
   const toggleVisible = useAppStore(s => s.toggleVisible)
   const toggleLocked = useAppStore(s => s.toggleLocked)
   const clearLayer = useAppStore(s => s.clearLayer)
+  const mergeLayerDown = useAppStore(s => s.mergeLayerDown)
 
   const [collapsed, setCollapsed] = useUIState('layersPanelCollapsed', false)
 
@@ -72,6 +73,13 @@ export function LayersPanel() {
                 <RCMenuItem onSelect={() => duplicateLayer(l.id)}>
                   <LuCopy aria-hidden />
                   <span>Duplicate Layer</span>
+                </RCMenuItem>
+                <RCMenuItem
+                  disabled={idx === 0 || l.locked || layers[idx - 1]?.locked}
+                  onSelect={() => mergeLayerDown(l.id)}
+                >
+                  <LuArrowDown aria-hidden />
+                  <span>Merge Down</span>
                 </RCMenuItem>
                 <RCMenuItem danger disabled={layers.length <= 1} onSelect={() => { if (layers.length <= 1) return; removeLayer(l.id) }}>
                   <LuTrash2 aria-hidden />
