@@ -11,7 +11,6 @@ import { useUIState } from '@/stores/useUiStore'
 export function PalettePanel() {
   const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)
-  const transparentIndex = useAppStore(s => s.transparentIndex)
   const addPaletteColor = useAppStore(s => s.addPaletteColor)
   const setTransparentIndex = useAppStore(s => s.setTransparentIndex)
   const removePaletteIndex = useAppStore(s => s.removePaletteIndex)
@@ -64,7 +63,7 @@ export function PalettePanel() {
         >
           {collapsed ? <LuChevronUp /> : <LuChevronDown />}
         </button>
-        <span className="text-sm text-muted">Palette ({palette.length})</span>
+        <span className="text-sm text-muted">Palette ({palette.colors.length})</span>
         {!collapsed && (
           <button
             className="px-2 py-1 text-xs rounded border border-border bg-surface hover:bg-surface-muted"
@@ -78,14 +77,14 @@ export function PalettePanel() {
         <PalettePresetsDialog
           open={presetsOpen}
           onCancel={() => setPresetsOpen(false)}
-          onSelect={(p) => { applyPalettePreset(p.colors, p.transparentIndex); setPresetsOpen(false) }}
+          onSelect={(p) => { applyPalettePreset({ colors: p.colors, transparentIndex: p.transparentIndex ?? 0 }); setPresetsOpen(false) }}
         />
       )}
 
       {!collapsed && (
         <div className="mt-2 flex flex-wrap gap-3">
-          {Array.from(palette).map((rgba, i) => {
-            const isTransparent = i === transparentIndex
+          {Array.from(palette.colors).map((rgba, i) => {
+            const isTransparent = i === palette.transparentIndex
             const isSelected = currentPaletteIndex === i
             const color = isTransparent ? "#0000" : rgbaToCSSHex(rgba)
             return (
@@ -144,8 +143,8 @@ export function PalettePanel() {
                 </RCMenuTrigger>
                 <RCMenuContent>
                   <RCMenuItem
-                    disabled={i === transparentIndex}
-                    onSelect={() => { if (i === transparentIndex) return; setTransparentIndex(i) }}
+                    disabled={i === palette.transparentIndex}
+                    onSelect={() => { if (i === palette.transparentIndex) return; setTransparentIndex(i) }}
                   >
                     <LuPin aria-hidden />
                     <span>Set transparent</span>
@@ -174,17 +173,17 @@ export function PalettePanel() {
                     <span>Move up</span>
                   </RCMenuItem>
                   <RCMenuItem
-                    disabled={i === palette.length - 1}
-                    onSelect={() => { if (i === palette.length - 1) return; movePaletteIndex(i, Math.min(palette.length - 1, i + 1)) }}
+                    disabled={i === palette.colors.length - 1}
+                    onSelect={() => { if (i === palette.colors.length - 1) return; movePaletteIndex(i, Math.min(palette.colors.length - 1, i + 1)) }}
                   >
                     <LuArrowDown aria-hidden />
                     <span>Move down</span>
                   </RCMenuItem>
                   <RCMenuSeparator />
                   <RCMenuItem
-                    disabled={palette.length <= 1}
+                    disabled={palette.colors.length <= 1}
                     danger
-                    onSelect={() => { if (palette.length <= 1) return; removePaletteIndex(i) }}
+                    onSelect={() => { if (palette.colors.length <= 1) return; removePaletteIndex(i) }}
                   >
                     <LuTrash2 aria-hidden />
                     <span>Remove</span>
@@ -208,7 +207,7 @@ export function PalettePanel() {
 
       {!collapsed && edit?.open && (
         <ColorPicker
-          color={palette[edit.index] ?? 0}
+          color={palette.colors[edit.index] ?? 0}
           open={true}
           anchor={{ x: edit.x, y: edit.y }}
           showAlpha={true}

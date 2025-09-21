@@ -38,6 +38,11 @@ type Layer = {
 
 export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand' | 'move' | 'pan'
 
+type Palette = {
+  colors: Uint32Array
+  transparentIndex: number
+}
+
 export type AppState = {
   mode:
   | null
@@ -69,8 +74,7 @@ export type AppState = {
   recentColorsRgba: number[]
   recentColorsIndexed: number[] // palette indices
   colorMode: 'rgba' | 'indexed'
-  palette: Uint32Array
-  transparentIndex: number
+  palette: Palette
   tool: ToolType
   shapeTool: 'line' | 'rect' | 'ellipse'
   selectTool: 'select-rect' | 'select-lasso' | 'select-wand'
@@ -91,7 +95,7 @@ export type AppState = {
   setTransparentIndex: (idx: number) => void
   removePaletteIndex: (idx: number) => void
   movePaletteIndex: (from: number, to: number) => void
-  applyPalettePreset: (colors: Uint32Array, transparentIndex?: number) => void
+  applyPalettePreset: (palette: Palette) => void
   setTool: (t: ToolType) => void
   setBrushSize: (n: number) => void
   setEraserSize: (n: number) => void
@@ -112,7 +116,7 @@ export type AppState = {
   }
   clipboard?:
   | { kind: 'rgba'; width: number; height: number; data: Uint32Array }
-  | { kind: 'indexed'; width: number; height: number; data: Uint8Array; palette: Uint32Array; transparentIndex: number }
+  | { kind: 'indexed'; width: number; height: number; data: Uint8Array; palette: Palette }
   setSelectionRect: (x0: number, y0: number, x1: number, y1: number) => void
   setSelectionMask: (mask: Uint8Array, bounds: { left: number; top: number; right: number; bottom: number }) => void
   clearSelection: () => void
@@ -157,8 +161,7 @@ type HistoryEntry = {
   height?: { before: number; after: number }
   colorMode?: { before: 'rgba' | 'indexed'; after: 'rgba' | 'indexed' }
   activeLayerId?: { before: string; after: string }
-  transparentIndex?: { before: number; after: number }
-  palette?: { before: Uint32Array; after: Uint32Array }
+  palette?: { before: Palette; after: Palette }
   layers?:
   | { replaced: { before: Layer[]; after: Layer[] } }
   | { dataChanges: Array<{ id: string; before: Uint32Array | Uint8Array; after: Uint32Array | Uint8Array }> }
@@ -187,20 +190,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   shapeTool: 'rect',
   selectTool: 'select-rect',
   dirty: false,
-  // simple default palette (16 base colors + transparent at 0)
-  palette: new Uint32Array([
-    0x00000000, 0xffffffff, 0xff0000ff, 0x00ff00ff, 0x0000ffff, 0xffff00ff, 0xff00ffff, 0x00ffffff,
-    0x7f7f7fff, 0x3f3f3fff, 0xff7f7fff, 0x7fff7fff, 0x7f7fffff, 0xffff7fff, 0xff7fffff, 0x7fffffff,
-  ]),
-  transparentIndex: 0,
+  palette: { colors: new Uint32Array([0x00000000, 0xffffffff]), transparentIndex: 0 },
   canUndo: false,
   canRedo: false,
-  // internal history state
   _undo: [],
   _redo: [],
   selection: undefined,
   clipboard: undefined,
-  // file metadata
   fileMeta: undefined,
   setFileMeta: (fileMeta) => set(() => ({ fileMeta })),
   addLayer: () => set((s) => {
@@ -266,15 +262,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   setColor: (rgba) => set((s) => {
     if (s.colorMode === 'indexed') {
       // In indexed, pick nearest palette index and sync color/index
-      const idx = rgba === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
-      const color = s.palette[idx] ?? 0
+      const idx = rgba === 0x00000000 ? s.palette.transparentIndex : nearestIndexInPalette(s.palette, rgba)
+      const color = s.palette.colors[idx] ?? 0
       return { color, currentPaletteIndex: idx }
     }
     return { color: rgba }
   }),
   setColorIndex: (i) => set((s) => {
-    const idx = Math.max(0, Math.min(i | 0, Math.max(0, s.palette.length - 1)))
-    const color = s.palette[idx] ?? 0
+    const idx = Math.max(0, Math.min(i | 0, Math.max(0, s.palette.colors.length - 1)))
+    const color = s.palette.colors[idx] ?? 0
     return { currentPaletteIndex: idx, color }
   }),
   pushRecentColor: () => set((s) => {
@@ -284,7 +280,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       let idx = s.currentPaletteIndex
       if (idx === undefined) {
         const rgba = s.color
-        idx = (rgba >>> 0) === 0x00000000 ? s.transparentIndex : nearestIndexInPalette(s.palette, s.transparentIndex, rgba)
+        idx = (rgba >>> 0) === 0x00000000 ? s.palette.transparentIndex : nearestIndexInPalette(s.palette, rgba)
       }
       if (idx === undefined) return {}
       const next = [idx, ...s.recentColorsIndexed.filter(v => v !== idx)].slice(0, MAX_RECENT)
@@ -297,29 +293,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   setPaletteColor: (index, rgba) => set((s) => {
     const i = index | 0
-    if (i < 0 || i >= s.palette.length) return {}
-    const pal = new Uint32Array(s.palette)
+    if (i < 0 || i >= s.palette.colors.length) return {}
+    const pal = new Uint32Array(s.palette.colors)
     // Keep the transparent slot actually transparent for clarity
-    pal[i] = (i === s.transparentIndex) ? 0x00000000 : (rgba >>> 0)
-    if (equalU32(pal, s.palette)) return {}
+    pal[i] = rgba >>> 0
+    if (equalU32(pal, s.palette.colors)) return {}
     // If editing currently selected index, also sync visible color string
-    const patch: Partial<AppState> = { palette: pal }
+    const patch: Partial<AppState> = { palette: { colors: pal, transparentIndex: s.palette.transparentIndex } }
     if (s.currentPaletteIndex === i) patch.color = pal[i]
     return nextPartialState(s, patch)
   }),
   currentColor: () => {
     const s = get()
     if (s.colorMode === 'rgba') return s.color
-    return s.palette[s.currentPaletteIndex ?? 0] ?? 0
+    return s.palette.colors[s.currentPaletteIndex ?? 0] ?? 0
   },
   removePaletteIndex: (idx) => set((s) => {
-    const n = s.palette.length
+    const n = s.palette.colors.length
     if (idx < 0 || idx >= n || n <= 1) return {}
     // build new palette without idx
     const pal = new Uint32Array(n - 1)
-    for (let i = 0, j = 0; i < n; i++) if (i !== idx) pal[j++] = s.palette[i]
+    for (let i = 0, j = 0; i < n; i++) if (i !== idx) pal[j++] = s.palette.colors[i]
     // compute new transparent index
-    let ti = s.transparentIndex
+    let ti = s.palette.transparentIndex
     if (ti === idx) ti = 0
     else if (ti > idx) ti = ti - 1
     // compute new current palette index
@@ -340,14 +336,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { ...l, data: dst }
     })
     const color = pal[ci] ?? 0
-    return nextPartialState(s, { palette: pal, transparentIndex: ti, layers, currentPaletteIndex: ci, color })
+    return nextPartialState(s, { palette: { colors: pal, transparentIndex: ti }, layers, currentPaletteIndex: ci, color })
   }),
   movePaletteIndex: (from, to) => set((s) => {
-    const n = s.palette.length
+    const n = s.palette.colors.length
     if (from === to || from < 0 || to < 0 || from >= n || to >= n) return {}
     // move in palette
     const pal = new Uint32Array(n)
-    pal.set(s.palette)
+    pal.set(s.palette.colors)
     const val = pal[from]
     if (from < to) {
       for (let i = from; i < to; i++) pal[i] = pal[i + 1]
@@ -373,25 +369,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { ...l, data: dst }
     })
     // remap transparent index
-    const ti = map[s.transparentIndex]
+    const ti = map[s.palette.transparentIndex]
     // remap current palette index
     const ci = s.currentPaletteIndex !== undefined ? map[s.currentPaletteIndex] : undefined
-    const patch: Partial<AppState> = { palette: pal, layers, transparentIndex: ti }
+    const patch: Partial<AppState> = { palette: { colors: pal, transparentIndex: ti }, layers }
     if (ci !== undefined) { patch.currentPaletteIndex = ci; patch.color = pal[ci] ?? 0 }
     return nextPartialState(s, patch)
   }),
-  applyPalettePreset: (colors, ti = 0) => set((s) => {
+  applyPalettePreset: (palette) => set((s) => {
+    let ti = palette.transparentIndex
     if (s.colorMode === 'rgba')
       throw new Error('applyPalettePreset should not be called in rgba mode')
 
     // Limit to 256 colors
-    const limited = colors.slice(0, 256)
+    const limited = palette.colors.slice(0, 256)
     if (limited.length === 0) limited[0] = 0x00000000
-    const palette = new Uint32Array(limited)
-    if (ti < 0 || ti >= palette.length) ti = 0
+    const paletteColors = new Uint32Array(limited)
+    if (ti < 0 || ti >= paletteColors.length) ti = 0
+    palette = { colors: paletteColors, transparentIndex: ti }
 
     // Remap indices by nearest color in the new palette
-    const remap = s.palette.map((c, i) => i === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, c))
+    const remap = s.palette.colors.map((c, i) => i === s.palette.transparentIndex ? ti : nearestIndexInPalette(palette, c))
     const layers = s.layers.map(l => {
       if (!(l.data instanceof Uint8Array)) return l
       const src = l.data
@@ -403,43 +401,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
 
     // choose current index nearest to previous selected color
-    const prevRGBA = s.palette[s.currentPaletteIndex ?? s.transparentIndex] ?? 0x00000000
-    const curIdx = s.currentPaletteIndex === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, prevRGBA)
-    const color = palette[curIdx] ?? 0
+    const prevRGBA = s.palette.colors[s.currentPaletteIndex ?? s.palette.transparentIndex] ?? 0x00000000
+    const curIdx = s.currentPaletteIndex === s.palette.transparentIndex ? ti : nearestIndexInPalette(palette, prevRGBA)
+    const color = palette.colors[curIdx] ?? 0
 
     const recentColorsIndexed = s.recentColorsIndexed
-      .map(i => (i === s.transparentIndex ? ti : nearestIndexInPalette(palette, ti, s.palette[i] ?? 0x00000000)))
+      .map(i => (i === s.palette.transparentIndex ? ti : nearestIndexInPalette(palette, s.palette.colors[i] ?? 0x00000000)))
       .filter((v, i, a) => a.indexOf(v) === i) // dedupe
 
-    return nextPartialState(s, { palette, transparentIndex: ti, layers, currentPaletteIndex: curIdx, color, recentColorsIndexed })
+    return nextPartialState(s, { palette, layers, currentPaletteIndex: curIdx, color, recentColorsIndexed })
   }),
   addPaletteColor: (rgba) => {
     const s = get()
-    if (s.palette.length >= 256) return s.palette.length - 1
-    const next = new Uint32Array(s.palette.length + 1)
-    next.set(s.palette)
-    next[s.palette.length] = rgba >>> 0
+    if (s.palette.colors.length >= 256) return s.palette.colors.length - 1
+    const next = new Uint32Array(s.palette.colors.length + 1)
+    next.set(s.palette.colors)
+    next[s.palette.colors.length] = rgba >>> 0
     set((s) => {
       // If in indexed mode, select the newly added color
       if (s.colorMode === 'indexed') {
         const idx = next.length - 1
-        return nextPartialState(s, { palette: next, currentPaletteIndex: idx, color: next[idx] ?? 0 })
+        return nextPartialState(s, { palette: { ...s.palette, colors: next }, currentPaletteIndex: idx, color: next[idx] ?? 0 })
       }
-      return nextPartialState(s, { palette: next })
+      return nextPartialState(s, { palette: { ...s.palette, colors: next } })
     })
     return next.length - 1
   },
   setTransparentIndex: (idx) => set((s) => {
-    const clamped = Math.max(0, Math.min(idx | 0, Math.max(0, s.palette.length - 1)))
-    if (clamped === s.transparentIndex) return {}
-    return nextPartialState(s, { transparentIndex: clamped })
+    const clamped = Math.max(0, Math.min(idx | 0, Math.max(0, s.palette.colors.length - 1)))
+    if (clamped === s.palette.transparentIndex) return {}
+    return nextPartialState(s, { palette: { colors: s.palette.colors, transparentIndex: clamped } })
   }),
   setView: (x, y, scale) => set(() => ({ view: { x, y, scale: clamp(scale, MIN_SCALE, MAX_SCALE) } })),
   translateAllLayers: (base, dx, dy) => set((s) => {
     dx |= 0; dy |= 0
     if (dx === 0 && dy === 0) return {}
     const W = s.width, H = s.height
-    const ti = s.transparentIndex
+    const ti = s.palette.transparentIndex
     const layers = base.map(l => ({ ...l, data: translate(l.data, W, H, dx, dy, l.data instanceof Uint32Array ? 0x00000000 : ti) }))
     return { layers }
   }),
@@ -601,7 +599,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         s.height,
         s.colorMode,
         s.palette,
-        s.transparentIndex,
         256,
       )
       const transparentIndex = 0
@@ -627,16 +624,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       // Sync current palette index nearest to current color
       const rgba = s.color
-      const curIdx = (rgba >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(autoPalette, rgba, transparentIndex)
-      return { colorMode: 'indexed', layers, currentPaletteIndex: curIdx, color: autoPalette[curIdx] ?? 0, palette: autoPalette, transparentIndex, recentColorsIndexed: [] }
+      const palette = { colors: autoPalette, transparentIndex }
+      const curIdx = (rgba >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(palette, rgba)
+      return { colorMode: 'indexed', layers, currentPaletteIndex: curIdx, color: palette.colors[curIdx] ?? 0, palette, recentColorsIndexed: [] }
     } else {
       // convert all layers: indices -> rgba
       const layers = s.layers.map(l => {
         const src = l.data ?? new Uint8Array(s.width * s.height)
         const data = new Uint32Array(s.width * s.height)
         for (let i = 0; i < data.length; i++) {
-          const pi = src[i] ?? s.transparentIndex
-          data[i] = s.palette[pi] ?? 0x00000000
+          const pi = src[i] ?? s.palette.transparentIndex
+          data[i] = s.palette.colors[pi] ?? 0x00000000
         }
         return { id: l.id, visible: l.visible, locked: l.locked, data }
       })
@@ -677,8 +675,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 }, snap: true }, selection: undefined }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
-      const pal = s.palette
-      const ti = s.transparentIndex
+      const pal = s.palette.colors
+      const ti = s.palette.transparentIndex
       const floatIdx = extractFloatingIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       const float = new Uint32Array(floatIdx.length)
       for (let i = 0; i < floatIdx.length; i++) {
@@ -702,7 +700,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (li < 0) return {}
     const layer = s.layers[li]
     if (layer.locked) return {}
-    const patch = sampleTransformedPatch(mode.transform, mode.width, mode.height, mode.data, mode.dataIdx, s.transparentIndex)
+    const patch = sampleTransformedPatch(mode.transform, mode.width, mode.height, mode.data, mode.dataIdx, s.palette.transparentIndex)
 
     let nextData: Uint32Array | Uint8Array
     if (s.colorMode === 'rgba') {
@@ -711,8 +709,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       nextData = patch.indices
-        ? applyFloatingIndicesToIndexedLayer(layer.data, patch.indices, s.transparentIndex, patch.left, patch.top, patch.width, patch.height, W, H)
-        : applyFloatingToIndexedLayer(layer.data, patch.rgba, s.palette, s.transparentIndex, patch.left, patch.top, patch.width, patch.height, W, H)
+        ? applyFloatingIndicesToIndexedLayer(layer.data, patch.indices, s.palette.transparentIndex, patch.left, patch.top, patch.width, patch.height, W, H)
+        : applyFloatingToIndexedLayer(layer.data, patch.rgba, s.palette, patch.left, patch.top, patch.width, patch.height, W, H)
     }
 
     const layers = s.layers.slice()
@@ -737,7 +735,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       patch.clipboard = { kind: 'rgba', data: float, width: bw, height: bh }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
-      const ti = s.transparentIndex
+      const ti = s.palette.transparentIndex
       const outIdx = new Uint8Array(bw * bh)
       // build masked indices copy
       for (let y = sel.bounds.top; y <= sel.bounds.bottom; y++) {
@@ -747,7 +745,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           outIdx[fi] = (!sel.mask || sel.mask[i]) ? (layer.data[i] ?? ti) : (ti & 0xff)
         }
       }
-      patch.clipboard = { kind: 'indexed', data: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }
+      patch.clipboard = { kind: 'indexed', data: outIdx, width: bw, height: bh, palette: { ...s.palette } }
     }
     useLogStore.getState().pushLog({ message: 'Copied selection' })
     return patch
@@ -776,13 +774,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       patch.clipboard = { kind: 'rgba', data: float, width: bw, height: bh }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
-      const ti = s.transparentIndex
+      const ti = s.palette.transparentIndex
       const out = clearSelectedIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       const layers = s.layers.slice()
       layers[li] = { ...layer, data: out }
       const outIdx = extractFloatingIndexed(layer.data, sel.mask, sel.bounds, W, ti)
       patch.layers = layers
-      patch.clipboard = { kind: 'indexed', data: outIdx, width: bw, height: bh, palette: s.palette.slice(0), transparentIndex: ti }
+      patch.clipboard = { kind: 'indexed', data: outIdx, width: bw, height: bh, palette: { ...s.palette } }
     }
     useLogStore.getState().pushLog({ message: 'Cut selection' })
     return nextPartialState(s, patch)
@@ -796,11 +794,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       data = clip.data.slice(0)
     } else {
       // convert indices to RGBA using clipboard palette
-      const pal = clip.palette ?? []
+      const pal = clip.palette
       data = new Uint32Array(clip.data.length)
       for (let i = 0; i < data.length; i++) {
         const pi = clip.data[i] & 0xff
-        data[i] = pi === clip.transparentIndex ? 0x00000000 : pal[pi] ?? 0x00000000
+        data[i] = pi === pal.transparentIndex ? 0x00000000 : pal.colors[pi] ?? 0x00000000
       }
       dataIdx = clip.data.slice(0)
     }
@@ -859,7 +857,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return nextPartialState(s, { layers })
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
-      const pi = (s.currentPaletteIndex ?? s.transparentIndex) & 0xff
+      const pi = (s.currentPaletteIndex ?? s.palette.transparentIndex) & 0xff
       const out = fillSelectedIndexed(layer.data, sel.mask, sel.bounds, W, pi)
       if (equalU8(out, layer.data)) return {}
       layers[li] = { ...layer, data: out }
@@ -884,7 +882,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return nextPartialState(s, { layers })
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
-      const out = clearSelectedIndexed(layer.data, sel.mask, sel.bounds, W, s.transparentIndex)
+      const out = clearSelectedIndexed(layer.data, sel.mask, sel.bounds, W, s.palette.transparentIndex)
       if (equalU8(out, layer.data)) return {}
       layers[li] = { ...layer, data: out }
       return nextPartialState(s, { layers })
@@ -969,14 +967,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     return nextPartialState(s, { layers })
   }),
   exportPNG: (scale?: number) => {
-    const { colorMode, layers, palette, transparentIndex, width: W, height: H } = get()
+    const { colorMode, layers, palette, width: W, height: H } = get()
     const s = Math.max(1, Math.floor(scale || 1))
     const base = document.createElement('canvas')
     base.width = W
     base.height = H
     const bctx = base.getContext('2d')!
     const img = new ImageData(W, H)
-    compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data })), colorMode, palette, transparentIndex, img)
+    compositeImageData(layers.map(l => ({ visible: l.visible, data: l.data })), colorMode, palette, img)
     bctx.putImageData(img, 0, 0)
 
     let outCanvas = base
@@ -997,7 +995,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   },
   exportJSON: () => {
-    const { colorMode, layers, activeLayerId, palette, transparentIndex, color, recentColorsRgba: recentColorsRgba, recentColorsIndexed, width, height } = get()
+    const { colorMode, layers, activeLayerId, palette, color, recentColorsRgba: recentColorsRgba, recentColorsIndexed, width, height } = get()
+    const transparentIndex = palette.transparentIndex
     const payload = {
       app: 'cpixel' as const,
       version: 1 as const,
@@ -1011,8 +1010,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         data: Array.from(l.data),
       })),
       activeLayerId,
-      palette: Array.from(palette),
-      transparentIndex,
+      palette: { colors: Array.from(palette.colors), transparentIndex },
       color,
       recentColorsRgba,
       recentColorsIndexed,
@@ -1026,7 +1024,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   },
   exportAse: async () => {
-    const { colorMode, layers, palette, transparentIndex, width, height } = get()
+    const { colorMode, layers, palette, width, height } = get()
     try {
       const { encodeAseprite } = await import('../utils/aseprite.ts')
       const buffer = encodeAseprite({
@@ -1035,7 +1033,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         colorMode,
         layers,
         palette,
-        transparentIndex,
       })
       const blob = new Blob([buffer], { type: 'application/octet-stream' })
 
@@ -1114,9 +1111,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       if (converted.colorMode === 'indexed') {
         statePatch.colorMode = 'indexed'
-        statePatch.palette = converted.palette
-        statePatch.transparentIndex = converted.transparentIndex
-        statePatch.currentPaletteIndex = converted.transparentIndex
+        statePatch.palette = { colors: converted.palette.colors, transparentIndex: converted.palette.transparentIndex ?? 0 }
+        statePatch.currentPaletteIndex = converted.palette.transparentIndex ?? 0
         statePatch.color = 0x00000000
       } else {
         statePatch.colorMode = 'rgba'
@@ -1164,13 +1160,13 @@ function nextPartialState(state: AppState, patch: Partial<AppState>): Partial<Ap
   if (prevEntry && Object.keys(prevEntry) + '' === 'palette' && entry && Object.keys(entry) + '' === 'palette') {
     const prevPal = prevEntry.palette!
     const nextPal = entry.palette!
-    if (prevPal.before.length === prevPal.after.length && prevPal.after.length === nextPal.after.length) {
+    if (prevPal.before.colors.length === prevPal.after.colors.length && prevPal.after.colors.length === nextPal.after.colors.length) {
       const diffIdxs = []
-      for (let i = 0; i < prevPal.after.length; i++) {
-        if (prevPal.before[i] !== prevPal.after[i] || prevPal.after[i] !== nextPal.after[i]) diffIdxs.push(i)
+      for (let i = 0; i < prevPal.after.colors.length; i++) {
+        if (prevPal.before.colors[i] !== prevPal.after.colors[i] || prevPal.after.colors[i] !== nextPal.after.colors[i]) diffIdxs.push(i)
       }
       if (diffIdxs.length === 1) {
-        const mergedEntry = { palette: { before: prevPal.before.slice(0), after: nextPal.after.slice(0) } }
+        const mergedEntry = { palette: { before: prevPal.before, after: nextPal.after } }
         return {
           ...patch,
           _undo: [...state._undo.slice(0, -1), mergedEntry],
@@ -1202,8 +1198,7 @@ function buildDiff(before: AppState, after: AppState): HistoryEntry | null {
   if (before.height !== after.height) entry.height = { before: before.height, after: after.height }
   if (before.colorMode !== after.colorMode) entry.colorMode = { before: before.colorMode, after: after.colorMode }
   if (before.activeLayerId !== after.activeLayerId) entry.activeLayerId = { before: before.activeLayerId, after: after.activeLayerId }
-  if (before.transparentIndex !== after.transparentIndex) entry.transparentIndex = { before: before.transparentIndex, after: after.transparentIndex }
-  if (!equalU32(before.palette, after.palette)) entry.palette = { before: before.palette.slice(0), after: after.palette.slice(0) }
+  if (before.palette.transparentIndex !== after.palette.transparentIndex || !equalU32(before.palette.colors, after.palette.colors)) entry.palette = { before: before.palette, after: after.palette }
 
   // Layers: if structure (ids/visibility/locked/count/type) differs, store full replacement; else store only data changes.
   let structureDiffers = false
@@ -1250,14 +1245,12 @@ function applyHistoryEntry(state: AppState, entry: HistoryEntry, dir: 'undo' | '
   const height = pick(entry.height)
   const colorMode = pick(entry.colorMode)
   const activeLayerId = pick(entry.activeLayerId)
-  const transparentIndex = pick(entry.transparentIndex)
   const palette = pick(entry.palette)
   if (width !== undefined) patch.width = width
   if (height !== undefined) patch.height = height
   if (colorMode !== undefined) patch.colorMode = colorMode
   if (activeLayerId !== undefined) patch.activeLayerId = activeLayerId
-  if (transparentIndex !== undefined) patch.transparentIndex = transparentIndex
-  if (palette !== undefined) patch.palette = palette.slice(0)
+  if (palette !== undefined) patch.palette = { colors: palette.colors.slice(), transparentIndex: palette.transparentIndex }
 
   if (entry.layers) {
     if ('replaced' in entry.layers) {

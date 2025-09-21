@@ -14,7 +14,7 @@ export function ColorSection() {
   const recentTrue = useAppStore(s => s.recentColorsRgba)
   const palette = useAppStore(s => s.palette)
   const recentColors = colorMode === 'indexed'
-    ? recentIndexed.map(i => palette[i] ?? 0x00000000)
+    ? recentIndexed.map(i => palette.transparentIndex === i ? 0x00000000 : palette.colors[i] ?? 0x00000000)
     : recentTrue
 
   return (

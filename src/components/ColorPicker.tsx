@@ -307,7 +307,7 @@ function PresetPalette({
     id: 'history',
     name: 'History',
     colors: colorMode === 'indexed'
-      ? rci.map(i => palette[i] ?? 0x00000000)
+      ? rci.map(i => palette.transparentIndex === i ? 0x00000000 : palette.colors[i] ?? 0x00000000)
       : rct,
     transparentIndex: -1,
   }), [colorMode, rct, rci, palette])

@@ -46,17 +46,18 @@ const dist2 = (a: RGBA, b: RGBA) => {
   const dr = a.r - b.r
   const dg = a.g - b.g
   const db = a.b - b.b
-  return dr*dr + dg*dg + db*db
+  return dr * dr + dg * dg + db * db
 }
 
-export function nearestIndexInPalette(palette: Uint32Array, transparentIndex: number, rgba: number): number {
+export function nearestIndexInPalette(palette: { colors: Uint32Array, transparentIndex: number }, rgba: number): number {
+  const ti = palette.transparentIndex
   const c = unpackRGBA(rgba)
-  if (c.a === 0) return transparentIndex
-  let best = transparentIndex
+  if (c.a === 0) return ti
+  let best = ti
   let bestD = Number.POSITIVE_INFINITY
-  for (let i = 0; i < palette.length; i++) {
-    if (i === transparentIndex) continue
-    const pi = palette[i] >>> 0
+  for (let i = 0; i < palette.colors.length; i++) {
+    if (i === ti) continue
+    const pi = palette.colors[i] >>> 0
     const a = pi & 0xff
     if (a === 0) continue // skip fully transparent entries (e.g., transparentIndex)
     const d = dist2(c, unpackRGBA(pi))

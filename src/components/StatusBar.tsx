@@ -46,7 +46,7 @@ export function StatusBar() {
 
   return (
     <div className="text-xs flex items-center gap-2 px-3 py-1 border-t border-border bg-surface/70 backdrop-blur overflow-x-auto [&>span]:whitespace-nowrap">
-      <span className="text-muted">{width}, {height} {colorMode}{colorMode === 'indexed' ? ` (${palette.length})` : ''}</span>
+      <span className="text-muted">{width}, {height} {colorMode}{colorMode === 'indexed' ? ` (${palette.colors.length})` : ''}</span>
       {mode && (
         <span className="text-muted">{mode.type.toUpperCase()}</span>
       )}

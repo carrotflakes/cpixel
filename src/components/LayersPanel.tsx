@@ -91,7 +91,6 @@ function LayerPreview({ layer }: { layer: { id: string; visible: boolean; locked
   const height = useAppStore(s => s.height)
   const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)
-  const transparentIndex = useAppStore(s => s.transparentIndex)
   const blockRedraw = useAppStore(s => s.mode !== null)
 
   const ref = useRef<HTMLCanvasElement | null>(null)
@@ -111,7 +110,7 @@ function LayerPreview({ layer }: { layer: { id: string; visible: boolean; locked
     ctx.drawImage(checker, 0, 0, rect.width, rect.height)
     // render layer to ImageData
     const img = ctx.createImageData(width, height)
-    compositeImageData([{ visible: true, data: layer.data }], colorMode, palette, transparentIndex, img)
+    compositeImageData([{ visible: true, data: layer.data }], colorMode, palette, img)
     // draw scaled into thumb
     const off = new OffscreenCanvas(img.width, img.height)
     const octx = off.getContext('2d', { willReadFrequently: true })!
@@ -133,7 +132,7 @@ function LayerPreview({ layer }: { layer: { id: string; visible: boolean; locked
     ctx.fillStyle = 'black'
     ctx.fillRect(dx, dy, drawW, drawH)
     ctx.restore()
-  }, [layer.data, layer.locked, width, height, colorMode, palette, transparentIndex, blockRedraw])
+  }, [layer.data, layer.locked, width, height, colorMode, palette, blockRedraw])
 
   return (
     <div className="relative w-10 h-10 pointer-events-none">

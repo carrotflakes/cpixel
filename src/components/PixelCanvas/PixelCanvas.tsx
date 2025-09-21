@@ -20,7 +20,6 @@ export function PixelCanvas() {
   const layers = useAppStore(s => s.layers)
   const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)
-  const transparentIndex = useAppStore(s => s.transparentIndex)
   const brush = useAppStore(s => s.brush)
   const eraserSize = useAppStore(s => s.eraserSize)
   const tool = useAppStore(s => s.tool)
@@ -80,7 +79,7 @@ export function PixelCanvas() {
       for (let li = 0; li < layers.length; li++) {
         const layer = layers[li]
         if (!layer.visible) continue
-        compositeImageData([layer], colorMode, palette, transparentIndex, tmpImage)
+        compositeImageData([layer], colorMode, palette, tmpImage)
         tctx.putImageData(tmpImage, 0, 0)
         const depth = li + 1
         const dx = -shiftOffsetRef.current.dx * depth / layers.length
@@ -96,7 +95,7 @@ export function PixelCanvas() {
 
     // Normal composited rendering
     const tctx = tmpCanvas.getContext('2d', { willReadFrequently: true })!
-    compositeImageData(layers, colorMode, palette, transparentIndex, tmpImage)
+    compositeImageData(layers, colorMode, palette, tmpImage)
     tctx.putImageData(tmpImage, 0, 0)
     ctx.drawImage(tmpCanvas, 0, 0, W, H, 0, 0, scaledW, scaledH)
 
@@ -162,7 +161,7 @@ export function PixelCanvas() {
           drawSelectionOutline(ctx, selection.mask, W, H, view.scale, antsPhase, 0, 0)
       }
     }
-  }, [mode, layers, palette, colorMode, transparentIndex, view, hover?.x, hover?.y, shapePreview, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
+  }, [mode, layers, palette, colorMode, view, hover?.x, hover?.y, shapePreview, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
 
   useEffect(() => {
     const canvas = canvasRef.current

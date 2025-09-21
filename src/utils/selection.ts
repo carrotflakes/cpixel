@@ -128,7 +128,7 @@ export function applyFloatingToRgbaLayer(dst: Uint32Array, floating: Uint32Array
   return out
 }
 
-export function applyFloatingToIndexedLayer(dst: Uint8Array, floating: Uint32Array, palette: Uint32Array, transparentIndex: number, dstLeft: number, dstTop: number, bw: number, bh: number, W: number, H: number) {
+export function applyFloatingToIndexedLayer(dst: Uint8Array, floating: Uint32Array, palette: { colors: Uint32Array; transparentIndex: number }, dstLeft: number, dstTop: number, bw: number, bh: number, W: number, H: number) {
   const out = new Uint8Array(dst)
   for (let y = 0; y < bh; y++) {
     for (let x = 0; x < bw; x++) {
@@ -137,7 +137,7 @@ export function applyFloatingToIndexedLayer(dst: Uint8Array, floating: Uint32Arr
       const X = dstLeft + x
       const Y = dstTop + y
       if (X < 0 || Y < 0 || X >= W || Y >= H) continue
-      const pi = nearestIndexInPalette(palette, transparentIndex, pix)
+      const pi = nearestIndexInPalette(palette, pix)
       out[Y * W + X] = pi & 0xff
     }
   }

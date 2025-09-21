@@ -11,8 +11,7 @@ export type NormalizedImport = {
   colorMode: 'rgba' | 'indexed'
   layers: NormalizedLayer[]
   activeLayerId: string
-  palette: Uint32Array
-  transparentIndex: number
+  palette: { colors: Uint32Array; transparentIndex: number }
   color: number
   recentColorsRgba: number[]
   recentColorsIndexed: number[]
@@ -21,7 +20,7 @@ export type NormalizedImport = {
 // Normalize a cpixel JSON payload into state-like fields. Returns null if invalid.
 export function normalizeImportedJSON(
   data: unknown,
-  defaults: { palette: Uint32Array; color: number; recentColorsRgba: number[]; recentColorsIndexed: number[] },
+  defaults: { palette: { colors: Uint32Array; transparentIndex: number }; color: number; recentColorsRgba: number[]; recentColorsIndexed: number[] },
 ): NormalizedImport | null {
   const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
   if (!isObj(data)) return null
@@ -39,14 +38,15 @@ export function normalizeImportedJSON(
     return out
   }
   const layersIn = Array.isArray(obj.layers) ? obj.layers : []
-  const paletteIn: number[] = Array.isArray(obj.palette) ? obj.palette : []
-  const transparentIndexIn = typeof obj.transparentIndex === 'number' ? obj.transparentIndex | 0 : 0
-  // Build palette (<= 256, ensure transparent slot is transparent)
-  let nextPalette = new Uint32Array(paletteIn.map((v) => v >>> 0))
-  if (nextPalette.length === 0) nextPalette = defaults.palette.slice(0)
-  if (nextPalette.length > 256) nextPalette = new Uint32Array(nextPalette.slice(0, 256))
-  const ti = Math.max(0, Math.min(transparentIndexIn | 0, Math.max(0, nextPalette.length - 1)))
-  if (nextPalette.length > 0) nextPalette[ti] = 0x00000000
+  let nextPalette = { ...defaults.palette }
+  if (isObj(obj.palette) && Array.isArray(obj.palette.colors) && typeof obj.palette.transparentIndex === 'number') {
+    const paletteArr: number[] = obj.palette.colors.filter((x): x is number => typeof x === 'number').slice(0, 256)
+    let colors = new Uint32Array(paletteArr.map((v) => v >>> 0))
+    if (colors.length === 0) colors = defaults.palette.colors.slice(0)
+    const ti = Math.max(0, Math.min(obj.palette.transparentIndex | 0, Math.max(0, colors.length - 1)))
+    if (colors.length > 0) colors[ti] = 0x00000000
+    nextPalette = { colors, transparentIndex: ti }
+  }
 
   const nextLayers = layersIn.map((l: unknown, idx: number) => {
     const rec = l as Record<string, unknown> | undefined
@@ -64,11 +64,11 @@ export function normalizeImportedJSON(
       }
     } else {
       if (Array.isArray(rec?.data)) {
-        const idxArr: number[] = clampSize((rec.data) as number[], ti)
+        const idxArr: number[] = clampSize((rec.data) as number[], nextPalette.transparentIndex)
         const data = new Uint8Array(idxArr.map(v => (v | 0) & 0xff))
         return { id, visible, locked, data }
       } else {
-        const data = new Uint8Array(new Array(targetSize).fill(ti & 0xff))
+        const data = new Uint8Array(new Array(targetSize).fill(nextPalette.transparentIndex & 0xff))
         return { id, visible, locked, data }
       }
     }
@@ -92,7 +92,6 @@ export function normalizeImportedJSON(
     layers: nextLayers,
     activeLayerId,
     palette: nextPalette,
-    transparentIndex: Math.max(0, Math.min(ti, Math.max(0, nextPalette.length - 1))),
     color: nextColor,
     recentColorsRgba: rcRgba,
     recentColorsIndexed: rcIndexed,

@@ -21,8 +21,7 @@ type PersistPayload = {
     id: string; visible: boolean; locked: boolean; data: number[];
   }>
   activeLayerId: string
-  palette: number[]
-  transparentIndex: number
+  palette: { colors: number[]; transparentIndex: number }
   color: number
   recentColorsRgba: number[]
   recentColorsIndexed: number[]
@@ -44,8 +43,10 @@ function buildPayload(): PersistPayload {
       data: Array.from(l.data),
     })),
     activeLayerId: s.activeLayerId,
-    palette: Array.from(s.palette),
-    transparentIndex: s.transparentIndex,
+    palette: {
+      colors: Array.from(s.palette.colors),
+      transparentIndex: s.palette.transparentIndex,
+    },
     color: s.color,
     recentColorsRgba: s.recentColorsRgba,
     recentColorsIndexed: s.recentColorsIndexed,

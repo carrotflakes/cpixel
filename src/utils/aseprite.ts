@@ -16,7 +16,7 @@ const CHUNK_COLOR_PROFILE = 0x2007
 const CHUNK_PALETTE = 0x2019
 
 export interface AseImportLayer { id: string; name: string; visible: boolean; blendMode: number; opacity: number; pixels?: Uint32Array; indices?: Uint8Array }
-export interface AseImportResult { width: number; height: number; colorDepth: number; layers: AseImportLayer[]; palette?: Uint32Array; transparentIndex?: number; frames: number }
+export interface AseImportResult { width: number; height: number; colorDepth: number; layers: AseImportLayer[]; palette?: { colors: Uint32Array; transparentIndex?: number }; frames: number }
 
 interface LayerInfo { name: string; flags: number; type: number; child: number; blend: number; opacity: number; id: number; visible: boolean }
 interface CelInfo { layerIndex: number; x: number; y: number; opacity: number; type: number; w: number; h: number; raw: Uint8Array }
@@ -190,12 +190,12 @@ export async function decodeAseprite(buf: ArrayBuffer, opts?: { preserveIndexed?
     if (!preserve) for (const L of outLayers) if (L.pixels) { const p = L.pixels; for (let i = 0; i < p.length; i++) p[i] = palette![p[i] & 0xff] ?? 0 }
   }
 
-  return { width, height, colorDepth: depth, layers: outLayers, palette, transparentIndex: depth === 8 ? (transparentIndex & 0xff) : undefined, frames }
+  return { width, height, colorDepth: depth, layers: outLayers, palette: palette ? { colors: palette, transparentIndex: depth === 8 ? (transparentIndex & 0xff) : undefined } : undefined, frames }
 }
 
 export function aseToCpixel(imported: AseImportResult) {
   if (imported.colorDepth === 8 && imported.layers.some(l => l.indices)) {
-    return { width: imported.width, height: imported.height, colorMode: 'indexed' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.indices ?? new Uint8Array(imported.width * imported.height) })), palette: imported.palette ?? new Uint32Array([0x00000000]), transparentIndex: imported.transparentIndex ?? 0 }
+    return { width: imported.width, height: imported.height, colorMode: 'indexed' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.indices ?? new Uint8Array(imported.width * imported.height) })), palette: imported.palette ?? { colors: new Uint32Array([0x00000000]), transparentIndex: 0 } }
   }
   return { width: imported.width, height: imported.height, colorMode: 'rgba' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.pixels ?? new Uint32Array(imported.width * imported.height) })) }
 }
@@ -205,14 +205,15 @@ export function aseToCpixel(imported: AseImportResult) {
 type CpixelLikeState = Readonly<{
   width: number; height: number; colorMode: 'indexed' | 'rgba';
   layers: ReadonlyArray<{ id: string; visible: boolean; data: Uint32Array | Uint8Array }>
-  palette: Uint32Array; transparentIndex: number;
+  palette: { colors: Uint32Array; transparentIndex: number };
 }>
 
 function writeU16(buf: Uint8Array, off: number, v: number) { buf[off] = v & 0xff; buf[off + 1] = (v >>> 8) & 0xff }
 function writeU32(buf: Uint8Array, off: number, v: number) { buf[off] = v & 0xff; buf[off + 1] = (v >>> 8) & 0xff; buf[off + 2] = (v >>> 16) & 0xff; buf[off + 3] = (v >>> 24) & 0xff }
 
 export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
-  const { width, height, colorMode, layers, palette, transparentIndex } = state
+  const { width, height, colorMode, layers, palette } = state
+  const transparentIndex = palette.transparentIndex
   const colorDepth = colorMode === 'indexed' ? 8 : 32
   const layerCount = layers.length
   const includePalette = colorMode === 'indexed'
@@ -224,7 +225,7 @@ export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
   // Palette chunk
   if (includePalette) {
     const first = 0
-    const last = palette.length - 1
+    const last = palette.colors.length - 1
     const count = last - first + 1
     // Each entry: 2 + 4 bytes (flags + rgba) = 6 bytes (no names)
     const entriesBytes = count * 6
@@ -234,13 +235,13 @@ export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
     let o = 0
     writeU32(arr, o, size); o += 4
     writeU16(arr, o, 0x2019); o += 2
-    writeU32(arr, o, palette.length); o += 4 // palette size
+    writeU32(arr, o, palette.colors.length); o += 4 // palette size
     writeU32(arr, o, first); o += 4
     writeU32(arr, o, last); o += 4
     o += 8 // reserved
     for (let i = first; i <= last; i++) {
       writeU16(arr, o, 0); o += 2 // flags
-      const rgba = palette[i] >>> 0
+      const rgba = palette.colors[i] >>> 0
       // Stored as RGBA; importer expects same (we packed that way). Ensure transparent alpha 0.
       const r = (rgba >>> 24) & 0xff
       const g = (rgba >>> 16) & 0xff
@@ -333,7 +334,7 @@ export function encodeAseprite(state: CpixelLikeState): ArrayBuffer {
   writeU32(out, o, 0); o += 4                      // reserved
   out[o++] = (colorMode === 'indexed') ? (transparentIndex & 0xff) : 0 // transparent palette index
   o += 3                                           // ignore
-  writeU16(out, o, (colorMode === 'indexed') ? palette.length : 256); o += 2 // number of colors (old field)
+  writeU16(out, o, (colorMode === 'indexed') ? palette.colors.length : 256); o += 2 // number of colors (old field)
   out[o++] = 1; out[o++] = 1                      // pixel ratio w/h
   writeU16(out, o, 0); o += 2                     // grid x
   writeU16(out, o, 0); o += 2                     // grid y

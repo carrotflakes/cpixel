@@ -365,7 +365,7 @@ function pickAndImportAse() {
 }
 
 async function saveProjectToGoogleDrive(filename: string, fileId?: string): Promise<{ id: string; name: string } | void> {
-  const { colorMode, layers, activeLayerId, palette, transparentIndex, color, recentColorsRgba, recentColorsIndexed, width, height } = useAppStore.getState()
+  const { colorMode, layers, activeLayerId, palette, color, recentColorsRgba, recentColorsIndexed, width, height } = useAppStore.getState()
   const payload = {
     app: 'cpixel' as const,
     version: 1 as const,
@@ -374,8 +374,10 @@ async function saveProjectToGoogleDrive(filename: string, fileId?: string): Prom
     colorMode,
     layers: layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: Array.from(l.data) })),
     activeLayerId,
-    palette: Array.from(palette ?? new Uint32Array(0)),
-    transparentIndex,
+    palette: {
+      colors: Array.from(palette.colors),
+      transparentIndex: palette.transparentIndex,
+    },
     color,
     recentColorsRgba,
     recentColorsIndexed,
