@@ -100,6 +100,10 @@ export function MoreMenu() {
                   state.setSelectionRect(0, 0, state.width - 1, state.height - 1)
                   setOpen(false)
                 }}>Select All</DropdownMenu.Item>
+                <DropdownMenu.Item className={itemCls} onSelect={() => {
+                  useAppStore.getState().selectCurrentColor()
+                  setOpen(false)
+                }}>Select Current color</DropdownMenu.Item>
                 <DropdownMenu.Separator className={separatorCls} />
                 <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; copySelection(); setOpen(false) }}>Copy</DropdownMenu.Item>
                 <DropdownMenu.Item disabled={!hasSelection} className={itemCls} onSelect={() => { if (!hasSelection) return; useAppStore.getState().beginStroke(); cutSelection(); useAppStore.getState().endStroke(); setOpen(false) }}>Cut</DropdownMenu.Item>

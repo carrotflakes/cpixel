@@ -131,6 +131,8 @@ export type AppState = {
   invertSelection: () => void
   fillSelection: () => void
   eraseSelection: () => void
+  // select
+  selectCurrentColor: () => void
   // history
   beginStroke: () => void
   endStroke: () => void
@@ -920,6 +922,50 @@ export const useAppStore = create<AppState>((set, get) => ({
       layers[li] = { ...layer, data: out }
       return nextPartialState(s, { layers })
     }
+  }),
+  selectCurrentColor: () => set((s) => {
+    // Build a selection mask over the active layer for all pixels equal to the current color
+    if (s.mode !== null) return {}
+    const W = s.width, H = s.height
+    const li = s.layers.findIndex(l => l.id === s.activeLayerId)
+    if (li < 0) return {}
+    const layer = s.layers[li]
+    const size = W * H
+    const mask = new Uint8Array(size)
+    let left = W, right = -1, top = H, bottom = -1
+    if (s.colorMode === 'rgba') {
+      if (!(layer.data instanceof Uint32Array)) return {}
+      const target = s.color >>> 0
+      for (let y = 0, i = 0; y < H; y++) {
+        for (let x = 0; x < W; x++, i++) {
+          if ((layer.data[i] >>> 0) === target) {
+            mask[i] = 1
+            if (x < left) left = x
+            if (x > right) right = x
+            if (y < top) top = y
+            if (y > bottom) bottom = y
+          }
+        }
+      }
+    } else {
+      if (!(layer.data instanceof Uint8Array)) return {}
+      const targetIdx = (s.currentPaletteIndex ?? s.palette.transparentIndex) & 0xff
+      for (let y = 0, i = 0; y < H; y++) {
+        for (let x = 0; x < W; x++, i++) {
+          if ((layer.data[i] & 0xff) === targetIdx) {
+            mask[i] = 1
+            if (x < left) left = x
+            if (x > right) right = x
+            if (y < top) top = y
+            if (y > bottom) bottom = y
+          }
+        }
+      }
+    }
+    if (right < left || bottom < top) {
+      return { selection: undefined }
+    }
+    return { selection: { mask, bounds: { left, top, right, bottom } } }
   }),
   setHoverInfo: (hover) => set({ hover }),
   beginStroke: () => set((s) => {
