@@ -8,7 +8,7 @@ export function generatePaletteFromComposite(
   layers: LayerLike[],
   width: number,
   height: number,
-  colorMode: 'truecolor' | 'indexed',
+  colorMode: 'rgba' | 'indexed',
   palette: Uint32Array,
   transparentIndex: number,
   maxColors: number = 256,

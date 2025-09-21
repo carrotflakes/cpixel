@@ -299,7 +299,7 @@ function PresetPalette({
   onChange: (rgba: number) => void
 }) {
   const [presetId, setPresetId] = useUIState('colorPickerPresetId', PALETTE_PRESETS[0].id)
-  const rct = useAppStore(s => s.recentColorsTruecolor)
+  const rct = useAppStore(s => s.recentColorsRgba)
   const rci = useAppStore(s => s.recentColorsIndexed)
   const colorMode = useAppStore(s => s.colorMode)
   const palette = useAppStore(s => s.palette)

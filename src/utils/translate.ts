@@ -1,7 +1,7 @@
 // Pure translation helpers for shifting pixel data
 // Keeps immutability: always returns a new typed array
 
-export function translateTruecolor(src: Uint32Array, W: number, H: number, dx: number, dy: number): Uint32Array {
+export function translateRgba(src: Uint32Array, W: number, H: number, dx: number, dy: number): Uint32Array {
   dx |= 0; dy |= 0
   if (dx === 0 && dy === 0) return src
   const out = new Uint32Array(W * H)

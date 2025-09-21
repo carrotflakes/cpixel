@@ -113,9 +113,9 @@ export function MoreMenu() {
                     <LuChevronRight className="ml-auto" aria-hidden />
                   </DropdownMenu.SubTrigger>
                   <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                    <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().setColorMode('truecolor'); setOpen(false) }}>
-                      {colorMode === 'truecolor' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
-                      <span>Truecolor</span>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().setColorMode('rgba'); setOpen(false) }}>
+                      {colorMode === 'rgba' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
+                      <span>RGBA</span>
                     </DropdownMenu.Item>
                     <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().setColorMode('indexed'); setOpen(false) }}>
                       {colorMode === 'indexed' ? <LuCheck aria-hidden /> : <span className="w-4 inline-block" />}
@@ -365,7 +365,7 @@ function pickAndImportAse() {
 }
 
 async function saveProjectToGoogleDrive(filename: string, fileId?: string): Promise<{ id: string; name: string } | void> {
-  const { colorMode, layers, activeLayerId, palette, transparentIndex, color, recentColorsTruecolor, recentColorsIndexed, width, height } = useAppStore.getState()
+  const { colorMode, layers, activeLayerId, palette, transparentIndex, color, recentColorsRgba, recentColorsIndexed, width, height } = useAppStore.getState()
   const payload = {
     app: 'cpixel' as const,
     version: 1 as const,
@@ -377,8 +377,8 @@ async function saveProjectToGoogleDrive(filename: string, fileId?: string): Prom
     palette: Array.from(palette ?? new Uint32Array(0)),
     transparentIndex,
     color,
-    recentColorsTruecolor: recentColorsTruecolor ?? [],
-    recentColorsIndexed: recentColorsIndexed ?? [],
+    recentColorsRgba,
+    recentColorsIndexed,
   }
   const name = filename && /\.json$/i.test(filename) ? filename : `${filename || 'cpixel'}.json`
   const result = await GoogleDrive.saveJSON(name, payload, fileId)

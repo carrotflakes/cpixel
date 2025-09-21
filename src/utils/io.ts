@@ -8,26 +8,26 @@ export type NormalizedLayer = {
 export type NormalizedImport = {
   width: number
   height: number
-  colorMode: 'truecolor' | 'indexed'
+  colorMode: 'rgba' | 'indexed'
   layers: NormalizedLayer[]
   activeLayerId: string
   palette: Uint32Array
   transparentIndex: number
   color: number
-  recentColorsTruecolor: number[]
+  recentColorsRgba: number[]
   recentColorsIndexed: number[]
 }
 
 // Normalize a cpixel JSON payload into state-like fields. Returns null if invalid.
 export function normalizeImportedJSON(
   data: unknown,
-  defaults: { palette: Uint32Array; color: number; recentColorsTruecolor: number[]; recentColorsIndexed: number[] },
+  defaults: { palette: Uint32Array; color: number; recentColorsRgba: number[]; recentColorsIndexed: number[] },
 ): NormalizedImport | null {
   const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object'
   if (!isObj(data)) return null
   const obj = data as Record<string, unknown>
   if (obj.app !== 'cpixel') return null
-  const impMode: 'truecolor' | 'indexed' = obj.colorMode === 'indexed' ? 'indexed' : 'truecolor'
+  const impMode: 'rgba' | 'indexed' = obj.colorMode === 'indexed' ? 'indexed' : 'rgba'
   const width = Math.max(1, (typeof obj.width === 'number' ? (obj.width | 0) : 0))
   const height = Math.max(1, (typeof obj.height === 'number' ? (obj.height | 0) : 0))
   const targetSize = width * height
@@ -53,7 +53,7 @@ export function normalizeImportedJSON(
     const id = typeof rec?.id === 'string' ? rec.id : `L${idx + 1}`
     const visible = rec?.visible !== false
     const locked = !!rec?.locked
-    if (impMode === 'truecolor') {
+    if (impMode === 'rgba') {
       if (Array.isArray(rec?.data)) {
         const dataArr: number[] = clampSize(rec.data, 0)
         const data = new Uint32Array(dataArr.map(v => v >>> 0))
@@ -78,9 +78,9 @@ export function normalizeImportedJSON(
     ? obj.activeLayerId
     : (nextLayers[0]?.id || 'L1')
   const nextColor = typeof obj.color === 'number' ? obj.color : defaults.color
-  const rcTrue = Array.isArray(obj.recentColorsTruecolor)
-    ? (obj.recentColorsTruecolor as unknown[]).filter((x): x is number => typeof x === 'number').slice(0, 10)
-    : defaults.recentColorsTruecolor
+  const rcRgba = Array.isArray(obj.recentColorsRgba)
+    ? (obj.recentColorsRgba as unknown[]).filter((x): x is number => typeof x === 'number').slice(0, 10)
+    : defaults.recentColorsRgba
   const rcIndexed = Array.isArray(obj.recentColorsIndexed)
     ? (obj.recentColorsIndexed as unknown[]).filter(x => Number.isFinite(Number(x))).map(x => Number(x) | 0).slice(0, 10)
     : defaults.recentColorsIndexed
@@ -94,7 +94,7 @@ export function normalizeImportedJSON(
     palette: nextPalette,
     transparentIndex: Math.max(0, Math.min(ti, Math.max(0, nextPalette.length - 1))),
     color: nextColor,
-    recentColorsTruecolor: rcTrue,
+    recentColorsRgba: rcRgba,
     recentColorsIndexed: rcIndexed,
   }
 }

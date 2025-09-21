@@ -16,7 +16,7 @@ type PersistPayload = {
   version: 1
   width: number
   height: number
-  colorMode: 'truecolor' | 'indexed'
+  colorMode: 'rgba' | 'indexed'
   layers: Array<{
     id: string; visible: boolean; locked: boolean; data: number[];
   }>
@@ -24,7 +24,7 @@ type PersistPayload = {
   palette: number[]
   transparentIndex: number
   color: number
-  recentColorsTruecolor: number[]
+  recentColorsRgba: number[]
   recentColorsIndexed: number[]
   fileMeta?: FileMeta
 }
@@ -44,11 +44,11 @@ function buildPayload(): PersistPayload {
       data: Array.from(l.data),
     })),
     activeLayerId: s.activeLayerId,
-    palette: Array.from(s.palette ?? new Uint32Array(0)),
+    palette: Array.from(s.palette),
     transparentIndex: s.transparentIndex,
     color: s.color,
-    recentColorsTruecolor: s.recentColorsTruecolor ?? [],
-    recentColorsIndexed: s.recentColorsIndexed ?? [],
+    recentColorsRgba: s.recentColorsRgba,
+    recentColorsIndexed: s.recentColorsIndexed,
     fileMeta: s.fileMeta,
   }
 }
@@ -73,9 +73,9 @@ function restore() {
     if (data && data.app === 'cpixel') {
       // migrate
       data.color = typeof data.color === 'string' ? parseCSSColor(data.color) : data.color
-      data.recentColorsTruecolor = typeof data.recentColorsTruecolor[0] === 'string'
-        ? data.recentColorsTruecolor.map(parseCSSColor)
-        : data.recentColorsTruecolor
+      data.recentColorsRgba = typeof data.recentColorsRgba[0] === 'string'
+        ? data.recentColorsRgba.map(parseCSSColor)
+        : data.recentColorsRgba
 
       useAppStore.getState().importJSON(data, data.fileMeta)
       useLogStore.getState().pushLog({ message: 'Autosave restored' })

@@ -225,7 +225,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       } else if (curTool.current === 'select-wand') {
         const contiguous = !e.shiftKey
         const colorGetter = (px: number, py: number) => {
-          if (colorMode === 'truecolor') {
+          if (colorMode === 'rgba') {
             return compositePixel(layers, px, py, colorMode, palette, transparentIndex, W, H) >>> 0
           } else {
             const idx = findTopPaletteIndex(layers as LayerLike[], px, py, W, H, transparentIndex) ?? transparentIndex

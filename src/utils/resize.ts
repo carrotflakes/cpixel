@@ -7,7 +7,7 @@ export type LayerLike = {
 
 export function resizeLayers(
   layers: LayerLike[],
-  colorMode: 'truecolor' | 'indexed',
+  colorMode: 'rgba' | 'indexed',
   oldW: number,
   oldH: number,
   newW: number,
@@ -16,7 +16,7 @@ export function resizeLayers(
   const copyW = Math.min(oldW, newW)
   const copyH = Math.min(oldH, newH)
   return layers.map((l) => {
-    if (colorMode === 'truecolor') {
+    if (colorMode === 'rgba') {
       const src = l.data instanceof Uint32Array ? l.data : new Uint32Array(oldW * oldH)
       const dst = new Uint32Array(newW * newH)
       for (let y = 0; y < copyH; y++) {

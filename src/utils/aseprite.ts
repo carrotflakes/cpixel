@@ -197,13 +197,13 @@ export function aseToCpixel(imported: AseImportResult) {
   if (imported.colorDepth === 8 && imported.layers.some(l => l.indices)) {
     return { width: imported.width, height: imported.height, colorMode: 'indexed' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.indices ?? new Uint8Array(imported.width * imported.height) })), palette: imported.palette ?? new Uint32Array([0x00000000]), transparentIndex: imported.transparentIndex ?? 0 }
   }
-  return { width: imported.width, height: imported.height, colorMode: 'truecolor' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.pixels ?? new Uint32Array(imported.width * imported.height) })) }
+  return { width: imported.width, height: imported.height, colorMode: 'rgba' as const, layers: imported.layers.map(l => ({ id: l.id, visible: l.visible, locked: false, data: l.pixels ?? new Uint32Array(imported.width * imported.height) })) }
 }
 
 // ------------------------- Encoding (export) ---------------------------------
 
 type CpixelLikeState = Readonly<{
-  width: number; height: number; colorMode: 'indexed' | 'truecolor';
+  width: number; height: number; colorMode: 'indexed' | 'rgba';
   layers: ReadonlyArray<{ id: string; visible: boolean; data: Uint32Array | Uint8Array }>
   palette: Uint32Array; transparentIndex: number;
 }>

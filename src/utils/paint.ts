@@ -1,7 +1,7 @@
 import { rasterizeLine } from './lines'
 
-// Stamp a square brush onto a truecolor layer. Returns original src if no change.
-export function stampTruecolor(
+// Stamp a square brush onto a rgba layer. Returns original src if no change.
+export function stampRgba(
   src: Uint32Array,
   W: number,
   H: number,
@@ -34,7 +34,7 @@ export function stampTruecolor(
 }
 
 // Stamp a square brush with a tiled NxN binary pattern mask (1=paint, 0=skip)
-export function stampTruecolorPattern(
+export function stampRgbaPattern(
   src: Uint32Array,
   W: number,
   H: number,
@@ -135,7 +135,7 @@ export function stampIndexedPattern(
   return changed ? out : src
 }
 
-export function drawLineBrushTruecolor(
+export function drawLineBrushRgba(
   src: Uint32Array,
   W: number,
   H: number,
@@ -167,7 +167,7 @@ export function drawLineBrushTruecolor(
   return changed ? out : src
 }
 
-export function drawLineBrushTruecolorPattern(
+export function drawLineBrushRgbaPattern(
   src: Uint32Array,
   W: number,
   H: number,
@@ -277,7 +277,7 @@ export function drawLineBrushIndexedPattern(
   return changed ? out : src
 }
 
-export function drawRectOutlineTruecolor(
+export function drawRectOutlineRgba(
   src: Uint32Array,
   W: number,
   H: number,
@@ -347,8 +347,8 @@ export function drawRectOutlineIndexed(
   return changed ? out : src
 }
 
-// Filled rectangle (includes outline) for truecolor mode
-export function drawRectFilledTruecolor(
+// Filled rectangle (includes outline) for rgba mode
+export function drawRectFilledRgba(
   src: Uint32Array,
   W: number,
   H: number,
@@ -511,7 +511,7 @@ function rasterizeEllipseFilled(x0: number, y0: number, x1: number, y1: number, 
   }
 }
 
-export function drawEllipseOutlineTruecolor(
+export function drawEllipseOutlineRgba(
   src: Uint32Array,
   W: number,
   H: number,
@@ -557,7 +557,7 @@ export function drawEllipseOutlineIndexed(
   return changed ? out : src
 }
 
-export function drawEllipseFilledTruecolor(
+export function drawEllipseFilledRgba(
   src: Uint32Array,
   W: number,
   H: number,

@@ -52,7 +52,7 @@ export function isPointInMask(mask: Uint8Array | undefined, W: number, H: number
   return mask[y * W + x] !== 0
 }
 
-export function extractFloatingTruecolor(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number) {
+export function extractFloatingRgba(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number) {
   const bw = bounds.right - bounds.left + 1
   const bh = bounds.bottom - bounds.top + 1
   const float = new Uint32Array(bw * bh)
@@ -67,11 +67,11 @@ export function extractFloatingTruecolor(data: Uint32Array, mask: Uint8Array | u
   return float
 }
 
-export function clearSelectedTruecolor(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number) {
-  return fillSelectedTruecolor(data, mask, bounds, W, 0x00000000)
+export function clearSelectedRgba(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number) {
+  return fillSelectedRgba(data, mask, bounds, W, 0x00000000)
 }
 
-export function fillSelectedTruecolor(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, color: number) {
+export function fillSelectedRgba(data: Uint32Array, mask: Uint8Array | undefined, bounds: { left: number; top: number; right: number; bottom: number }, W: number, color: number) {
   const out = new Uint32Array(data)
   for (let y = bounds.top; y <= bounds.bottom; y++) {
     for (let x = bounds.left; x <= bounds.right; x++) {
@@ -113,7 +113,7 @@ export function fillSelectedIndexed(data: Uint8Array, mask: Uint8Array | undefin
   return out
 }
 
-export function applyFloatingToTruecolorLayer(dst: Uint32Array, floating: Uint32Array, dstLeft: number, dstTop: number, bw: number, bh: number, W: number, H: number) {
+export function applyFloatingToRgbaLayer(dst: Uint32Array, floating: Uint32Array, dstLeft: number, dstTop: number, bw: number, bh: number, W: number, H: number) {
   const out = new Uint32Array(dst)
   for (let y = 0; y < bh; y++) {
     for (let x = 0; x < bw; x++) {
@@ -195,7 +195,7 @@ export function extractFloatingSelectionIndices(
 }
 
 // Magic wand: build a mask selecting all pixels connected (contiguous=true) or all matching color (contiguous=false)
-// colorRef is either RGBA (truecolor mode) or palette index (indexed mode with provideIndices=true)
+// colorRef is either RGBA (rgba mode) or palette index (indexed mode with provideIndices=true)
 export function magicWandMask(
   W: number,
   H: number,

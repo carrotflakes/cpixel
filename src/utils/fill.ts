@@ -1,7 +1,7 @@
-// Flood fill utilities for truecolor and indexed modes
+// Flood fill utilities for rgba and indexed modes
 // Immutable: return new arrays based on input buffers
 
-export function floodFillTruecolor(
+export function floodFillRgba(
   src: Uint32Array,
   w: number,
   h: number,
