@@ -195,12 +195,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     if (isEyedropperTool()) { pickColorAt(x, y); return true }
 
-    if (!inBounds(x, y)) return false
-
-    // If a selection mask exists and pointer is outside, block starting paint / shape tools (selection tools still allowed)
-    if (!isSelectionTool() && selectionMask && !pointInSelection(x, y)) return false
-
     if (isMoveTool()) {
+      if (!inBounds(x, y)) return false
       beginStroke()
       moveDrag.current = { active: true, startX: x, startY: y, baseLayers: layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: l.data instanceof Uint32Array ? new Uint32Array(l.data) : new Uint8Array(l.data) })) }
       return true
