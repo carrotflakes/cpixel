@@ -250,7 +250,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       } else if (isBrushishTool()) {
         const erase = curTool.current === 'eraser'
         mouseStroke.current = { active: true, erase, lastX: x, lastY: y }
-        useAppStore.getState().setAt(x, y, paintFor(erase))
+        useAppStore.getState().setAt(x, y, erase, paintFor(erase))
       }
     }
   }
@@ -284,7 +284,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
 
     if (mouseStroke.current.active && mouseStroke.current.lastX !== undefined && mouseStroke.current.lastY !== undefined) {
       const rgba = paintFor(mouseStroke.current.erase)
-      useAppStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, rgba)
+      useAppStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, mouseStroke.current.erase, rgba)
       mouseStroke.current.lastX = x
       mouseStroke.current.lastY = y
     }
@@ -621,7 +621,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const s = shapePreview
       if (s) {
         const rgba = paintFor(false)
-        if (s.kind === 'line') useAppStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, rgba)
+        if (s.kind === 'line') useAppStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, false, rgba)
         else if (s.kind === 'rect') useAppStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
         else if (s.kind === 'ellipse') useAppStore.getState().drawEllipse(s.startX, s.startY, s.curX, s.curY, rgba)
         setShapePreview(null)
@@ -670,7 +670,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           } else if (isBrushishTool()) {
             const erase = curTool.current === 'eraser'
             mouseStroke.current = { active: true, erase, lastX: f.x, lastY: f.y }
-            useAppStore.getState().setAt(f.x, f.y, paintFor(erase))
+            useAppStore.getState().setAt(f.x, f.y, erase, paintFor(erase))
           }
 
           endTool()

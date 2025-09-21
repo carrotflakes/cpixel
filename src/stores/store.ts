@@ -104,8 +104,8 @@ export type AppState = {
   setBrushPattern: (size: number, mask: Uint8Array) => void
   toggleShapeFill: () => void
   setView: (x: number, y: number, scale: number) => void
-  setAt: (x: number, y: number, rgbaOrIndex: number) => void
-  drawLine: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
+  setAt: (x: number, y: number, erase: boolean, rgbaOrIndex: number) => void
+  drawLine: (x0: number, y0: number, x1: number, y1: number, erase: boolean, rgbaOrIndex: number) => void
   drawRect: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   drawEllipse: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   fillBucket: (x: number, y: number, rgbaOrIndex: number) => void
@@ -475,10 +475,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const layers = base.map(l => ({ ...l, data: translate(l.data, W, H, dx, dy, l.data instanceof Uint32Array ? 0x00000000 : ti) }))
     return { layers }
   }),
-  setAt: (x, y, rgbaOrIndex) => {
+  setAt: (x, y, erase, rgbaOrIndex) => {
     set((s) => {
       const W = s.width, H = s.height
-      if (x < 0 || y < 0 || x >= W || y >= H) return {}
+      const brush = erase ? { size: s.eraserSize, pattern: undefined, subMode: 'normal' } : s.brush
 
       // Block painting while a floating selection exists to force commit first
       if (s.mode?.type !== 'stroking') return {}
@@ -488,14 +488,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (!s.selection.mask[i]) return {}
       }
 
-      const brush = s.brush
       const li = s.layers.findIndex(l => l.id === s.activeLayerId)
       if (li < 0) return {}
       const layer = s.layers[li]
       if (layer.locked) return {}
       const layers = s.layers.slice()
-      const size = Math.max(1, (s.tool === 'eraser' ? s.eraserSize : brush.size) | 0)
-      const pattern = s.tool === 'brush' && brush.subMode === 'pattern' ? brush.pattern : undefined
+      const size = Math.max(1, brush.size | 0)
+      const pattern = brush.subMode === 'pattern' ? brush.pattern : undefined
       const out = stamp(layer.data, W, H, x, y, size, rgbaOrIndex >>> 0, s.selection?.mask, pattern)
       if (out === layer.data) return {}
       layers[li] = { ...layer, data: out }
@@ -503,13 +502,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
     get().pushRecentColor()
   },
-  drawLine: (x0, y0, x1, y1, rgbaOrIndex) => {
+  drawLine: (x0, y0, x1, y1, erase, rgbaOrIndex) => {
     set((s) => {
       const W = s.width, H = s.height
+      const brush = erase ? { size: s.eraserSize, pattern: undefined, subMode: 'normal' } : s.brush
       // Clamp endpoints
       x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
       const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
-      const brush = s.brush
       const li = s.layers.findIndex(l => l.id === s.activeLayerId)
       if (li < 0) return {}
       const layer = s.layers[li]
