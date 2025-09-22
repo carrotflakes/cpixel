@@ -21,7 +21,7 @@ type TransformDragState =
   | {
     kind: 'scale'
     handle: CornerHandleId
-    initial: { transform: Transform2D; width: number; height: number }
+    initial: { transform: Transform2D; width: number; height: number, offsetX: number, offsetY: number }
     handleLocal: { x: number; y: number }
   }
   | {
@@ -192,7 +192,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         transformDrag.current = {
           kind: 'scale',
           handle: corner.id,
-          initial: { transform: { ...mode.transform }, width: mode.width, height: mode.height },
+          initial: { transform: { ...mode.transform }, width: mode.width, height: mode.height, offsetX: precise.x - corner.x, offsetY: precise.y - corner.y },
           handleLocal: { x: corner.localX, y: corner.localY },
         }
         return true
@@ -483,9 +483,9 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           }
           if (drag.kind === 'scale') {
             const init = drag.initial.transform
-            const point = inverseTransformPoint(init, precise.x, precise.y)
-            const dx = point.x - init.cx
-            const dy = point.y - init.cy
+            const point = inverseTransformPoint(init, precise.x - drag.initial.offsetX, precise.y - drag.initial.offsetY)
+            const dx = point.x - (init.cx - drag.handleLocal.x)
+            const dy = point.y - (init.cy - drag.handleLocal.y)
             const computeRatio = (value: number, base: number) => {
               if (Math.abs(base) < 1e-6) return 1
               let ratio = value / base
@@ -494,8 +494,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
               const sign = Math.sign(ratio) || 1
               return sign * magnitude
             }
-            let ratioX = computeRatio(dx, drag.handleLocal.x)
-            let ratioY = computeRatio(dy, drag.handleLocal.y)
+            let ratioX = computeRatio(dx, drag.handleLocal.x * 2)
+            let ratioY = computeRatio(dy, drag.handleLocal.y * 2)
             if (e.shiftKey) {
               const dominant = Math.abs(ratioX) > Math.abs(ratioY) ? ratioX : ratioY
               const mag = Math.max(MIN_TRANSFORM_SCALE, Math.abs(dominant))
@@ -510,11 +510,15 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
               if (s.mode?.type !== 'transform') return {}
               const prev = s.mode.transform
               if (Math.abs(prev.scaleX - nextScaleX) < 1e-4 && Math.abs(prev.scaleY - nextScaleY) < 1e-4) return {}
+              const dcx = drag.handleLocal.x * (nextScaleX - init.scaleX)
+              const dcy = drag.handleLocal.y * (nextScaleY - init.scaleY)
               return {
                 mode: {
                   ...s.mode,
                   transform: {
                     ...prev,
+                    cx: init.cx + dcx * Math.cos(init.angle) - dcy * Math.sin(init.angle),
+                    cy: init.cy + dcy * Math.cos(init.angle) + dcx * Math.sin(init.angle),
                     scaleX: nextScaleX,
                     scaleY: nextScaleY,
                   },
