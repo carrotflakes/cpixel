@@ -508,8 +508,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const W = s.width, H = s.height
       const brush = erase ? { size: s.eraserSize, pattern: undefined, subMode: 'normal' } : s.brush
-      // Clamp endpoints
-      x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
       const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H
       const li = s.layers.findIndex(l => l.id === s.activeLayerId)
       if (li < 0) return {}

@@ -95,9 +95,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     return { x, y }
   }
   const pickPointPrecise = (clientX: number, clientY: number) => {
-    const canvas = canvasRef.current
-    if (!canvas) return null
-    const rect = canvas.getBoundingClientRect()
+    const rect = canvasRef.current!.getBoundingClientRect()
     const vx = view.x + (rect.width - W * view.scale) / 2
     const vy = view.y + (rect.height - H * view.scale) / 2
     const x = (clientX - rect.left - vx) / view.scale
@@ -138,8 +136,27 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     setShapePreview({ kind: curTool.current as 'line' | 'rect' | 'ellipse', startX: x, startY: y, curX: x, curY: y })
     beginStroke()
   }
-  const updateShapeTo = (x: number, y: number) => {
-    setShapePreview((s) => s && ({ ...s, curX: clamp(x, 0, W - 1), curY: clamp(y, 0, H - 1) }))
+  const updateShapeTo = (x: number, y: number, shiftKey: boolean) => {
+    if (shiftKey && shapePreview) {
+      if (shapePreview.kind === 'line') {
+        const dx = x - shapePreview.startX
+        const dy = y - shapePreview.startY
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI
+        const snappedAngle = Math.round(angle / 45) * 45
+        const dist = Math.hypot(dx, dy)
+        x = shapePreview.startX + dist * Math.cos(snappedAngle * Math.PI / 180)
+        y = shapePreview.startY + dist * Math.sin(snappedAngle * Math.PI / 180)
+      } else if (shapePreview.kind === 'rect' || shapePreview.kind === 'ellipse') {
+        const dx = x - shapePreview.startX
+        const dy = y - shapePreview.startY
+        const size = Math.round((Math.abs(dx) + Math.abs(dy)) / 2)
+        x = shapePreview.startX + Math.sign(dx) * size
+        y = shapePreview.startY + Math.sign(dy) * size
+      }
+    }
+    x = clamp(x, 0, W - 1)
+    y = clamp(y, 0, H - 1)
+    setShapePreview((s) => s && ({ ...s, curX: x, curY: y }))
   }
   const endBrush = () => {
     mouseStroke.current = { active: false, erase: false }
@@ -582,7 +599,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           return
         }
         if (shapePreview) {
-          updateShapeTo(x, y)
+          updateShapeTo(x, y, e.shiftKey)
           return
         }
         onPointer(e)
@@ -621,7 +638,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const s = shapePreview
       if (s) {
         const rgba = paintFor(false)
-        if (s.kind === 'line') useAppStore.getState().drawLine(s.startX, s.startY, s.curX, s.curY, false, rgba)
+        if (s.kind === 'line') useAppStore.getState().drawLine(s.startX + 0.5, s.startY + 0.5, s.curX + 0.5, s.curY + 0.5, false, rgba)
         else if (s.kind === 'rect') useAppStore.getState().drawRect(s.startX, s.startY, s.curX, s.curY, rgba)
         else if (s.kind === 'ellipse') useAppStore.getState().drawEllipse(s.startX, s.startY, s.curX, s.curY, rgba)
         setShapePreview(null)
