@@ -197,15 +197,15 @@ export function ToolSelector() {
 }
 
 const SHAPE_TOOLS = [
-  { id: 'line', name: 'Line', shortName: 'Line', icon: LuSlash },
-  { id: 'rect', name: 'Rectangle', shortName: 'Rect', icon: LuSquare },
-  { id: 'ellipse', name: 'Ellipse', shortName: 'Ellipse', icon: LuCircle },
+  { id: 'line', name: 'Line', icon: LuSlash },
+  { id: 'rect', name: 'Rectangle', icon: LuSquare },
+  { id: 'ellipse', name: 'Ellipse', icon: LuCircle },
 ] as const
 
 const SELECT_TOOLS = [
-  { id: 'select-rect', name: 'Rect Select', shortName: 'Select', icon: PiRectangleDashed },
-  { id: 'select-lasso', name: 'Lasso', shortName: 'Lasso', icon: PiLasso },
-  { id: 'select-wand', name: 'Magic Wand', shortName: 'Wand', icon: PiMagicWand },
+  { id: 'select-rect', name: 'Rect Select', icon: PiRectangleDashed },
+  { id: 'select-lasso', name: 'Lasso', icon: PiLasso },
+  { id: 'select-wand', name: 'Magic Wand', icon: PiMagicWand },
 ] as const
 
 const PRESET_SIZES = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32]
