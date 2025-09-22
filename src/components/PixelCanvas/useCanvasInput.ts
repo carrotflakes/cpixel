@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useAppStore, MIN_SCALE, MAX_SCALE, ToolType } from '@/stores/store'
 import { clamp, clampView } from '@/utils/view'
 import { compositePixel, findTopPaletteIndex, LayerLike } from '@/utils/composite'
-import { computeTransformHandles, inverseTransformPoint, pointInTransformedRect, CornerHandleId, Transform2D } from '@/utils/transform'
+import { computeTransformHandles, inverseTransformPoint, pointInTransformedRect, ResizeHandleId, Transform2D } from '@/utils/transform'
 import { isPointInMask, polygonToMask, magicWandMask } from '@/utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
@@ -20,7 +20,7 @@ type TransformDragState =
   | { kind: 'translate'; lastX: number; lastY: number }
   | {
     kind: 'scale'
-    handle: CornerHandleId
+    handle: ResizeHandleId
     initial: { transform: Transform2D; width: number; height: number, offsetX: number, offsetY: number }
     handleLocal: { x: number; y: number }
   }
@@ -172,7 +172,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const handleOffset = 16 / Math.max(s, 0.0000001)
     const handles = computeTransformHandles(mode.transform, mode.width, mode.height, handleOffset)
     const handleSize = Math.min(12, Math.max(6, s * 0.7))
-    const cornerHit = handleSize * 0.6
+    const resizeHit = handleSize * 0.6
     const rotationHit = handleSize
     const dist = (hx: number, hy: number) => Math.hypot((precise.x - hx) * s, (precise.y - hy) * s)
 
@@ -187,13 +187,19 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       return true
     }
 
-    for (const corner of handles.corners) {
-      if (dist(corner.x, corner.y) <= cornerHit) {
+    for (const handle of handles.resize) {
+      if (dist(handle.x, handle.y) <= resizeHit) {
         transformDrag.current = {
           kind: 'scale',
-          handle: corner.id,
-          initial: { transform: { ...mode.transform }, width: mode.width, height: mode.height, offsetX: precise.x - corner.x, offsetY: precise.y - corner.y },
-          handleLocal: { x: corner.localX, y: corner.localY },
+          handle: handle.id,
+          initial: {
+            transform: { ...mode.transform },
+            width: mode.width,
+            height: mode.height,
+            offsetX: precise.x - handle.x,
+            offsetY: precise.y - handle.y,
+          },
+          handleLocal: { x: handle.localX, y: handle.localY },
         }
         return true
       }

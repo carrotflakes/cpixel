@@ -232,9 +232,9 @@ export function drawBoundsOutline(
   ctx.lineWidth = 1
   function drawRect() {
     ctx.beginPath()
-    ctx.moveTo(handles.corners[0].x * s, handles.corners[0].y * s)
-    for (let i = 1; i < handles.corners.length; i++) {
-      ctx.lineTo(handles.corners[i].x * s, handles.corners[i].y * s)
+    ctx.moveTo(handles.resize[0].x * s, handles.resize[0].y * s)
+    for (let i = 1; i < 4; i++) {
+      ctx.lineTo(handles.resize[i].x * s, handles.resize[i].y * s)
     }
     ctx.closePath()
     ctx.stroke()
@@ -255,9 +255,10 @@ export function drawBoundsOutline(
   ctx.fillStyle = '#fff'
   ctx.strokeStyle = '#000'
 
-  for (const corner of handles.corners) {
-    const hx = corner.x * s
-    const hy = corner.y * s
+
+  for (const handle of handles.resize) {
+    const hx = handle.x * s
+    const hy = handle.y * s
     ctx.beginPath()
     ctx.rect(hx - half, hy - half, handleSize, handleSize)
     ctx.fill()

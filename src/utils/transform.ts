@@ -7,9 +7,11 @@ export type Transform2D = {
 }
 
 export type CornerHandleId = 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left'
+export type EdgeHandleId = 'top' | 'right' | 'bottom' | 'left'
+export type ResizeHandleId = CornerHandleId | EdgeHandleId
 
-export type TransformCornerHandle = {
-  id: CornerHandleId
+export type TransformResizeHandle = {
+  id: CornerHandleId | EdgeHandleId
   x: number
   y: number
   localX: number
@@ -17,7 +19,7 @@ export type TransformCornerHandle = {
 }
 
 export type TransformHandles = {
-  corners: TransformCornerHandle[]
+  resize: TransformResizeHandle[]
   rotation: {
     x: number
     y: number
@@ -55,14 +57,18 @@ export function inverseTransformPoint(transform: Transform2D, px: number, py: nu
   return { x: transform.cx + sx, y: transform.cy + sy }
 }
 
-export function getTransformedCorners(transform: Transform2D, width: number, height: number) {
+function getTransformedHandles(transform: Transform2D, width: number, height: number) {
   const hw = width / 2
   const hh = height / 2
-  const corners: TransformCornerHandle[] = [
+  const corners: TransformResizeHandle[] = [
     { id: 'top-left', localX: -hw, localY: -hh, x: 0, y: 0 },
     { id: 'top-right', localX: hw, localY: -hh, x: 0, y: 0 },
     { id: 'bottom-right', localX: hw, localY: hh, x: 0, y: 0 },
     { id: 'bottom-left', localX: -hw, localY: hh, x: 0, y: 0 },
+    { id: 'top', localX: 0, localY: -hh, x: 0, y: 0 },
+    { id: 'right', localX: hw, localY: 0, x: 0, y: 0 },
+    { id: 'bottom', localX: 0, localY: hh, x: 0, y: 0 },
+    { id: 'left', localX: -hw, localY: 0, x: 0, y: 0 },
   ]
   for (const corner of corners) {
     const vec = transformVector(transform, corner.localX, corner.localY)
@@ -78,7 +84,7 @@ export function computeTransformHandles(
   height: number,
   rotationOffset = 0,
 ): TransformHandles {
-  const corners = getTransformedCorners(transform, width, height)
+  const resize = getTransformedHandles(transform, width, height)
   const topCenterLocalY = -height / 2
   const topCenterVec = transformVector(transform, 0, topCenterLocalY)
   const topCenter = { x: transform.cx + topCenterVec.x, y: transform.cy + topCenterVec.y }
@@ -90,7 +96,7 @@ export function computeTransformHandles(
     localX: 0,
     localY: rotationLocalY,
   }
-  return { corners, rotation, topCenter }
+  return { resize, rotation, topCenter }
 }
 
 export function pointInTransformedRect(
@@ -107,16 +113,16 @@ export function pointInTransformedRect(
 }
 
 export function transformedPatchBounds(transform: Transform2D, width: number, height: number) {
-  const corners = getTransformedCorners(transform, width, height)
+  const handles = getTransformedHandles(transform, width, height)
   let minX = Infinity
   let maxX = -Infinity
   let minY = Infinity
   let maxY = -Infinity
-  for (const corner of corners) {
-    if (corner.x < minX) minX = corner.x
-    if (corner.x > maxX) maxX = corner.x
-    if (corner.y < minY) minY = corner.y
-    if (corner.y > maxY) maxY = corner.y
+  for (const handle of handles) {
+    if (handle.x < minX) minX = handle.x
+    if (handle.x > maxX) maxX = handle.x
+    if (handle.y < minY) minY = handle.y
+    if (handle.y > maxY) maxY = handle.y
   }
   if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
     return { left: 0, top: 0, width: 0, height: 0 }
