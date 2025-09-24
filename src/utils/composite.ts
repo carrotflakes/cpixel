@@ -1,3 +1,5 @@
+import type { ColorMode } from '@/types'
+
 export type LayerLike = {
   visible: boolean
   data: Uint32Array | Uint8Array
@@ -26,7 +28,7 @@ export function compositePixel(
   layers: LayerLike[],
   x: number,
   y: number,
-  colorMode: 'rgba' | 'indexed',
+  colorMode: ColorMode,
   palette: { colors: Uint32Array, transparentIndex: number },
   width: number,
   height: number,
@@ -67,7 +69,7 @@ export function findTopPaletteIndex(
 // Composite all pixels into an ImageData
 export function compositeImageData(
   layers: LayerLike[],
-  colorMode: 'rgba' | 'indexed',
+  colorMode: ColorMode,
   palette: { colors: Uint32Array, transparentIndex: number },
   img: ImageData,
 ) {

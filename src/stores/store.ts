@@ -13,6 +13,7 @@ import { translate } from '@/utils/translate.ts'
 import { clamp } from '@/utils/view.ts'
 import { useLogStore } from '@/stores/logStore.ts'
 import { sampleTransformedPatch } from '@/utils/transform.ts'
+import type { ColorMode } from '@/types.ts'
 
 const WIDTH = 64
 const HEIGHT = 64
@@ -41,6 +42,12 @@ export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'erase
 type Palette = {
   colors: Uint32Array
   transparentIndex: number
+}
+
+type NewFileOptions = {
+  width?: number
+  height?: number
+  colorMode?: ColorMode
 }
 
 export type AppState = {
@@ -73,7 +80,7 @@ export type AppState = {
   currentPaletteIndex?: number
   recentColorsRgba: number[]
   recentColorsIndexed: number[] // palette indices
-  colorMode: 'rgba' | 'indexed'
+  colorMode: ColorMode
   palette: Palette
   tool: ToolType
   shapeTool: 'line' | 'rect' | 'ellipse'
@@ -109,7 +116,7 @@ export type AppState = {
   drawRect: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   drawEllipse: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   fillBucket: (x: number, y: number, rgbaOrIndex: number) => void
-  setColorMode: (m: 'rgba' | 'indexed') => void
+  setColorMode: (m: ColorMode) => void
   translateAllLayers: (base: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[], dx: number, dy: number) => void
   selection?: {
     mask: Uint8Array
@@ -157,12 +164,13 @@ export type AppState = {
   flipVertical: () => void
   fileMeta?: FileMeta
   setFileMeta: (fileMeta: FileMeta | undefined) => void
+  newFile: (options?: NewFileOptions) => void
 }
 
 type HistoryEntry = {
   width?: { before: number; after: number }
   height?: { before: number; after: number }
-  colorMode?: { before: 'rgba' | 'indexed'; after: 'rgba' | 'indexed' }
+  colorMode?: { before: ColorMode; after: ColorMode }
   activeLayerId?: { before: string; after: string }
   palette?: { before: Palette; after: Palette }
   layers?:
@@ -170,38 +178,55 @@ type HistoryEntry = {
   | { dataChanges: Array<{ id: string; before: Uint32Array | Uint8Array; after: Uint32Array | Uint8Array }> }
 }
 
+function createDocumentState(options: NewFileOptions = {}) {
+  const width = Math.max(1, Math.floor(options.width ?? WIDTH))
+  const height = Math.max(1, Math.floor(options.height ?? HEIGHT))
+  const colorMode = options.colorMode ?? 'rgba'
+  const paletteColors = new Uint32Array([0x00000000, 0x000000ff, 0xffffffff])
+  const layerData = colorMode === 'indexed'
+    ? new Uint8Array(width * height)
+    : new Uint32Array(width * height)
+  const layers: Layer[] = [{ id: 'L1', visible: true, locked: false, data: layerData }]
+  const currentPaletteIndex = paletteColors.length > 1 ? 1 : 0
+
+  return {
+    mode: null,
+    width,
+    height,
+    layers,
+    activeLayerId: 'L1',
+    view: { x: 0, y: 0, scale: 5 },
+    colorMode,
+    color: colorMode === 'indexed' ? (paletteColors[currentPaletteIndex] ?? 0) : 0x000000ff,
+    currentPaletteIndex,
+    recentColorsRgba: [0x000000ff, 0xffffffff],
+    recentColorsIndexed: [1, 0],
+    dirty: false,
+    palette: { colors: paletteColors, transparentIndex: 0 },
+    canUndo: false,
+    canRedo: false,
+    _undo: [],
+    _redo: [],
+    selection: undefined,
+    fileMeta: undefined,
+    hover: undefined,
+  } satisfies Partial<AppState>
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
-  mode: null,
-  width: WIDTH,
-  height: HEIGHT,
-  layers: [{ id: 'L1', visible: true, locked: false, data: new Uint32Array(WIDTH * HEIGHT) }],
-  activeLayerId: 'L1',
-  view: { x: 0, y: 0, scale: 5 },
-  color: 0x000000,
-  brush: {
-    size: 1,
-    subMode: 'normal',
-    pattern: { size: 2, mask: new Uint8Array([1, 0, 0, 1]) },
-  },
-  eraserSize: 1,
-  shapeFill: false,
-  currentPaletteIndex: 1,
-  recentColorsRgba: [0x000000, 0xffffff],
-  recentColorsIndexed: [],
-  colorMode: 'rgba',
+  ...createDocumentState(),
   tool: 'brush',
   shapeTool: 'rect',
   selectTool: 'select-rect',
-  dirty: false,
-  palette: { colors: new Uint32Array([0x00000000, 0xffffffff]), transparentIndex: 0 },
-  canUndo: false,
-  canRedo: false,
-  _undo: [],
-  _redo: [],
-  selection: undefined,
+  brush: { size: 1, subMode: 'normal', pattern: { size: 2, mask: new Uint8Array([1, 0, 0, 1]) } },
+  eraserSize: 1,
+  shapeFill: false,
   clipboard: undefined,
-  fileMeta: undefined,
   setFileMeta: (fileMeta) => set(() => ({ fileMeta })),
+  newFile: (options) => {
+    set(() => createDocumentState(options))
+    useLogStore.getState().pushLog({ message: 'Started a new file' })
+  },
   addLayer: () => set((s) => {
     const id = newLayerId(s.layers)
     const layer: Layer = s.colorMode === 'rgba'

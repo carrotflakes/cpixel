@@ -1,4 +1,5 @@
 import { compositePixel, LayerLike } from './composite'
+import type { ColorMode } from '@/types'
 
 // Generate a palette from the current composited image.
 // - Collects unique non-transparent colors and sorts by frequency (desc)
@@ -8,7 +9,7 @@ export function generatePaletteFromComposite(
   layers: LayerLike[],
   width: number,
   height: number,
-  colorMode: 'rgba' | 'indexed',
+  colorMode: ColorMode,
   palette: { colors: Uint32Array, transparentIndex: number },
   maxColors: number = 256,
 ): Uint32Array {

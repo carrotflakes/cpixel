@@ -1,3 +1,5 @@
+import type { ColorMode } from '@/types'
+
 export type NormalizedLayer = {
   id: string
   visible: boolean
@@ -8,7 +10,7 @@ export type NormalizedLayer = {
 export type NormalizedImport = {
   width: number
   height: number
-  colorMode: 'rgba' | 'indexed'
+  colorMode: ColorMode
   layers: NormalizedLayer[]
   activeLayerId: string
   palette: { colors: Uint32Array; transparentIndex: number }
@@ -26,7 +28,7 @@ export function normalizeImportedJSON(
   if (!isObj(data)) return null
   const obj = data as Record<string, unknown>
   if (obj.app !== 'cpixel') return null
-  const impMode: 'rgba' | 'indexed' = obj.colorMode === 'indexed' ? 'indexed' : 'rgba'
+  const impMode: ColorMode = obj.colorMode === 'indexed' ? 'indexed' : 'rgba'
   const width = Math.max(1, (typeof obj.width === 'number' ? (obj.width | 0) : 0))
   const height = Math.max(1, (typeof obj.height === 'number' ? (obj.height | 0) : 0))
   const targetSize = width * height

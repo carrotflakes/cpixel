@@ -1,3 +1,5 @@
+import type { ColorMode } from '@/types'
+
 export type LayerLike = {
   id: string
   visible: boolean
@@ -7,7 +9,7 @@ export type LayerLike = {
 
 export function resizeLayers(
   layers: LayerLike[],
-  colorMode: 'rgba' | 'indexed',
+  colorMode: ColorMode,
   oldW: number,
   oldH: number,
   newW: number,

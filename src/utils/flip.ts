@@ -1,3 +1,5 @@
+import type { ColorMode } from '@/types'
+
 type LayerLike = {
   id: string
   visible: boolean
@@ -10,7 +12,7 @@ type LayerLike = {
  */
 export function flipLayersHorizontal(
   layers: LayerLike[],
-  colorMode: 'rgba' | 'indexed',
+  colorMode: ColorMode,
   width: number,
   height: number,
 ) {
@@ -32,7 +34,7 @@ export function flipLayersHorizontal(
  */
 export function flipLayersVertical(
   layers: LayerLike[],
-  colorMode: 'rgba' | 'indexed',
+  colorMode: ColorMode,
   width: number,
   height: number,
 ) {

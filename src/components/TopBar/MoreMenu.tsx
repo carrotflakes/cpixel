@@ -1,6 +1,7 @@
 import { CanvasSizeDialog } from '@/components/CanvasSizeDialog'
 import { ExportPNGDialog } from '@/components/ExportPNGDialog'
 import { SettingsDialog } from '@/components/SettingsDialog'
+import { NewFileDialog } from '@/components/NewFileDialog'
 import { useLogStore } from '@/stores/logStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAppStore } from '@/stores/store'
@@ -16,10 +17,12 @@ export function MoreMenu() {
   const curW = useAppStore(s => s.width)
   const curH = useAppStore(s => s.height)
   const fileMeta = useAppStore(s => s.fileMeta)
+  const dirty = useAppStore(s => s.dirty)
   const googleDriveEnabled = useSettingsStore(s => s.googleDrive)
 
   const [open, setOpen] = useState(false)
   const [sizeOpen, setSizeOpen] = useState(false)
+  const [newFileOpen, setNewFileOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [exportPngOpen, setExportPngOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
@@ -85,6 +88,57 @@ export function MoreMenu() {
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content className={contentCls} align="end" sideOffset={6}>
+            {/* File submenu */}
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className={itemCls}>
+                <span>File</span>
+                <LuChevronRight className="ml-auto" aria-hidden />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                <DropdownMenu.Item
+                  className={itemCls}
+                  onSelect={() => {
+                    setNewFileOpen(true)
+                    setOpen(false)
+                  }}
+                >
+                  <span>New File…</span>
+                </DropdownMenu.Item>
+                {/* Import submenu */}
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger className={itemCls}>
+                    <span>Import</span>
+                    <LuChevronRight className="ml-auto" aria-hidden />
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportPNG(); setOpen(false) }}>PNG…</DropdownMenu.Item>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { importProjectJSON(); setOpen(false) }}>Project JSON…</DropdownMenu.Item>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportAse(); setOpen(false) }}>Aseprite (.ase/.aseprite)…</DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+                {/* Export submenu */}
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger className={itemCls}>
+                    <span>Export</span>
+                    <LuChevronRight className="ml-auto" aria-hidden />
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { setExportPngOpen(true); /* export after dialog submit */ }}>
+                      <LuDownload aria-hidden />
+                      <span>PNG</span>
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().exportJSON(); setOpen(false) }}>
+                      <LuDownload aria-hidden />
+                      <span>Project JSON</span>
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().exportAse(); setOpen(false) }}>
+                      <LuDownload aria-hidden />
+                      <span>Aseprite (.aseprite)</span>
+                    </DropdownMenu.Item>
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+              </DropdownMenu.SubContent>
+            </DropdownMenu.Sub>
             {/* Edit submenu */}
             <DropdownMenu.Sub>
               <DropdownMenu.SubTrigger className={itemCls}>
@@ -135,39 +189,6 @@ export function MoreMenu() {
                 <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().beginStroke(); useAppStore.getState().flipVertical(); useAppStore.getState().endStroke(); setOpen(false) }}>
                   <LuFlipVertical aria-hidden />
                   <span>Flip vertical</span>
-                </DropdownMenu.Item>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Sub>
-            {/* Import submenu */}
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger className={itemCls}>
-                <span>Import</span>
-                <LuChevronRight className="ml-auto" aria-hidden />
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportPNG(); setOpen(false) }}>PNG…</DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { importProjectJSON(); setOpen(false) }}>Project JSON…</DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { pickAndImportAse(); setOpen(false) }}>Aseprite (.ase/.aseprite)…</DropdownMenu.Item>
-              </DropdownMenu.SubContent>
-            </DropdownMenu.Sub>
-            {/* Export submenu */}
-            <DropdownMenu.Sub>
-              <DropdownMenu.SubTrigger className={itemCls}>
-                <span>Export</span>
-                <LuChevronRight className="ml-auto" aria-hidden />
-              </DropdownMenu.SubTrigger>
-              <DropdownMenu.SubContent className={subContentCls} sideOffset={4} alignOffset={-4}>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { setExportPngOpen(true); /* export after dialog submit */ }}>
-                  <LuDownload aria-hidden />
-                  <span>PNG</span>
-                </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().exportJSON(); setOpen(false) }}>
-                  <LuDownload aria-hidden />
-                  <span>Project JSON</span>
-                </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().exportAse(); setOpen(false) }}>
-                  <LuDownload aria-hidden />
-                  <span>Aseprite (.aseprite)</span>
                 </DropdownMenu.Item>
               </DropdownMenu.SubContent>
             </DropdownMenu.Sub>
@@ -249,6 +270,19 @@ export function MoreMenu() {
         initialHeight={curH}
         onCancel={() => setSizeOpen(false)}
         onSubmit={(w, h) => { useAppStore.getState().resizeCanvas(w, h); setSizeOpen(false) }}
+      />
+      <NewFileDialog
+        open={newFileOpen}
+        initialWidth={curW}
+        initialHeight={curH}
+        initialMode={colorMode}
+        dirty={dirty}
+        onCancel={() => setNewFileOpen(false)}
+        onCreate={({ width, height, colorMode: mode }) => {
+          useAppStore.getState().newFile({ width, height, colorMode: mode })
+          setNewFileOpen(false)
+          setOpen(false)
+        }}
       />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <ExportPNGDialog open={exportPngOpen} onClose={() => { setExportPngOpen(false); setOpen(false) }} />

@@ -1,6 +1,7 @@
 import { FileMeta, useAppStore } from './store'
 import { useLogStore } from './logStore'
 import { parseCSSColor } from '../utils/color'
+import type { ColorMode } from '@/types'
 
 // Simple localStorage autosave / restore
 // - Periodic save (every 10s)
@@ -16,7 +17,7 @@ type PersistPayload = {
   version: 1
   width: number
   height: number
-  colorMode: 'rgba' | 'indexed'
+  colorMode: ColorMode
   layers: Array<{
     id: string; visible: boolean; locked: boolean; data: number[];
   }>
