@@ -82,7 +82,7 @@ export function PalettePanel() {
       )}
 
       {!collapsed && (
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap gap-1">
           {Array.from(palette.colors).map((rgba, i) => {
             const isTransparent = i === palette.transparentIndex
             const isSelected = currentPaletteIndex === i
@@ -93,7 +93,7 @@ export function PalettePanel() {
                   <button
                     title={`${color} (${i})`}
                     aria-pressed={isSelected}
-                    className={`w-7 h-7 rounded border border-border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-accent' : ''}`}
+                    className={`w-6 h-6 rounded border border-border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-accent' : ''}`}
                     style={COLOR_BOX_STYLE}
                     onClick={(e) => {
                       if (suppressClickRef.current) {
@@ -194,7 +194,7 @@ export function PalettePanel() {
           })}
           {/* Add new color button at the end */}
           <button
-            className="w-7 h-7 rounded border border-accent flex items-center justify-center text-accent bg-surface hover:bg-accent/10"
+            className="w-6 h-6 rounded border border-accent flex items-center justify-center text-accent bg-surface hover:bg-accent/10"
             title="Add new color"
             onClick={onAddBlackColor}
           >
