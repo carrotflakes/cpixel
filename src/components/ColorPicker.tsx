@@ -350,7 +350,7 @@ function PresetPalette({
                   className="w-5 h-5 rounded border border-border focus:outline-none focus:ring-1 focus:ring-accent"
                   style={{ padding: 0 }}
                   onClick={() => { onChange(c) }}
-                  title={`Preset color #${i}`}
+                  title={`${hex} (${i})`}
                 >
                   <ColorBox color={hex} className="w-full h-full rounded" />
                 </button>

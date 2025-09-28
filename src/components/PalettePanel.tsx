@@ -82,7 +82,7 @@ export function PalettePanel() {
       )}
 
       {!collapsed && (
-        <div className="mt-2 flex flex-wrap gap-3">
+        <div className="mt-2 flex flex-wrap gap-2">
           {Array.from(palette.colors).map((rgba, i) => {
             const isTransparent = i === palette.transparentIndex
             const isSelected = currentPaletteIndex === i
@@ -91,7 +91,7 @@ export function PalettePanel() {
               <RCMenuRoot key={i}>
                 <RCMenuTrigger asChild>
                   <button
-                    title={`#${i}`}
+                    title={`${color} (${i})`}
                     aria-pressed={isSelected}
                     className={`w-7 h-7 rounded border border-border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-accent' : ''}`}
                     style={COLOR_BOX_STYLE}

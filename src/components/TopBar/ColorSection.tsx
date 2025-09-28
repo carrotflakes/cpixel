@@ -39,7 +39,7 @@ export function ColorSection() {
               key={colorMode === 'indexed' ? `${recentIndexed[idx]}` : c}
               className="h-5 w-5 rounded border border-border focus:outline-none"
               style={COLOR_BOX_STYLE}
-              title={colorMode === 'indexed' ? `Palette index ${recentIndexed[idx]}` : rgbaToCSSHex(c)}
+              title={colorMode === 'indexed' ? `${rgbaToCSSHex(c)} (${recentIndexed[idx]})` : rgbaToCSSHex(c)}
               onClick={() => {
                 if (colorMode === 'indexed' && currentPaletteIndex !== undefined) {
                   setColorIndex(recentIndexed[idx])
