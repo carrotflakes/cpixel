@@ -1,6 +1,34 @@
 import { rasterizeLine } from './lines'
 
 type ImageData = Uint32Array | Uint8Array
+type PatternMask = { size: number; mask: Uint8Array }
+type MaskPredicate = (x: number, y: number) => boolean
+
+const positiveModulo = (value: number, size: number) => ((value % size) + size) % size
+
+function createMaskPredicate(
+  width: number,
+  selectionMask?: Uint8Array,
+  pattern?: PatternMask,
+): MaskPredicate | undefined {
+  if (!selectionMask && !pattern) return undefined
+
+  const patternPredicate = pattern
+    ? (x: number, y: number) => (
+      pattern.mask[positiveModulo(y, pattern.size) * pattern.size + positiveModulo(x, pattern.size)] !== 0
+    )
+    : undefined
+
+  if (selectionMask && patternPredicate) {
+    return (x, y) => selectionMask[y * width + x] !== 0 && patternPredicate(x, y)
+  }
+
+  if (selectionMask) {
+    return (x, y) => selectionMask[y * width + x] !== 0
+  }
+
+  return patternPredicate
+}
 
 function normalizeRectBounds(
   W: number,
@@ -28,17 +56,9 @@ export function stamp<T extends ImageData>(
   brushSize: number,
   value: number,
   selectionMask?: Uint8Array,
-  pattern?: { size: number; mask: Uint8Array },
+  pattern?: PatternMask,
 ): T {
-  const p = pattern
-  const mask = selectionMask
-    ? (p
-      ? (x: number, y: number) => selectionMask[y * W + x] !== 0 && p.mask[((y % p.size + p.size) % p.size) * p.size + ((x % p.size + p.size) % p.size)] !== 0
-      : (x: number, y: number) => selectionMask[y * W + x] !== 0)
-    : (p
-      ? (x: number, y: number) => p.mask[((y % p.size + p.size) % p.size) * p.size + ((x % p.size + p.size) % p.size)] !== 0
-      : undefined
-    )
+  const mask = createMaskPredicate(W, selectionMask, pattern)
   return stampGeneric(src, W, H, x, y, brushSize, value, mask)
 }
 
@@ -50,7 +70,7 @@ export function stampGeneric<T extends ImageData>(
   y: number,
   brushSize: number,
   value: number,
-  mask?: (x: number, y: number) => boolean,
+  mask?: MaskPredicate,
 ): T {
   const out = src.slice() as T
   const half = Math.floor(brushSize / 2)
@@ -85,17 +105,9 @@ export function drawLineBrush<T extends ImageData>(
   brushSize: number,
   value: number,
   selectionMask?: Uint8Array,
-  pattern?: { size: number; mask: Uint8Array },
+  pattern?: PatternMask,
 ): T {
-  const p = pattern
-  const mask = selectionMask
-    ? (p
-      ? (x: number, y: number) => selectionMask[y * W + x] !== 0 && p.mask[((y % p.size + p.size) % p.size) * p.size + ((x % p.size + p.size) % p.size)] !== 0
-      : (x: number, y: number) => selectionMask[y * W + x] !== 0)
-    : (p
-      ? (x: number, y: number) => p.mask[((y % p.size + p.size) % p.size) * p.size + ((x % p.size + p.size) % p.size)] !== 0
-      : undefined
-    )
+  const mask = createMaskPredicate(W, selectionMask, pattern)
   return drawLineGeneric(src, W, H, x0, y0, x1, y1, brushSize, value, mask)
 }
 
@@ -109,7 +121,7 @@ export function drawLineGeneric<T extends ImageData>(
   y1: number,
   brushSize: number,
   value: number,
-  mask?: (x: number, y: number) => boolean,
+  mask?: MaskPredicate,
 ): T {
   const out = src.slice() as T
   const half = Math.floor(brushSize / 2)
