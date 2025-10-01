@@ -538,29 +538,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       let top = Math.max(0, Math.min(y0, y1))
       let bottom = Math.min(H - 1, Math.max(y0, y1))
       if (left > right || top > bottom) return {}
-      const li = s.layers.findIndex(l => l.id === s.activeLayerId)
-      if (li < 0) return {}
-      const layer = s.layers[li]
-      if (layer.locked) return {}
-      if (s.mode?.type !== 'stroking') return {}
-      const layers = s.layers.slice()
-      if (s.colorMode === 'rgba') {
-        if (!(layer.data instanceof Uint32Array)) return {}
-        const out = (s.shapeFill
-          ? drawRectFilledRgba(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
-          : drawRectOutlineRgba(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
-        if (equalU32(out, layer.data)) return {}
-        layers[li] = { ...layer, data: out }
-        return { layers }
-      } else {
-        if (!(layer.data instanceof Uint8Array)) return {}
-        const out = (s.shapeFill
-          ? drawRectFilledIndexed(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
-          : drawRectOutlineIndexed(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
-        if (equalU8(out, layer.data)) return {}
-        layers[li] = { ...layer, data: out }
-        return { layers }
-      }
+      return paintActiveLayer(s, {
+        rgba: (data) => (s.shapeFill
+          ? drawRectFilledRgba(data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
+          : drawRectOutlineRgba(data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)),
+        indexed: (data) => (s.shapeFill
+          ? drawRectFilledIndexed(data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
+          : drawRectOutlineIndexed(data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)),
+      })
     })
     get().pushRecentColor()
   },
@@ -568,30 +553,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const W = s.width, H = s.height
       x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
-      // x0 += 0.5; y0 += 0.5; x1 += 0.5; y1 += 0.5 // offset by 0.5 to align to pixel centers
-      const li = s.layers.findIndex(l => l.id === s.activeLayerId)
-      if (li < 0) return {}
-      const layer = s.layers[li]
-      if (layer.locked) return {}
-      if (s.mode?.type !== 'stroking') return {}
-      const layers = s.layers.slice()
-      if (s.colorMode === 'rgba') {
-        if (!(layer.data instanceof Uint32Array)) return {}
-        const out = (s.shapeFill
-          ? drawEllipseFilledRgba(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
-          : drawEllipseOutlineRgba(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask))
-        if (equalU32(out, layer.data)) return {}
-        layers[li] = { ...layer, data: out }
-        return { layers }
-      } else {
-        if (!(layer.data instanceof Uint8Array)) return {}
-        const out = (s.shapeFill
-          ? drawEllipseFilledIndexed(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
-          : drawEllipseOutlineIndexed(layer.data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask))
-        if (equalU8(out, layer.data)) return {}
-        layers[li] = { ...layer, data: out }
-        return { layers }
-      }
+      return paintActiveLayer(s, {
+        rgba: (data) => (s.shapeFill
+          ? drawEllipseFilledRgba(data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)
+          : drawEllipseOutlineRgba(data, W, H, x0, y0, x1, y1, rgbaOrIndex >>> 0, s.selection?.mask)),
+        indexed: (data) => (s.shapeFill
+          ? drawEllipseFilledIndexed(data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)
+          : drawEllipseOutlineIndexed(data, W, H, x0, y0, x1, y1, rgbaOrIndex & 0xff, s.selection?.mask)),
+      })
     })
     get().pushRecentColor()
   },
@@ -599,30 +568,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => {
       const W = s.width, H = s.height
       if (x < 0 || y < 0 || x >= W || y >= H) return {}
-      if (s.mode?.type !== 'stroking') return {}
       const mask = s.selection?.mask
-      if (mask) {
-        const i0 = y * W + x
-        if (!mask[i0]) return {}
-      }
-      const li = s.layers.findIndex(l => l.id === s.activeLayerId)
-      if (li < 0) return {}
-      const layer = s.layers[li]
-      if (layer.locked) return {}
-      const layers = s.layers.slice()
-      if (s.colorMode === 'rgba') {
-        if (!(layer.data instanceof Uint32Array)) return {}
-        const out = floodFillRgba(layer.data, W, H, x, y, rgbaOrIndex, mask)
-        if (equalU32(out, layer.data)) return {}
-        layers[li] = { ...layer, data: out }
-        return { layers }
-      } else {
-        if (!(layer.data instanceof Uint8Array)) return {}
-        const out = floodFillIndexed(layer.data, W, H, x, y, rgbaOrIndex, mask)
-        if (out === layer.data || equalU8(out, layer.data)) return {}
-        layers[li] = { ...layer, data: out }
-        return { layers }
-      }
+      if (mask && !mask[y * W + x]) return {}
+
+      return paintActiveLayer(s, {
+        rgba: (data) => floodFillRgba(data, W, H, x, y, rgbaOrIndex, s.selection?.mask),
+        indexed: (data) => floodFillIndexed(data, W, H, x, y, rgbaOrIndex, s.selection?.mask),
+      })
     })
     get().pushRecentColor()
   },
@@ -1232,6 +1184,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   }),
 }))
+
+function paintActiveLayer(
+  state: AppState,
+  handlers: {
+    rgba: (data: Uint32Array) => Uint32Array | undefined
+    indexed: (data: Uint8Array) => Uint8Array | undefined
+  },
+): Partial<AppState> {
+  if (state.mode?.type !== 'stroking') return {}
+  const layerIndex = state.layers.findIndex(l => l.id === state.activeLayerId)
+  if (layerIndex < 0) return {}
+  const layer = state.layers[layerIndex]
+  if (layer.locked) return {}
+
+  if (state.colorMode === 'rgba') {
+    const data = layer.data
+    if (!(data instanceof Uint32Array)) return {}
+    const next = handlers.rgba(data)
+    if (!next || equalU32(next, data)) return {}
+    const layers = state.layers.slice()
+    layers[layerIndex] = { ...layer, data: next }
+    return { layers }
+  }
+
+  const data = layer.data
+  if (!(data instanceof Uint8Array)) return {}
+  const next = handlers.indexed(data)
+  if (!next || next === data || equalU8(next, data)) return {}
+  const layers = state.layers.slice()
+  layers[layerIndex] = { ...layer, data: next }
+  return { layers }
+}
 
 function nextPartialState(state: AppState, patch: Partial<AppState>): Partial<AppState> {
   const entry = buildDiff(state, { ...state, ...patch })
