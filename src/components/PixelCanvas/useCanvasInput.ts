@@ -7,6 +7,7 @@ import { isPointInMask, polygonToMask, magicWandMask } from '@/utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { skipPath, smoothPath, StrokePath } from './strokePath'
 
 type ShapePreview = {
   kind: 'line' | 'rect' | 'ellipse'
@@ -71,7 +72,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     gestureMoved: boolean
     maxPointers: number
   }>({ pointers: [], multiGesture: false, maxPointers: 0, gestureStartTime: 0, gestureMoved: false })
-  const mouseStroke = useRef<{ lastX?: number; lastY?: number; active: boolean; erase: boolean }>({ active: false, erase: false })
+  const brush = useRef<{ lastX: number, lastY: number, erase: boolean, strokePath: StrokePath } | null>(null)
   const selectionDrag = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
   const moveDrag = useRef<{ active: boolean; startX: number; startY: number; baseLayers: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[] } | null>(null)
   const rectSelecting = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
@@ -158,8 +159,21 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     y = clamp(y, 0, H - 1)
     setShapePreview((s) => s && ({ ...s, curX: x, curY: y }))
   }
-  const endBrush = () => {
-    mouseStroke.current = { active: false, erase: false }
+  const beginBrush = (x: number, y: number, erase: boolean) => {
+    const strokePath = settings.brushStabilize === 0 ? smoothPath(1) : skipPath(smoothPath(settings.brushStabilize + 1))
+    brush.current = { lastX: x, lastY: y, erase, strokePath }
+  }
+  const drawBrush = () => {
+    const ms = brush.current
+    if (!ms) return
+    while (true) {
+      const p = ms.strokePath.getSmoothedPoint()
+      if (!p) break
+      const rgba = paintFor(ms.erase)
+      useAppStore.getState().drawLine(ms.lastX, ms.lastY, p.x, p.y, ms.erase, rgba)
+      ms.lastX = p.x
+      ms.lastY = p.y
+    }
   }
   const addPointer = (e: { pointerId: number, clientX: number, clientY: number }) => {
     if (!touchState.current.pointers.some(p => p.id === e.pointerId))
@@ -272,7 +286,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
         useAppStore.getState().fillBucket(x, y, paintFor(false))
       } else if (isBrushishTool()) {
         const erase = curTool.current === 'eraser'
-        mouseStroke.current = { active: true, erase, lastX: x, lastY: y }
+        beginBrush(x, y, erase)
         useAppStore.getState().setAt(x, y, erase, paintFor(erase))
       }
     }
@@ -305,12 +319,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (isEyedropperTool()) { pickColorAt(x, y); return }
     if (isBucketTool()) return
 
-    if (mouseStroke.current.active && mouseStroke.current.lastX !== undefined && mouseStroke.current.lastY !== undefined) {
-      const rgba = paintFor(mouseStroke.current.erase)
-      useAppStore.getState().drawLine(mouseStroke.current.lastX, mouseStroke.current.lastY, x, y, mouseStroke.current.erase, rgba)
-      mouseStroke.current.lastX = x
-      mouseStroke.current.lastY = y
-    }
+    brush.current?.strokePath.addPoint(x, y)
+    drawBrush()
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -656,8 +666,11 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       }
       return
     }
+
+    brush.current?.strokePath.finish()
+    drawBrush()
+    brush.current = null
     endStroke()
-    endBrush()
   }
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -696,7 +709,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
             useAppStore.getState().fillBucket(f.x, f.y, paintFor(false))
           } else if (isBrushishTool()) {
             const erase = curTool.current === 'eraser'
-            mouseStroke.current = { active: true, erase, lastX: f.x, lastY: f.y }
+            beginBrush(f.x, f.y, erase)
             useAppStore.getState().setAt(f.x, f.y, erase, paintFor(erase))
           }
 

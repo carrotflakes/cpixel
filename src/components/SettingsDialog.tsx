@@ -12,6 +12,7 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const rightClickTool = useSettingsStore(s => s.rightClickTool)
   const usePen = useSettingsStore(s => s.usePen)
   const googleDrive = useSettingsStore(s => s.googleDrive)
+  const brushStabilize = useSettingsStore(s => s.brushStabilize)
   const [checkerStr, setCheckerStr] = useState(String(checkerSize))
   const [tiltTriggerStr, setTiltTriggerStr] = useState(String(tiltTrigger))
   const [tiltAmountStr, setTiltAmountStr] = useState(String(tiltAmount))
@@ -20,6 +21,7 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
   const [tiltEnabledLocal, setTiltEnabledLocal] = useState<boolean>(tiltEnabled)
   const [usePenLocal, setUsePenLocal] = useState<boolean>(usePen)
   const [googleDriveLocal, setGoogleDriveLocal] = useState<boolean>(googleDrive)
+  const [brushStabilizeStr, setBrushStabilizeStr] = useState(String(brushStabilize))
   const firstRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -31,9 +33,10 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     setTiltAlphaStr(String(tiltAlpha))
     setRightClickToolLocal(rightClickTool)
     setUsePenLocal(usePen)
+    setBrushStabilizeStr(String(brushStabilize))
     const t = setTimeout(() => firstRef.current?.focus(), 0)
     return () => clearTimeout(t)
-  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount, tiltAlpha, rightClickTool, usePen])
+  }, [open, checkerSize, tiltTrigger, tiltEnabled, tiltAmount, tiltAlpha, rightClickTool, usePen, brushStabilize])
 
   useEffect(() => {
     if (!open) return
@@ -71,6 +74,11 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
     api.setRightClickTool(rightClickToolLocal)
     api.setUsePen(usePenLocal)
     api.setGoogleDrive(googleDriveLocal)
+    const stabilizer = Number(brushStabilizeStr)
+    if (Number.isFinite(stabilizer)) {
+      const norm = Math.max(0, Math.min(32, Math.floor(stabilizer)))
+      api.setBrushStabilize(norm)
+    }
     onClose()
   }
 
@@ -120,6 +128,19 @@ export function SettingsDialog(props: { open: boolean; onClose: () => void }) {
                 className="h-4 w-4"
               />
               <span className="text-sm">Pen mode</span>
+            </label>
+            <label className="flex flex-col gap-1 max-w-40">
+              <span className="text-sm text-muted">Brush stabilize</span>
+              <input
+                type="number"
+                min={0}
+                max={32}
+                inputMode="numeric"
+                className="w-full rounded border border-border bg-surface p-1"
+                value={brushStabilizeStr}
+                onChange={(e) => setBrushStabilizeStr(e.target.value)}
+              />
+              <span className="text-[11px] text-muted leading-snug">Average last N points (0 disables).</span>
             </label>
           </div>
           <fieldset className="flex flex-col gap-3 border border-border rounded p-3 max-w-[26rem]">

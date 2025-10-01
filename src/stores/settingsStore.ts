@@ -19,6 +19,8 @@ export type SettingsState = {
   setUsePen: (v: boolean) => void
   googleDrive: boolean
   setGoogleDrive: (v: boolean) => void
+  brushStabilize: number
+  setBrushStabilize: (n: number) => void
 }
 
 const KEY = 'cpixel.settings.v1'
@@ -31,7 +33,8 @@ const DEFAULT_STATE = {
   tiltParallaxAlpha: 0.9,
   rightClickTool: 'eraser',
   usePen: false,
-  googleDrive: false
+  googleDrive: false,
+  brushStabilize: 0,
 } as const
 
 export const useSettingsStore = create<SettingsState>()(
@@ -59,6 +62,10 @@ export const useSettingsStore = create<SettingsState>()(
       setRightClickTool: (t) => set({ rightClickTool: t }),
       setUsePen: (v: boolean) => set({ usePen: !!v }),
       setGoogleDrive: (v: boolean) => set({ googleDrive: !!v }),
+      setBrushStabilize: (n: number) => {
+        const v = Math.max(0, Math.min(32, Math.floor(n)))
+        set({ brushStabilize: v })
+      },
     }),
     {
       name: KEY,
@@ -73,6 +80,7 @@ export const useSettingsStore = create<SettingsState>()(
         rightClickTool: s.rightClickTool,
         usePen: s.usePen,
         googleDrive: s.googleDrive,
+        brushStabilize: s.brushStabilize,
       }),
       migrate: (persisted: any, _fromVersion) => {
         const state = { ...DEFAULT_STATE }
@@ -85,6 +93,7 @@ export const useSettingsStore = create<SettingsState>()(
         if (typeof persisted.rightClickTool === 'string') state.rightClickTool = persisted.rightClickTool
         if (typeof persisted.usePen === 'boolean') state.usePen = persisted.usePen
         if (typeof persisted.googleDrive === 'boolean') state.googleDrive = persisted.googleDrive
+        if (typeof persisted.brushStabilize === 'number') state.brushStabilize = persisted.brushStabilize
         return state
       },
     }
