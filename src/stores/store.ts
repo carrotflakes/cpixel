@@ -384,17 +384,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (ci === idx) ci = ti
     else if (ci > idx) ci = ci - 1
     // remap indices for all layers
-    const layers = s.layers.map(l => {
-      if (!(l.data instanceof Uint8Array)) return l
-      const src = l.data
-      const dst = new Uint8Array(src.length)
-      for (let k = 0; k < src.length; k++) {
-        const v = src[k]
-        if (v === idx) dst[k] = ti
-        else if (v > idx) dst[k] = (v - 1) & 0xff
-        else dst[k] = v
-      }
-      return { ...l, data: dst }
+    const layers = remapIndexedLayers(s.layers, (value) => {
+      if (value === idx) return ti
+      if (value > idx) return (value - 1) & 0xff
+      return value
     })
     const color = pal[ci] ?? 0
     return nextPartialState(s, { palette: { colors: pal, transparentIndex: ti }, layers, currentPaletteIndex: ci, color })
@@ -422,13 +415,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       else map[i] = i
     }
     // remap indices for all layers
-    const layers = s.layers.map(l => {
-      if (!(l.data instanceof Uint8Array)) return l
-      const src = l.data
-      const dst = new Uint8Array(src.length)
-      for (let k = 0; k < src.length; k++) dst[k] = map[src[k]]
-      return { ...l, data: dst }
-    })
+    const layers = remapIndexedLayers(s.layers, (value) => map[value])
     // remap transparent index
     const ti = map[s.palette.transparentIndex]
     // remap current palette index
@@ -451,15 +438,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Remap indices by nearest color in the new palette
     const remap = s.palette.colors.map((c, i) => i === s.palette.transparentIndex ? ti : nearestIndexInPalette(palette, c))
-    const layers = s.layers.map(l => {
-      if (!(l.data instanceof Uint8Array)) return l
-      const src = l.data
-      const dst = new Uint8Array(src.length)
-      for (const i in src) {
-        dst[i] = remap[src[i]]
-      }
-      return { ...l, data: dst }
-    })
+    const layers = remapIndexedLayers(s.layers, (value) => remap[value])
 
     // choose current index nearest to previous selected color
     const prevRGBA = s.palette.colors[s.currentPaletteIndex ?? s.palette.transparentIndex] ?? 0x00000000
@@ -1370,6 +1349,18 @@ function applyHistoryEntry(state: AppState, entry: HistoryEntry, dir: 'undo' | '
     }
   }
   return patch
+}
+
+function remapIndexedLayers(layers: Layer[], mapIndex: (value: number) => number): Layer[] {
+  return layers.map(layer => {
+    const data = layer.data
+    if (!(data instanceof Uint8Array)) return layer
+    const next = new Uint8Array(data.length)
+    for (let i = 0; i < data.length; i++) {
+      next[i] = mapIndex(data[i])
+    }
+    return { ...layer, data: next }
+  })
 }
 
 function newLayerId(layers: Layer[]): string {
