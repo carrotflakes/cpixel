@@ -7,6 +7,7 @@ import { useAppStore } from '@/stores/store'
 import { RCMenuContent, RCMenuItem, RCMenuRoot, RCMenuSeparator, RCMenuTrigger } from '@/components/ui/RadixContextMenu'
 import { parseCSSColor, rgbaToCSSHex } from '@/utils/color'
 import { useUIState } from '@/stores/useUiStore'
+import { useTouchLongPress } from '@/hooks/useTouchLongPress'
 
 export function PalettePanel() {
   const colorMode = useAppStore(s => s.colorMode)
@@ -23,9 +24,7 @@ export function PalettePanel() {
   const panelRef = useRef<HTMLDivElement | null>(null)
   const [presetsOpen, setPresetsOpen] = useState(false)
   const [collapsed, setCollapsed] = useUIState('palettePanelCollapsed', false)
-  const longPressRef = useRef<{ timer?: number; index?: number } | null>({})
   const suppressClickRef = useRef(false)
-  const touchStartPos = useRef<{ x: number; y: number } | null>(null)
   const [edit, setEdit] = useState<{ open: boolean; index: number; x: number; y: number } | null>(null)
 
   // Track last context menu position (for opening Edit color picker near pointer)
@@ -39,16 +38,24 @@ export function PalettePanel() {
   }
 
   // Long-press handling: dispatch synthetic contextmenu event for touch so Radix opens
-  const scheduleLongPress = (el: HTMLElement, index: number, clientX: number, clientY: number) => {
-    if (longPressRef.current?.timer) window.clearTimeout(longPressRef.current.timer)
-    const timer = window.setTimeout(() => {
+  const touchLongPress = useTouchLongPress<HTMLButtonElement>({
+    onTrigger: ({ target, clientX, clientY }) => {
       suppressClickRef.current = true
       lastContextPos.current = { x: clientX, y: clientY }
       const evt = new MouseEvent('contextmenu', { bubbles: true, clientX, clientY })
-      el.dispatchEvent(evt)
-    }, 500)
-    longPressRef.current = { timer, index }
-    touchStartPos.current = { x: clientX, y: clientY }
+      target.dispatchEvent(evt)
+    },
+  })
+
+  const openColorEditor = (index: number, anchor: { x: number; y: number }) => {
+    setEdit({ open: true, index, x: anchor.x, y: anchor.y })
+  }
+
+  const fallbackAnchorForIndex = (index: number) => {
+    const btn = panelRef.current?.querySelector<HTMLButtonElement>(`[data-palette-index="${index}"]`)
+    if (!btn) return null
+    const rect = btn.getBoundingClientRect()
+    return { x: rect.left, y: rect.bottom + 6 }
   }
 
   return (
@@ -91,6 +98,7 @@ export function PalettePanel() {
               <RCMenuRoot key={i}>
                 <RCMenuTrigger asChild>
                   <button
+                    data-palette-index={i}
                     title={`${color} (${i})`}
                     aria-pressed={isSelected}
                     className={`w-6 h-6 rounded border border-border relative flex items-center justify-center ${isSelected ? 'ring-2 ring-accent' : ''}`}
@@ -103,37 +111,18 @@ export function PalettePanel() {
                     }}
                     onDoubleClick={(e) => {
                       e.preventDefault()
-                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                       setColorIndex(i)
-                      setEdit({ open: true, index: i, x: r.left, y: r.bottom + 6 })
+                      openColorEditor(i, { x: rect.left, y: rect.bottom + 6 })
                     }}
                     onContextMenu={(e) => {
                       lastContextPos.current = { x: e.clientX, y: e.clientY }
                       suppressClickRef.current = true
                     }}
-                    onPointerDown={(e) => {
-                      if (e.pointerType === 'touch') {
-                        scheduleLongPress(e.currentTarget as HTMLElement, i, e.clientX, e.clientY)
-                      }
-                    }}
-                    onPointerMove={(e) => {
-                      if (e.pointerType === 'touch' && touchStartPos.current) {
-                        const dx = e.clientX - touchStartPos.current.x
-                        const dy = e.clientY - touchStartPos.current.y
-                        if (dx * dx + dy * dy > 16) {
-                          if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
-                          touchStartPos.current = null
-                        }
-                      }
-                    }}
-                    onPointerUp={() => {
-                      if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
-                      touchStartPos.current = null
-                    }}
-                    onPointerCancel={() => {
-                      if (longPressRef.current?.timer) { window.clearTimeout(longPressRef.current.timer); longPressRef.current = {} }
-                      touchStartPos.current = null
-                    }}
+                    onPointerDown={touchLongPress.onPointerDown}
+                    onPointerMove={touchLongPress.onPointerMove}
+                    onPointerUp={touchLongPress.cancel}
+                    onPointerCancel={touchLongPress.cancel}
                   >
                     <ColorBoxInner color={color} />
                     {isTransparent && (
@@ -144,7 +133,7 @@ export function PalettePanel() {
                 <RCMenuContent>
                   <RCMenuItem
                     disabled={i === palette.transparentIndex}
-                    onSelect={() => { if (i === palette.transparentIndex) return; setTransparentIndex(i) }}
+                    onSelect={() => setTransparentIndex(i)}
                   >
                     <LuPin aria-hidden />
                     <span>Set transparent</span>
@@ -152,29 +141,22 @@ export function PalettePanel() {
                   <RCMenuItem
                     onSelect={() => {
                       setColorIndex(i)
-                      const pos = lastContextPos.current
-                      if (pos) setEdit({ open: true, index: i, x: pos.x, y: pos.y })
-                      else {
-                        const btn = panelRef.current?.querySelectorAll('button')[i]
-                        if (btn) {
-                          const r = (btn as HTMLElement).getBoundingClientRect()
-                          setEdit({ open: true, index: i, x: r.left, y: r.bottom + 6 })
-                        }
-                      }
+                      const anchor = lastContextPos.current ?? fallbackAnchorForIndex(i)
+                      if (anchor) openColorEditor(i, anchor)
                     }}
                   >
                     <span>Edit color</span>
                   </RCMenuItem>
                   <RCMenuItem
                     disabled={i === 0}
-                    onSelect={() => { if (i === 0) return; movePaletteIndex(i, Math.max(0, i - 1)) }}
+                    onSelect={() => movePaletteIndex(i, Math.max(0, i - 1))}
                   >
                     <LuArrowUp aria-hidden />
                     <span>Move up</span>
                   </RCMenuItem>
                   <RCMenuItem
                     disabled={i === palette.colors.length - 1}
-                    onSelect={() => { if (i === palette.colors.length - 1) return; movePaletteIndex(i, Math.min(palette.colors.length - 1, i + 1)) }}
+                    onSelect={() => movePaletteIndex(i, Math.min(palette.colors.length - 1, i + 1))}
                   >
                     <LuArrowDown aria-hidden />
                     <span>Move down</span>
@@ -183,7 +165,7 @@ export function PalettePanel() {
                   <RCMenuItem
                     disabled={palette.colors.length <= 1}
                     danger
-                    onSelect={() => { if (palette.colors.length <= 1) return; removePaletteIndex(i) }}
+                    onSelect={() => removePaletteIndex(i)}
                   >
                     <LuTrash2 aria-hidden />
                     <span>Remove</span>
