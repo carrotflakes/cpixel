@@ -3,7 +3,7 @@ import { useCanvasInput } from './useCanvasInput'
 import { useTilt } from '@/hooks/useTilt'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAppStore } from '@/stores/store'
-import { drawBorder, drawGrid, drawHoverCell, drawSelectionOverlay, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas, drawSelectionOutline, drawBoundsOutline } from '@/utils/canvasDraw'
+import { drawBorder, drawGrid, drawHoverCell, drawShapePreview, ensureHiDPICanvas, getCheckerCanvas, drawSelectionOutline, drawBoundsOutline, createSelectionOverlay } from '@/utils/canvasDraw'
 import { compositeImageData } from '@/utils/composite'
 import { snappedTransform } from '@/utils/transform'
 
@@ -60,6 +60,8 @@ export function PixelCanvas() {
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [selection])
+
+  const drawSelectionOverlay = useMemo(() => selection?.mask ? createSelectionOverlay(selection.mask, W, H) : null, [selection, W, H])
 
   useEffect(() => {
     const cvs = canvasRef.current
@@ -156,12 +158,12 @@ export function PixelCanvas() {
       drawBoundsOutline(ctx, mode.width, mode.height, transform, s, antsPhase)
     } else {
       if (selection) {
-        drawSelectionOverlay(ctx, selection.mask, W, H, view.scale)
+        drawSelectionOverlay?.(ctx, view.scale)
         if (mode === null)
           drawSelectionOutline(ctx, selection.mask, W, H, view.scale, antsPhase, 0, 0)
       }
     }
-  }, [mode, layers, palette, colorMode, view, hover?.x, hover?.y, shapePreview, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill])
+  }, [mode, layers, palette, colorMode, view, hover?.x, hover?.y, shapePreview, W, H, selection, antsPhase, resizeTick, checkerSize, parallaxActive, shiftTick, shapeFill, drawSelectionOverlay])
 
   useEffect(() => {
     const canvas = canvasRef.current

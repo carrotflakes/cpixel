@@ -135,22 +135,19 @@ export function drawShapePreview(
   ctx.restore()
 }
 
-export function drawSelectionOverlay(
-  ctx: CanvasRenderingContext2D,
-  mask: Uint8Array,
-  W: number,
-  H: number,
-  size: number
-) {
-  // Dim non-selected area with a translucent veil
-  ctx.save()
+export function createSelectionOverlay(mask: Uint8Array, W: number, H: number) {
+  const canvas = new OffscreenCanvas(W, H)
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
   ctx.fillStyle = 'rgba(0,0,0,0.15)'
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      if (!mask[y * W + x]) ctx.fillRect(x * size, y * size, size, size)
+      if (!mask[y * W + x]) ctx.fillRect(x, y, 1, 1)
     }
   }
-  ctx.restore()
+
+  return (ctx: CanvasRenderingContext2D, size: number) => {
+    ctx.drawImage(canvas, 0, 0, W, H, 0, 0, W * size, H * size)
+  }
 }
 
 export function drawSelectionOutline(
