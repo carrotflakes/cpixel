@@ -1,7 +1,25 @@
 import { rasterizeLine } from './lines'
 
+type ImageData = Uint32Array | Uint8Array
+
+function normalizeRectBounds(
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+) {
+  x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
+  const left = Math.max(0, Math.min(x0, x1))
+  const right = Math.min(W - 1, Math.max(x0, x1))
+  const top = Math.max(0, Math.min(y0, y1))
+  const bottom = Math.min(H - 1, Math.max(y0, y1))
+  return left > right || top > bottom ? undefined : { left, right, top, bottom }
+}
+
 // Stamp a square brush. Returns original src if no change.
-export function stamp<T extends Uint32Array | Uint8Array>(
+export function stamp<T extends ImageData>(
   src: T,
   W: number,
   H: number,
@@ -24,7 +42,7 @@ export function stamp<T extends Uint32Array | Uint8Array>(
   return stampGeneric(src, W, H, x, y, brushSize, value, mask)
 }
 
-export function stampGeneric<T extends Uint32Array | Uint8Array>(
+export function stampGeneric<T extends ImageData>(
   src: T,
   W: number,
   H: number,
@@ -56,7 +74,7 @@ export function stampGeneric<T extends Uint32Array | Uint8Array>(
   return changed ? out : src
 }
 
-export function drawLineBrush<T extends Uint32Array | Uint8Array>(
+export function drawLineBrush<T extends ImageData>(
   src: T,
   W: number,
   H: number,
@@ -81,7 +99,7 @@ export function drawLineBrush<T extends Uint32Array | Uint8Array>(
   return drawLineGeneric(src, W, H, x0, y0, x1, y1, brushSize, value, mask)
 }
 
-export function drawLineGeneric<T extends Uint32Array | Uint8Array>(
+export function drawLineGeneric<T extends ImageData>(
   src: T,
   W: number,
   H: number,
@@ -124,28 +142,7 @@ export function drawRectOutlineRgba(
   rgba: number,
   selectionMask?: Uint8Array,
 ): Uint32Array {
-  const out = new Uint32Array(src)
-  let changed = false
-  x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
-  let left = Math.max(0, Math.min(x0, x1))
-  let right = Math.min(W - 1, Math.max(x0, x1))
-  let top = Math.max(0, Math.min(y0, y1))
-  let bottom = Math.min(H - 1, Math.max(y0, y1))
-  if (left > right || top > bottom) return src
-  const pix = rgba >>> 0
-  for (let x = left; x <= right; x++) {
-    const it = top * W + x
-    const ib = bottom * W + x
-    if (!selectionMask || selectionMask[it]) { if (out[it] !== pix) { out[it] = pix; changed = true } }
-    if (!selectionMask || selectionMask[ib]) { if (out[ib] !== pix) { out[ib] = pix; changed = true } }
-  }
-  for (let y = top; y <= bottom; y++) {
-    const il = y * W + left
-    const ir = y * W + right
-    if (!selectionMask || selectionMask[il]) { if (out[il] !== pix) { out[il] = pix; changed = true } }
-    if (!selectionMask || selectionMask[ir]) { if (out[ir] !== pix) { out[ir] = pix; changed = true } }
-  }
-  return changed ? out : src
+  return drawRectOutlineGeneric(src, W, H, x0, y0, x1, y1, rgba >>> 0, selectionMask)
 }
 
 export function drawRectOutlineIndexed(
@@ -159,26 +156,39 @@ export function drawRectOutlineIndexed(
   index: number,
   selectionMask?: Uint8Array,
 ): Uint8Array {
-  const out = new Uint8Array(src)
+  return drawRectOutlineGeneric(src, W, H, x0, y0, x1, y1, index & 0xff, selectionMask)
+}
+
+function drawRectOutlineGeneric<T extends ImageData>(
+  src: T,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  value: number,
+  selectionMask?: Uint8Array,
+): T {
+  const bounds = normalizeRectBounds(W, H, x0, y0, x1, y1)
+  if (!bounds) return src
+  const out = src.slice() as T
   let changed = false
-  x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
-  let left = Math.max(0, Math.min(x0, x1))
-  let right = Math.min(W - 1, Math.max(x0, x1))
-  let top = Math.max(0, Math.min(y0, y1))
-  let bottom = Math.min(H - 1, Math.max(y0, y1))
-  if (left > right || top > bottom) return src
-  const v = index & 0xff
+  const apply = (index: number) => {
+    if (selectionMask && !selectionMask[index]) return
+    if (out[index] !== value) {
+      out[index] = value
+      changed = true
+    }
+  }
+  const { left, right, top, bottom } = bounds
   for (let x = left; x <= right; x++) {
-    const it = top * W + x
-    const ib = bottom * W + x
-    if (!selectionMask || selectionMask[it]) { if (out[it] !== v) { out[it] = v; changed = true } }
-    if (!selectionMask || selectionMask[ib]) { if (out[ib] !== v) { out[ib] = v; changed = true } }
+    apply(top * W + x)
+    apply(bottom * W + x)
   }
   for (let y = top; y <= bottom; y++) {
-    const il = y * W + left
-    const ir = y * W + right
-    if (!selectionMask || selectionMask[il]) { if (out[il] !== v) { out[il] = v; changed = true } }
-    if (!selectionMask || selectionMask[ir]) { if (out[ir] !== v) { out[ir] = v; changed = true } }
+    apply(y * W + left)
+    apply(y * W + right)
   }
   return changed ? out : src
 }
@@ -195,24 +205,7 @@ export function drawRectFilledRgba(
   rgba: number,
   selectionMask?: Uint8Array,
 ): Uint32Array {
-  const out = new Uint32Array(src)
-  let changed = false
-  x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
-  let left = Math.max(0, Math.min(x0, x1))
-  let right = Math.min(W - 1, Math.max(x0, x1))
-  let top = Math.max(0, Math.min(y0, y1))
-  let bottom = Math.min(H - 1, Math.max(y0, y1))
-  if (left > right || top > bottom) return src
-  const pix = rgba >>> 0
-  for (let y = top; y <= bottom; y++) {
-    const row = y * W
-    for (let x = left; x <= right; x++) {
-      const i = row + x
-      if (selectionMask && !selectionMask[i]) continue
-      if (out[i] !== pix) { out[i] = pix; changed = true }
-    }
-  }
-  return changed ? out : src
+  return drawRectFilledGeneric(src, W, H, x0, y0, x1, y1, rgba >>> 0, selectionMask)
 }
 
 // Filled rectangle (includes outline) for indexed mode
@@ -227,23 +220,124 @@ export function drawRectFilledIndexed(
   index: number,
   selectionMask?: Uint8Array,
 ): Uint8Array {
-  const out = new Uint8Array(src)
+  return drawRectFilledGeneric(src, W, H, x0, y0, x1, y1, index & 0xff, selectionMask)
+}
+
+function drawRectFilledGeneric<T extends ImageData>(
+  src: T,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  value: number,
+  selectionMask?: Uint8Array,
+): T {
+  const bounds = normalizeRectBounds(W, H, x0, y0, x1, y1)
+  if (!bounds) return src
+  const out = src.slice() as T
   let changed = false
-  x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0
-  let left = Math.max(0, Math.min(x0, x1))
-  let right = Math.min(W - 1, Math.max(x0, x1))
-  let top = Math.max(0, Math.min(y0, y1))
-  let bottom = Math.min(H - 1, Math.max(y0, y1))
-  if (left > right || top > bottom) return src
-  const v = index & 0xff
+  const { left, right, top, bottom } = bounds
   for (let y = top; y <= bottom; y++) {
     const row = y * W
     for (let x = left; x <= right; x++) {
-      const i = row + x
-      if (selectionMask && !selectionMask[i]) continue
-      if (out[i] !== v) { out[i] = v; changed = true }
+      const index = row + x
+      if (selectionMask && !selectionMask[index]) continue
+      if (out[index] !== value) {
+        out[index] = value
+        changed = true
+      }
     }
   }
+  return changed ? out : src
+}
+
+export function drawEllipseOutlineRgba(
+  src: Uint32Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  rgba: number,
+  selectionMask?: Uint8Array,
+): Uint32Array {
+  return drawEllipseGeneric(src, W, H, x0, y0, x1, y1, rgba >>> 0, selectionMask, rasterizeEllipse)
+}
+
+export function drawEllipseOutlineIndexed(
+  src: Uint8Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  index: number,
+  selectionMask?: Uint8Array,
+): Uint8Array {
+  return drawEllipseGeneric(src, W, H, x0, y0, x1, y1, index & 0xff, selectionMask, rasterizeEllipse)
+}
+
+export function drawEllipseFilledRgba(
+  src: Uint32Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  rgba: number,
+  selectionMask?: Uint8Array,
+): Uint32Array {
+  return drawEllipseGeneric(src, W, H, x0, y0, x1, y1, rgba >>> 0, selectionMask, rasterizeEllipseFilled)
+}
+
+export function drawEllipseFilledIndexed(
+  src: Uint8Array,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  index: number,
+  selectionMask?: Uint8Array,
+): Uint8Array {
+  return drawEllipseGeneric(src, W, H, x0, y0, x1, y1, index & 0xff, selectionMask, rasterizeEllipseFilled)
+}
+
+function drawEllipseGeneric<T extends ImageData>(
+  src: T,
+  W: number,
+  H: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  value: number,
+  selectionMask: Uint8Array | undefined,
+  rasterize: (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    plot: (x: number, y: number) => void,
+  ) => void,
+): T {
+  const out = src.slice() as T
+  let changed = false
+  rasterize(x0, y0, x1, y1, (px, py) => {
+    if (px < 0 || py < 0 || px >= W || py >= H) return
+    const index = py * W + px
+    if (selectionMask && !selectionMask[index]) return
+    if (out[index] !== value) {
+      out[index] = value
+      changed = true
+    }
+  })
   return changed ? out : src
 }
 
@@ -345,96 +439,4 @@ function rasterizeEllipseFilled(x0: number, y0: number, x1: number, y1: number, 
     }
     y -= 1
   }
-}
-
-export function drawEllipseOutlineRgba(
-  src: Uint32Array,
-  W: number,
-  H: number,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  rgba: number,
-  selectionMask?: Uint8Array,
-): Uint32Array {
-  const out = new Uint32Array(src)
-  let changed = false
-  const pix = rgba >>> 0
-  rasterizeEllipse(x0, y0, x1, y1, (px, py) => {
-    if (px < 0 || py < 0 || px >= W || py >= H) return
-    const i = py * W + px
-    if (selectionMask && !selectionMask[i]) return
-    if (out[i] !== pix) { out[i] = pix; changed = true }
-  })
-  return changed ? out : src
-}
-
-export function drawEllipseOutlineIndexed(
-  src: Uint8Array,
-  W: number,
-  H: number,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  index: number,
-  selectionMask?: Uint8Array,
-): Uint8Array {
-  const out = new Uint8Array(src)
-  let changed = false
-  const v = index & 0xff
-  rasterizeEllipse(x0, y0, x1, y1, (px, py) => {
-    if (px < 0 || py < 0 || px >= W || py >= H) return
-    const i = py * W + px
-    if (selectionMask && !selectionMask[i]) return
-    if (out[i] !== v) { out[i] = v; changed = true }
-  })
-  return changed ? out : src
-}
-
-export function drawEllipseFilledRgba(
-  src: Uint32Array,
-  W: number,
-  H: number,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  rgba: number,
-  selectionMask?: Uint8Array,
-): Uint32Array {
-  const out = new Uint32Array(src)
-  let changed = false
-  const pix = rgba >>> 0
-  rasterizeEllipseFilled(x0, y0, x1, y1, (px, py) => {
-    if (px < 0 || py < 0 || px >= W || py >= H) return
-    const i = py * W + px
-    if (selectionMask && !selectionMask[i]) return
-    if (out[i] !== pix) { out[i] = pix; changed = true }
-  })
-  return changed ? out : src
-}
-
-export function drawEllipseFilledIndexed(
-  src: Uint8Array,
-  W: number,
-  H: number,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  index: number,
-  selectionMask?: Uint8Array,
-): Uint8Array {
-  const out = new Uint8Array(src)
-  let changed = false
-  const v = index & 0xff
-  rasterizeEllipseFilled(x0, y0, x1, y1, (px, py) => {
-    if (px < 0 || py < 0 || px >= W || py >= H) return
-    const i = py * W + px
-    if (selectionMask && !selectionMask[i]) return
-    if (out[i] !== v) { out[i] = v; changed = true }
-  })
-  return changed ? out : src
 }
