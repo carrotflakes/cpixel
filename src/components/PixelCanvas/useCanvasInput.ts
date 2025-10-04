@@ -708,6 +708,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           if (settings.usePen)
             return
 
+          if (isEyedropperTool()) { pickColorAt(f.x, f.y); return }
+
           // Invoke tool that would have been started on pointerdown
           beginStroke()
           if (isBucketTool()) {
