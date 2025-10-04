@@ -30,8 +30,6 @@ export function PalettePanel() {
   // Track last context menu position (for opening Edit color picker near pointer)
   const lastContextPos = useRef<{ x: number; y: number } | null>(null)
 
-  if (colorMode !== 'indexed') return null
-
   const onAddBlackColor = () => {
     const idx = addPaletteColor(parseCSSColor('#000000') ?? 0)
     setColorIndex(idx)
@@ -57,6 +55,8 @@ export function PalettePanel() {
     const rect = btn.getBoundingClientRect()
     return { x: rect.left, y: rect.bottom + 6 }
   }
+
+  if (colorMode !== 'indexed') return null
 
   return (
     <div ref={panelRef} className="px-3 py-2 border-t border-border bg-surface/70 backdrop-blur relative">
