@@ -1,19 +1,17 @@
-import { create } from 'zustand'
+import { useLogStore } from '@/stores/logStore.ts'
+import type { ColorMode } from '@/types.ts'
 import { equalU32, equalU8 } from '@/utils/arrays.ts'
 import { nearestIndexInPalette } from '@/utils/color.ts'
 import { compositeImageData, over } from '@/utils/composite.ts'
 import { floodFillIndexed, floodFillRgba } from '@/utils/fill.ts'
-import { flipLayersHorizontal, flipLayersVertical } from '@/utils/flip.ts'
 import { normalizeImportedJSON } from '@/utils/io.ts'
 import { drawEllipseFilledIndexed, drawEllipseFilledRgba, drawEllipseOutlineIndexed, drawEllipseOutlineRgba, drawLineBrush, drawRectFilledIndexed, drawRectFilledRgba, drawRectOutlineIndexed, drawRectOutlineRgba, stamp } from '@/utils/paint.ts'
-import { generatePaletteFromComposite } from '@/utils/palette.ts'
+import { generatePalette } from '@/utils/palette.ts'
 import { resizeLayers } from '@/utils/resize.ts'
 import { applyFloatingIndicesToIndexedLayer, applyFloatingToIndexedLayer, applyFloatingToRgbaLayer, clearSelectedIndexed, clearSelectedRgba, extractFloatingIndexed, extractFloatingRgba, fillSelectedIndexed, fillSelectedRgba, rectToMask } from '@/utils/selection.ts'
-import { translate } from '@/utils/translate.ts'
-import { clamp } from '@/utils/view.ts'
-import { useLogStore } from '@/stores/logStore.ts'
 import { sampleTransformedPatch } from '@/utils/transform.ts'
-import type { ColorMode } from '@/types.ts'
+import { clamp } from '@/utils/view.ts'
+import { create } from 'zustand'
 
 const WIDTH = 64
 const HEIGHT = 64
@@ -117,7 +115,6 @@ export type AppState = {
   drawEllipse: (x0: number, y0: number, x1: number, y1: number, rgbaOrIndex: number) => void
   fillBucket: (x: number, y: number, rgbaOrIndex: number) => void
   setColorMode: (m: ColorMode) => void
-  translateAllLayers: (base: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[], dx: number, dy: number) => void
   selection?: {
     mask: Uint8Array
     bounds: { left: number; top: number; right: number; bottom: number }
@@ -160,8 +157,7 @@ export type AppState = {
   importPNGFromImageData: (img: ImageData, meta?: FileMeta) => void
   importAse: (buffer: ArrayBuffer, meta?: FileMeta) => Promise<void>
   resizeCanvas: (w: number, h: number) => void
-  flipHorizontal: () => void
-  flipVertical: () => void
+  updateLayers: (layers: Layer[]) => void
   fileMeta?: FileMeta
   setFileMeta: (fileMeta: FileMeta | undefined) => void
   newFile: (options?: NewFileOptions) => void
@@ -473,14 +469,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     return nextPartialState(s, { palette: { colors: s.palette.colors, transparentIndex: clamped } })
   }),
   setView: (x, y, scale) => set(() => ({ view: { x, y, scale: clamp(scale, MIN_SCALE, MAX_SCALE) } })),
-  translateAllLayers: (base, dx, dy) => set((s) => {
-    dx |= 0; dy |= 0
-    if (dx === 0 && dy === 0) return {}
-    const W = s.width, H = s.height
-    const ti = s.palette.transparentIndex
-    const layers = base.map(l => ({ ...l, data: translate(l.data, W, H, dx, dy, l.data instanceof Uint32Array ? 0x00000000 : ti) }))
-    return { layers }
-  }),
   setAt: (x, y, erase, rgbaOrIndex) => {
     set((s) => {
       const W = s.width, H = s.height
@@ -582,27 +570,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (s.colorMode === m) return {}
     if (m === 'indexed') {
       // Auto-generate a palette from current composited image (transparent at index 0)
-      const autoPalette = generatePaletteFromComposite(
-        s.layers.map(l => ({ visible: l.visible, data: l.data })),
-        s.width,
-        s.height,
-        s.colorMode,
-        s.palette,
-        256,
-      )
-      const transparentIndex = 0
+      const palette = generatePalette(s.layers, s.palette, 256)
       // Convert all layers: rgba -> indices using the generated palette
       const layers = s.layers.map(l => {
-        const src = l.data ?? new Uint32Array(s.width * s.height)
         const idx = new Uint8Array(s.width * s.height)
         for (let i = 0; i < idx.length; i++) {
-          const rgba = src[i] >>> 0
-          if (rgba === 0x00000000) { idx[i] = transparentIndex; continue }
-          let best = transparentIndex, bestD = Infinity
+          const rgba = l.data[i] >>> 0
+          if (rgba === 0x00000000) { idx[i] = palette.transparentIndex; continue }
+          let best = palette.transparentIndex, bestD = Infinity
           const r = (rgba >>> 24) & 0xff, g = (rgba >>> 16) & 0xff, b = (rgba >>> 8) & 0xff
-          for (let k = 0; k < autoPalette.length; k++) {
-            const c = autoPalette[k] >>> 0
-            if (c === 0x00000000 && k === transparentIndex) continue
+          for (let k = 0; k < palette.colors.length; k++) {
+            const c = palette.colors[k] >>> 0
+            if (c === 0x00000000 && k === palette.transparentIndex) continue
             const cr = (c >>> 24) & 0xff, cg = (c >>> 16) & 0xff, cb = (c >>> 8) & 0xff
             const d = (cr - r) * (cr - r) + (cg - g) * (cg - g) + (cb - b) * (cb - b)
             if (d < bestD) { bestD = d; best = k }
@@ -613,16 +592,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       // Sync current palette index nearest to current color
       const rgba = s.color
-      const palette = { colors: autoPalette, transparentIndex }
-      const curIdx = (rgba >>> 0) === 0x00000000 ? transparentIndex : nearestIndexInPalette(palette, rgba)
+      const curIdx = (rgba >>> 0) === 0x00000000 ? palette.transparentIndex : nearestIndexInPalette(palette, rgba)
       return { colorMode: 'indexed', layers, currentPaletteIndex: curIdx, color: palette.colors[curIdx] ?? 0, palette, recentColorsIndexed: [] }
     } else {
       // convert all layers: indices -> rgba
       const layers = s.layers.map(l => {
-        const src = l.data ?? new Uint8Array(s.width * s.height)
         const data = new Uint32Array(s.width * s.height)
         for (let i = 0; i < data.length; i++) {
-          const pi = src[i] ?? s.palette.transparentIndex
+          const pi = l.data[i]
           data[i] = s.palette.colors[pi] ?? 0x00000000
         }
         return { id: l.id, visible: l.visible, locked: l.locked, data }
@@ -1156,30 +1133,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   resizeCanvas: (w, h) => set((s) => {
-    let newW = Math.max(1, Math.floor(w))
-    let newH = Math.max(1, Math.floor(h))
     const MAX_WH = 2048
-    newW = Math.min(newW, MAX_WH)
-    newH = Math.min(newH, MAX_WH)
+    if (w < 1 || h < 1 || w > MAX_WH || h > MAX_WH) throw new Error(`Invalid canvas size ${w}x${h}`)
     const oldW = s.width, oldH = s.height
-    if (newW === oldW && newH === oldH) return {}
+    if (w === oldW && h === oldH) return {}
 
     return nextPartialState(s, {
-      width: newW,
-      height: newH,
-      layers: resizeLayers(s.layers, s.colorMode, oldW, oldH, newW, newH),
+      width: w,
+      height: h,
+      layers: resizeLayers(s.layers, oldW, oldH, w, h),
       selection: undefined,
     })
   }),
-  flipHorizontal: () => set((s) => {
+  updateLayers: (layers: Layer[]) => set((s) => {
     return nextPartialState(s, {
-      layers: flipLayersHorizontal(s.layers, s.colorMode, s.width, s.height),
-      selection: undefined,
-    })
-  }),
-  flipVertical: () => set((s) => {
-    return nextPartialState(s, {
-      layers: flipLayersVertical(s.layers, s.colorMode, s.width, s.height),
+      layers,
       selection: undefined,
     })
   }),

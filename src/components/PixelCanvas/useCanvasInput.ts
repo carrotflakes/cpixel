@@ -8,6 +8,7 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { useCanvasPanZoom } from './useCanvasPanZoom'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { skipPath, smoothPath, StrokePath } from './strokePath'
+import { translate } from '@/utils/translate'
 
 type ShapePreview = {
   kind: 'line' | 'rect' | 'ellipse'
@@ -74,7 +75,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   }>({ pointers: [], multiGesture: false, maxPointers: 0, gestureStartTime: 0, gestureMoved: false })
   const brush = useRef<{ lastX: number, lastY: number, erase: boolean, strokePath: StrokePath } | null>(null)
   const selectionDrag = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
-  const moveDrag = useRef<{ active: boolean; startX: number; startY: number; baseLayers: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[] } | null>(null)
+  const moveDrag = useRef<{ startX: number; startY: number; baseLayers: { id: string; visible: boolean; locked: boolean; data: Uint32Array | Uint8Array }[] } | null>(null)
   const rectSelecting = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 })
   const lassoPath = useRef<{ x: number; y: number }[] | null>(null)
   const state = useRef<null | "firstTouch" | "pinch" | "tool">(null)
@@ -235,7 +236,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     if (isMoveTool()) {
       if (!inBounds(x, y)) return false
       beginStroke()
-      moveDrag.current = { active: true, startX: x, startY: y, baseLayers: layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: l.data instanceof Uint32Array ? new Uint32Array(l.data) : new Uint8Array(l.data) })) }
+      moveDrag.current = { startX: x, startY: y, baseLayers: layers.map(l => ({ id: l.id, visible: l.visible, locked: l.locked, data: l.data instanceof Uint32Array ? new Uint32Array(l.data) : new Uint8Array(l.data) })) }
       return true
     }
     if (isSelectionTool()) {
@@ -575,10 +576,14 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           }
         }
 
-        if (moveDrag.current?.active) {
+        if (moveDrag.current) {
           const dx = x - moveDrag.current.startX
           const dy = y - moveDrag.current.startY
-          useAppStore.getState().translateAllLayers(moveDrag.current.baseLayers, dx, dy)
+          const layers = moveDrag.current.baseLayers.map(l => ({
+            ...l,
+            data: translate(l.data, W, H, dx, dy, l.data instanceof Uint32Array ? 0x00000000 : palette.transparentIndex)
+          }))
+          useAppStore.getState().updateLayers(layers)
           return
         }
         // Selection drag/create
@@ -638,7 +643,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       selectionDrag.current.active = false
       return
     }
-    if (moveDrag.current?.active) {
+    if (moveDrag.current) {
       moveDrag.current = null
       endStroke()
       return

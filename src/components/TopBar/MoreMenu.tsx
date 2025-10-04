@@ -10,6 +10,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useEffect, useRef, useState } from 'react'
 import { FaEllipsisV } from 'react-icons/fa'
 import { LuCheck, LuChevronRight, LuDownload, LuFlipHorizontal, LuFlipVertical, LuMaximize, LuSettings } from 'react-icons/lu'
+import { flipLayersHorizontal, flipLayersVertical } from '@/utils/flip'
 
 export function MoreMenu() {
   // store selectors
@@ -182,11 +183,19 @@ export function MoreMenu() {
                   </DropdownMenu.SubContent>
                 </DropdownMenu.Sub>
                 <DropdownMenu.Separator className={separatorCls} />
-                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().beginStroke(); useAppStore.getState().flipHorizontal(); useAppStore.getState().endStroke(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => {
+                  const s = useAppStore.getState()
+                  s.updateLayers(flipLayersHorizontal(s.layers, s.width, s.height))
+                  setOpen(false)
+                }}>
                   <LuFlipHorizontal aria-hidden />
                   <span>Flip horizontal</span>
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemCls} onSelect={() => { useAppStore.getState().beginStroke(); useAppStore.getState().flipVertical(); useAppStore.getState().endStroke(); setOpen(false) }}>
+                <DropdownMenu.Item className={itemCls} onSelect={() => {
+                  const s = useAppStore.getState()
+                  s.updateLayers(flipLayersVertical(s.layers, s.width, s.height))
+                  setOpen(false)
+                }}>
                   <LuFlipVertical aria-hidden />
                   <span>Flip vertical</span>
                 </DropdownMenu.Item>

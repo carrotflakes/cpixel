@@ -6,7 +6,6 @@ export function translate(src: Uint32Array | Uint8Array, W: number, H: number, d
   if (dx === 0 && dy === 0) return src
   const out = src instanceof Uint32Array ? new Uint32Array(W * H) : new Uint8Array(W * H)
   out.fill(transparent)
-  if (Math.abs(dx) >= W || Math.abs(dy) >= H) return out // all moved out -> fully transparent
   for (let y = 0; y < H; y++) {
     const ny = y + dy
     if (ny < 0 || ny >= H) continue

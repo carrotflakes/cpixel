@@ -1,26 +1,24 @@
-import { compositePixel, LayerLike } from './composite'
-import type { ColorMode } from '@/types'
-
-// Generate a palette from the current composited image.
-// - Collects unique non-transparent colors and sorts by frequency (desc)
-// - Ensures a transparent slot at index 0 (0x00000000)
-// - Caps palette to maxColors (<=256)
-export function generatePaletteFromComposite(
-  layers: LayerLike[],
-  width: number,
-  height: number,
-  colorMode: ColorMode,
+export function generatePalette(
+  layers: {data: Uint32Array | Uint8Array}[],
   palette: { colors: Uint32Array, transparentIndex: number },
   maxColors: number = 256,
-): Uint32Array {
-  const MAX = Math.max(1, Math.min(maxColors | 0, 256))
-  // freq map of RGBA (excluding fully transparent)
+) {
   const freq = new Map<number, number>()
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const rgba = compositePixel(layers, x, y, colorMode, palette, width, height) >>> 0
-      if ((rgba & 0xff) === 0) continue // skip fully transparent
-      freq.set(rgba, (freq.get(rgba) || 0) + 1)
+  for (const layer of layers) {
+    const data = layer.data
+    if (data instanceof Uint32Array) {
+      for (let i = 0; i < data.length; i++) {
+        const c = data[i] >>> 0
+        if ((c & 0xff) === 0) continue // skip fully transparent
+        freq.set(c, (freq.get(c) ?? 0) + 1)
+      }
+    } else {
+      for (let i = 0; i < data.length; i++) {
+        const idx = data[i] & 0xff
+        if (idx === palette.transparentIndex) continue // skip transparent index
+        const c = palette.colors[idx]
+        freq.set(c, (freq.get(c) ?? 0) + 1)
+      }
     }
   }
 
@@ -30,9 +28,12 @@ export function generatePaletteFromComposite(
     .map(([c]) => c >>> 0)
 
   // Build final palette with transparent at index 0
-  const count = Math.min(colors.length, Math.max(0, MAX - 1))
+  const count = Math.min(colors.length, Math.max(0, maxColors - 1))
   const out = new Uint32Array(count + 1)
   out[0] = 0x00000000 // transparent slot
   for (let i = 0; i < count; i++) out[i + 1] = colors[i] >>> 0
-  return out
+  return {
+    colors: out,
+    transparentIndex: 0,
+  }
 }

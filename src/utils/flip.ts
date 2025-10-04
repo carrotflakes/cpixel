@@ -1,5 +1,3 @@
-import type { ColorMode } from '@/types'
-
 type LayerLike = {
   id: string
   visible: boolean
@@ -12,12 +10,11 @@ type LayerLike = {
  */
 export function flipLayersHorizontal(
   layers: LayerLike[],
-  colorMode: ColorMode,
   width: number,
   height: number,
 ) {
   return layers.map((layer) => {
-    const dst = colorMode === 'rgba' ? new Uint32Array(width * height) : new Uint8Array(width * height)
+    const dst = layer.data instanceof Uint32Array ? new Uint32Array(width * height) : new Uint8Array(width * height)
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const srcIndex = y * width + x
@@ -34,12 +31,11 @@ export function flipLayersHorizontal(
  */
 export function flipLayersVertical(
   layers: LayerLike[],
-  colorMode: ColorMode,
   width: number,
   height: number,
 ) {
   return layers.map((layer) => {
-    const dst = colorMode === 'rgba' ? new Uint32Array(width * height) : new Uint8Array(width * height)
+    const dst = layer.data instanceof Uint32Array ? new Uint32Array(width * height) : new Uint8Array(width * height)
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const srcIndex = y * width + x
