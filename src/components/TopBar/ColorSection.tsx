@@ -18,7 +18,7 @@ export function ColorSection() {
     : recentTrue
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="min-w-5 flex items-center gap-3">
       <div className="flex items-center gap-2">
         <label className="hidden sm:inline text-sm text-muted">Color</label>
         <ColorButton
@@ -33,11 +33,11 @@ export function ColorSection() {
         />
       </div>
       {recentColors?.length > 0 && (
-        <div className="flex items-center gap-1" aria-label="Recent colors">
+        <div className="min-w-0 flex items-center gap-1 overflow-x-auto" aria-label="Recent colors">
           {recentColors.slice(0, 4).map((c, idx) => (
             <button
               key={colorMode === 'indexed' ? `${recentIndexed[idx]}` : c}
-              className="h-5 w-5 rounded border border-border focus:outline-none"
+              className="shrink-0 h-5 w-5 rounded border border-border focus:outline-none"
               style={COLOR_BOX_STYLE}
               title={colorMode === 'indexed' ? `${rgbaToCSSHex(c)} (${recentIndexed[idx]})` : rgbaToCSSHex(c)}
               onClick={() => {
