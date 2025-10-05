@@ -12,7 +12,9 @@ export function useKeyboardShortcuts(
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        useAppStore.getState().clearSelection()
+        const state = useAppStore.getState()
+        if (state.mode?.type === 'transform') state.cancelTransform()
+        else state.clearSelection()
         e.preventDefault()
       }
     }

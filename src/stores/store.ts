@@ -61,6 +61,10 @@ export type AppState = {
     dataIdx?: Uint8Array,
     transform: { cx: number, cy: number, angle: number, scaleX: number, scaleY: number },
     snap: boolean,
+    selection?: {
+      mask: Uint8Array
+      bounds: { left: number; top: number; right: number; bottom: number }
+    },
   },
   width: number
   height: number
@@ -127,6 +131,7 @@ export type AppState = {
   clearSelection: () => void
   beginSelectionDrag: () => void
   endTransform: () => void
+  cancelTransform: () => void
   // selection clipboard ops
   copySelection: () => void
   cutSelection: () => void
@@ -638,7 +643,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const cy = (sel.bounds.top + sel.bounds.bottom + 1) / 2
       const width = sel.bounds.right - sel.bounds.left + 1
       const height = sel.bounds.bottom - sel.bounds.top + 1
-      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 }, snap: true }, selection: undefined }
+      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 }, snap: true, selection: sel }, selection: undefined }
     } else {
       if (!(layer.data instanceof Uint8Array)) return {}
       const pal = s.palette.colors
@@ -655,8 +660,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const cy = (sel.bounds.top + sel.bounds.bottom + 1) / 2
       const width = sel.bounds.right - sel.bounds.left + 1
       const height = sel.bounds.bottom - sel.bounds.top + 1
-      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, dataIdx: floatIdx, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 }, snap: true }, selection: undefined }
+      return { layers, mode: { type: 'transform', orgLayer: layer, width, height, data: float, dataIdx: floatIdx, transform: { cx, cy, angle: 0, scaleX: 1, scaleY: 1 }, snap: true, selection: sel }, selection: undefined }
     }
+  }),
+  cancelTransform: () => set((s) => {
+    const mode = s.mode
+    if (mode?.type !== 'transform') return {}
+    const layers = s.layers.map(l => l.id === s.activeLayerId ? mode.orgLayer : l)
+    return { mode: null, layers, selection: mode.selection }
   }),
   endTransform: () => set((s) => {
     const mode = s.mode

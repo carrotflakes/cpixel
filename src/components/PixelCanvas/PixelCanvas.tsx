@@ -188,10 +188,15 @@ export function PixelCanvas() {
           style={{ left: '50%', top: 8, transform: 'translateX(-50%)' }}
         >
           <button
+            onClick={() => useAppStore.getState().cancelTransform()}
+            className="px-3 py-1 rounded hover:bg-surface-muted"
+            title="Cancel transform"
+          >Cancel</button>
+          <button
             onClick={() => useAppStore.getState().endTransform()}
             className="px-3 py-1 rounded hover:bg-surface-muted"
-            title="End"
-          >End</button>
+            title="Apply transform"
+          >Apply</button>
         </div>
       </div>)
 
