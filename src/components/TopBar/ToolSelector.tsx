@@ -15,7 +15,10 @@ export function ToolSelector() {
   const setTool = useAppStore(s => s.setTool)
   const shapeTool = useAppStore(s => s.shapeTool)
   const selectTool = useAppStore(s => s.selectTool)
-  const [selOpen, setSelOpen] = useState(false)
+  const [openMenu, setOpenMenu] = useState<Record<string, boolean>>({})
+
+  const eyedropperSampleMode = useAppStore(s => s.eyedropperSampleMode)
+  const setEyedropperSampleMode = useAppStore(s => s.setEyedropperSampleMode)
 
   const shapeToolObj = SHAPE_TOOLS.find(s => s.id === shapeTool) ?? SHAPE_TOOLS[0]
   const ShapeIcon = shapeToolObj.icon
@@ -23,7 +26,6 @@ export function ToolSelector() {
   const SelIcon = selToolObj.icon
 
   // Brush size menu
-  const [brushOpen, setBrushOpen] = useState(false)
   const brushSize = useAppStore(s => s.brush.size)
   const eraserSize = useAppStore(s => s.eraserSize)
   const setEraserSize = useAppStore(s => s.setEraserSize)
@@ -33,9 +35,6 @@ export function ToolSelector() {
   const shapeFill = useAppStore(s => s.shapeFill)
   const toggleShapeFill = useAppStore(s => s.toggleShapeFill)
 
-  // Shape options menu
-  const [shapeOpen, setShapeOpen] = useState(false)
-
   const shapeToolSelected = !!SHAPE_TOOLS.find(s => s.id === tool)
   const selectToolSelected = !!SELECT_TOOLS.find(s => s.id === tool)
 
@@ -43,13 +42,18 @@ export function ToolSelector() {
     <div className="flex items-center gap-2 ml-auto">
       <label className="hidden sm:inline text-sm text-muted">Tool</label>
       <div className="inline-flex rounded border border-border overflow-hidden">
-        <DropdownMenu.Root modal={false} open={brushOpen} onOpenChange={(o) => { setBrushOpen(o); if (o) setTool('brush') }}>
+        <DropdownMenu.Root
+          modal={false}
+          open={openMenu.brush ?? false}
+          onOpenChange={(open) => setOpenMenu(s => ({ ...s, brush: open }))}
+        >
           <DropdownMenu.Trigger asChild>
             <button
               className={`px-2 py-1 inline-flex items-center gap-1 ${tool === 'brush' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+              onClick={() => setTool('brush')}
               aria-pressed={tool === 'brush'}
               aria-haspopup="menu"
-              aria-expanded={brushOpen}
+              aria-expanded={openMenu.brush ?? false}
               title={`Brush (size ${brushSize})`}
             >
               <LuPaintbrush aria-hidden />
@@ -61,22 +65,51 @@ export function ToolSelector() {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
-        <button
-          className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${tool === 'eyedropper' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-          onClick={() => setTool('eyedropper')}
-          aria-pressed={tool === 'eyedropper'}
-          title="Eyedropper"
+        <DropdownMenu.Root
+          modal={false}
+          open={openMenu.eyedropper ?? false}
+          onOpenChange={(open) => setOpenMenu(s => ({ ...s, eyedropper: open }))}
         >
-          <LuPipette aria-hidden />
-        </button>
-        <DropdownMenu.Root modal={false} open={tool === 'eraser' && brushOpen === false && false}>
-          {/* Dummy root to satisfy structure (not using separate state) */}
-        </DropdownMenu.Root>
-        <DropdownMenu.Root modal={false}>
           <DropdownMenu.Trigger asChild>
             <button
-              onClick={() => setTool('eraser')}
+              className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${tool === 'eyedropper' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+              onClick={() => setTool('eyedropper')}
+              aria-pressed={tool === 'eyedropper'}
+              aria-haspopup="menu"
+              aria-expanded={openMenu.eyedropper ?? false}
+              title={`Eyedropper (${eyedropperSampleMode === 'front' ? 'front-most' : 'composited'})`}
+            >
+              <LuPipette aria-hidden />
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className={contentCls} sideOffset={6} align="start">
+              <DropdownMenu.Item
+                className={itemCls}
+                onSelect={() => setEyedropperSampleMode('composite')}
+              >
+                {eyedropperSampleMode === 'composite' ? <span className="w-4 inline-block"><LuCheck /></span> : <span className="w-4 inline-block" />}
+                <span>Composited color</span>
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className={itemCls}
+                onSelect={() => setEyedropperSampleMode('front')}
+              >
+                {eyedropperSampleMode === 'front' ? <span className="w-4 inline-block"><LuCheck /></span> : <span className="w-4 inline-block" />}
+                <span>Front-most pixel</span>
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+        <DropdownMenu.Root
+          modal={false}
+          open={openMenu.eraser ?? false}
+          onOpenChange={(open) => setOpenMenu(s => ({ ...s, eraser: open }))}
+        >
+          <DropdownMenu.Trigger asChild>
+            <button
               className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${tool === 'eraser' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+              onClick={() => setTool('eraser')}
               aria-pressed={tool === 'eraser'}
               aria-haspopup="menu"
               title={`Eraser (size ${eraserSize})`}
@@ -84,32 +117,30 @@ export function ToolSelector() {
               <FaEraser aria-hidden />
             </button>
           </DropdownMenu.Trigger>
-          {tool === 'eraser' && (
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content className={contentCls} sideOffset={6} align="start">
-                <div className="px-3 py-2 flex flex-col gap-2">
-                  <div className="flex gap-2 text-sm">Eraser Size: {eraserSize}</div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={maxDim}
-                    value={eraserSize}
-                    onChange={e => setEraserSize(Number(e.target.value))}
-                    aria-label="Eraser size"
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {PRESET_SIZES.map(sz => (
-                      <button
-                        key={sz}
-                        onClick={() => { setEraserSize(sz) }}
-                        className={`px-2 py-1 rounded border text-xs ${eraserSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
-                      >{sz}</button>
-                    ))}
-                  </div>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className={contentCls} sideOffset={6} align="start">
+              <div className="px-3 py-2 flex flex-col gap-2">
+                <div className="flex gap-2 text-sm">Eraser Size: {eraserSize}</div>
+                <input
+                  type="range"
+                  min={1}
+                  max={maxDim}
+                  value={eraserSize}
+                  onChange={e => setEraserSize(Number(e.target.value))}
+                  aria-label="Eraser size"
+                />
+                <div className="flex flex-wrap gap-1">
+                  {PRESET_SIZES.map(sz => (
+                    <button
+                      key={sz}
+                      onClick={() => { setEraserSize(sz) }}
+                      className={`px-2 py-1 rounded border text-xs ${eraserSize === sz ? 'bg-accent text-elevated border-accent' : 'bg-surface hover:bg-surface-muted border-border'}`}
+                    >{sz}</button>
+                  ))}
                 </div>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          )}
+              </div>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
         </DropdownMenu.Root>
         <button
           className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${tool === 'bucket' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
@@ -119,13 +150,18 @@ export function ToolSelector() {
         >
           <LuPaintBucket aria-hidden />
         </button>
-        <DropdownMenu.Root modal={false} open={shapeOpen} onOpenChange={(o) => { setShapeOpen(o); if (o) setTool(shapeTool) }}>
+        <DropdownMenu.Root
+          modal={false}
+          open={openMenu.shape ?? false}
+          onOpenChange={(open) => setOpenMenu(s => ({ ...s, shape: open }))}
+        >
           <DropdownMenu.Trigger asChild>
             <button
               className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${shapeToolSelected ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+              onClick={() => setTool(shapeTool)}
               aria-pressed={shapeToolSelected}
               aria-haspopup="menu"
-              aria-expanded={shapeOpen}
+              aria-expanded={openMenu.shape ?? false}
               title={tool === 'line' ? shapeToolObj.name : `${shapeToolObj.name} (${shapeFill ? 'Filled' : 'Outline'})`}
             >
               <ShapeIcon aria-hidden />
@@ -136,7 +172,11 @@ export function ToolSelector() {
               {SHAPE_TOOLS.map(t => {
                 const Icon = t.icon
                 return (
-                  <DropdownMenu.Item key={t.id} className={itemCls} onSelect={() => { setTool(t.id); setShapeOpen(false) }}>
+                  <DropdownMenu.Item
+                    key={t.id}
+                    className={itemCls}
+                    onSelect={() => setTool(t.id)}
+                  >
                     {shapeTool === t.id ? <span className="w-4 inline-block"><LuCheck /></span> : <span className="w-4 inline-block" />}
                     <Icon />
                     <span>{t.name}</span>
@@ -156,13 +196,18 @@ export function ToolSelector() {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
-        <DropdownMenu.Root modal={false} open={selOpen} onOpenChange={(o) => { setSelOpen(o); if (o) setTool(selectTool) }}>
+        <DropdownMenu.Root
+          modal={false}
+          open={openMenu.select ?? false}
+          onOpenChange={(open) => setOpenMenu(s => ({ ...s, select: open }))}
+        >
           <DropdownMenu.Trigger asChild>
             <button
               className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${selectToolSelected ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
+              onClick={() => setTool(selectTool)}
               aria-pressed={selectToolSelected}
               aria-haspopup="menu"
-              aria-expanded={selOpen}
+              aria-expanded={openMenu.select ?? false}
               title={selToolObj.name}
             >
               <SelIcon />
@@ -173,7 +218,11 @@ export function ToolSelector() {
               {SELECT_TOOLS.map(t => {
                 const Icon = t.icon
                 return (
-                  <DropdownMenu.Item key={t.id} className={itemCls} onSelect={() => { setTool(t.id); setSelOpen(false) }}>
+                  <DropdownMenu.Item
+                    key={t.id}
+                    className={itemCls}
+                    onSelect={() => setTool(t.id)}
+                  >
                     {selectTool === t.id ? <span className="w-4 inline-block"><LuCheck /></span> : <span className="w-4 inline-block" />}
                     <Icon />
                     <span>{t.name}</span>

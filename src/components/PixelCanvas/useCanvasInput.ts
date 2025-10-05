@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import { useAppStore, MIN_SCALE, MAX_SCALE, ToolType } from '@/stores/store'
+import { useAppStore, MIN_SCALE, MAX_SCALE } from '@/stores/store'
 import { clamp, clampView } from '@/utils/view'
-import { compositePixel, findTopPaletteIndex, LayerLike } from '@/utils/composite'
+import { compositePixel } from '@/utils/composite'
 import { computeTransformHandles, inverseTransformPoint, pointInTransformedRect, ResizeHandleId, Transform2D } from '@/utils/transform'
 import { isPointInMask, polygonToMask, magicWandMask } from '@/utils/selection'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
@@ -9,6 +9,8 @@ import { useCanvasPanZoom } from './useCanvasPanZoom'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { skipPath, smoothPath, StrokePath } from './strokePath'
 import { translate } from '@/utils/translate'
+import { findTopPaletteIndex, pickColor } from '@/app/pickColor'
+import { ToolType } from '@/app/types'
 
 type ShapePreview = {
   kind: 'line' | 'rect' | 'ellipse'
@@ -55,6 +57,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const beginSelectionDrag = useAppStore(s => s.beginSelectionDrag)
   const W = useAppStore(s => s.width)
   const H = useAppStore(s => s.height)
+  const eyedropperSampleMode = useAppStore(s => s.eyedropperSampleMode)
   const settings = useSettingsStore()
 
   const TOUCH_MOVE_DIST_THRESHOLD = 5 * window.devicePixelRatio
@@ -116,12 +119,13 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
   const isBrushishTool = () => curTool.current === 'brush' || curTool.current === 'eraser'
   const isBucketTool = () => curTool.current === 'bucket'
   const isEyedropperTool = () => curTool.current === 'eyedropper'
+
   const updateHover = (x: number, y: number) => {
     if (touchState.current.multiGesture) return
     if (!inBounds(x, y)) { setHoverInfo(undefined); return }
-    const hov = compositePixel(layers, x, y, colorMode, palette, W, H)
+    const rgba = pickColor({ colorMode, layers, width: W, height: H, eyedropperSampleMode, palette }, x, y)
     const idx = colorMode === 'indexed' ? findTopPaletteIndex(layers, x, y, W, H, palette.transparentIndex) ?? palette.transparentIndex : undefined
-    setHoverInfo({ x, y, rgba: hov, index: idx })
+    setHoverInfo({ x, y, rgba: rgba ?? undefined, index: idx })
   }
   const pickColorAt = (x: number, y: number) => {
     if (!inBounds(x, y)) return
@@ -129,8 +133,8 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
       const idx = findTopPaletteIndex(layers, x, y, W, H, palette.transparentIndex) ?? palette.transparentIndex
       setColorIndex(idx)
     } else {
-      const rgba = compositePixel(layers, x, y, colorMode, palette, W, H)
-      setColor(rgba)
+      const rgba = pickColor({ colorMode, layers, width: W, height: H, eyedropperSampleMode, palette }, x, y)
+      if (rgba != null) setColor(rgba)
     }
   }
   const pointInSelection = (x: number, y: number) => isPointInMask(selectionMask, W, H, x, y)
@@ -260,7 +264,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
           if (colorMode === 'rgba') {
             return compositePixel(layers, px, py, colorMode, palette, W, H) >>> 0
           } else {
-            const idx = findTopPaletteIndex(layers as LayerLike[], px, py, W, H, palette.transparentIndex) ?? palette.transparentIndex
+            const idx = findTopPaletteIndex(layers, px, py, W, H, palette.transparentIndex) ?? palette.transparentIndex
             return idx & 0xff
           }
         }

@@ -1,3 +1,4 @@
+import { EyedropperSampleMode, Layer, Palette, ToolType } from '@/app/types.ts'
 import { useLogStore } from '@/stores/logStore.ts'
 import type { ColorMode } from '@/types.ts'
 import { equalU32, equalU8 } from '@/utils/arrays.ts'
@@ -26,20 +27,6 @@ export type FileMeta = {
     type: "google-drive"
     fileId: string
   }
-}
-
-type Layer = {
-  id: string
-  visible: boolean
-  locked: boolean
-  data: Uint32Array | Uint8Array
-}
-
-export type ToolType = 'brush' | 'bucket' | 'line' | 'rect' | 'ellipse' | 'eraser' | 'eyedropper' | 'select-rect' | 'select-lasso' | 'select-wand' | 'move' | 'pan'
-
-type Palette = {
-  colors: Uint32Array
-  transparentIndex: number
 }
 
 type NewFileOptions = {
@@ -87,6 +74,7 @@ export type AppState = {
   tool: ToolType
   shapeTool: 'line' | 'rect' | 'ellipse'
   selectTool: 'select-rect' | 'select-lasso' | 'select-wand'
+  eyedropperSampleMode: EyedropperSampleMode
   setColor: (c: number) => void
   setColorIndex: (i: number) => void
   pushRecentColor: () => void
@@ -107,6 +95,7 @@ export type AppState = {
   movePaletteIndex: (from: number, to: number) => void
   applyPalettePreset: (palette: Palette) => void
   setTool: (t: ToolType) => void
+  setEyedropperSampleMode: (mode: EyedropperSampleMode) => void
   setBrushSize: (n: number) => void
   setEraserSize: (n: number) => void
   setBrushSubMode: (m: 'normal' | 'pattern') => void
@@ -219,6 +208,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tool: 'brush',
   shapeTool: 'rect',
   selectTool: 'select-rect',
+  eyedropperSampleMode: 'composite',
   brush: { size: 1, subMode: 'normal', pattern: { size: 2, mask: new Uint8Array([1, 0, 0, 1]) } },
   eraserSize: 1,
   shapeFill: false,
@@ -308,6 +298,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (t === 'select-rect' || t === 'select-lasso' || t === 'select-wand') patch.selectTool = t
     return patch
   }),
+  setEyedropperSampleMode: (mode) => set({ eyedropperSampleMode: mode }),
   setBrushSize: (n) => set((s) => {
     const maxDim = Math.max(s.width, s.height)
     const size = Math.max(1, Math.min(Math.floor(n), maxDim))

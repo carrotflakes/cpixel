@@ -46,26 +46,6 @@ export function compositePixel(
   return out >>> 0
 }
 
-// Find the top-most visible palette index at a pixel (returns undefined if none)
-export function findTopPaletteIndex(
-  layers: LayerLike[],
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  transparentIndex: number,
-): number | undefined {
-  if (x < 0 || y < 0 || x >= width || y >= height) return undefined
-  for (let li = layers.length - 1; li >= 0; li--) {
-    const L = layers[li]
-    if (!L.visible) continue
-    const pi = L.data[y * width + x]
-    if (pi === undefined || pi === transparentIndex) continue
-    return pi
-  }
-  return undefined
-}
-
 // Composite all pixels into an ImageData
 export function compositeImageData(
   layers: LayerLike[],
