@@ -186,7 +186,7 @@ export function useCanvasInput(canvasRef: React.RefObject<HTMLCanvasElement | nu
     const s = view.scale
     const handleOffset = 16 / Math.max(s, 0.0000001)
     const handles = computeTransformHandles(mode.transform, mode.width, mode.height, handleOffset)
-    const handleSize = Math.min(12, Math.max(6, s * 0.7))
+    const handleSize = Math.min(12, Math.max(6, s * 0.7)) * 2
     const resizeHit = handleSize * 0.6
     const rotationHit = handleSize
     const dist = (hx: number, hy: number) => Math.hypot((precise.x - hx) * s, (precise.y - hy) * s)

@@ -244,23 +244,13 @@ export function drawBoundsOutline(
   drawRect()
   ctx.restore()
 
-  const handleSize = Math.min(12, Math.max(6, s * 0.7))
+  const handleSize = Math.min(12, Math.max(6, s * 0.7)) * 2
   const half = handleSize / 2
 
   ctx.save()
   ctx.lineWidth = 1
   ctx.fillStyle = '#fff'
   ctx.strokeStyle = '#000'
-
-
-  for (const handle of handles.resize) {
-    const hx = handle.x * s
-    const hy = handle.y * s
-    ctx.beginPath()
-    ctx.rect(hx - half, hy - half, handleSize, handleSize)
-    ctx.fill()
-    ctx.stroke()
-  }
 
   // Connector line to rotation handle
   ctx.beginPath()
@@ -273,6 +263,15 @@ export function drawBoundsOutline(
   ctx.arc(handles.rotation.x * s, handles.rotation.y * s, rotRadius, 0, Math.PI * 2)
   ctx.fill()
   ctx.stroke()
+
+  for (const handle of handles.resize) {
+    const hx = handle.x * s
+    const hy = handle.y * s
+    ctx.beginPath()
+    ctx.rect(hx - half, hy - half, handleSize, handleSize)
+    ctx.fill()
+    ctx.stroke()
+  }
 
   ctx.restore()
 }
