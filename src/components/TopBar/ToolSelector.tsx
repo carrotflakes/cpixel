@@ -45,12 +45,11 @@ export function ToolSelector() {
         <DropdownMenu.Root
           modal={false}
           open={openMenu.brush ?? false}
-          onOpenChange={(open) => setOpenMenu(s => ({ ...s, brush: open }))}
+          onOpenChange={(open) => { open && setTool('brush'); setOpenMenu(s => ({ ...s, brush: open })) }}
         >
           <DropdownMenu.Trigger asChild>
             <button
               className={`px-2 py-1 inline-flex items-center gap-1 ${tool === 'brush' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-              onClick={() => setTool('brush')}
               aria-pressed={tool === 'brush'}
               aria-haspopup="menu"
               aria-expanded={openMenu.brush ?? false}
@@ -68,12 +67,11 @@ export function ToolSelector() {
         <DropdownMenu.Root
           modal={false}
           open={openMenu.eyedropper ?? false}
-          onOpenChange={(open) => setOpenMenu(s => ({ ...s, eyedropper: open }))}
+          onOpenChange={(open) => { open && setTool('eyedropper'); setOpenMenu(s => ({ ...s, eyedropper: open })) }}
         >
           <DropdownMenu.Trigger asChild>
             <button
               className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${tool === 'eyedropper' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-              onClick={() => setTool('eyedropper')}
               aria-pressed={tool === 'eyedropper'}
               aria-haspopup="menu"
               aria-expanded={openMenu.eyedropper ?? false}
@@ -104,12 +102,11 @@ export function ToolSelector() {
         <DropdownMenu.Root
           modal={false}
           open={openMenu.eraser ?? false}
-          onOpenChange={(open) => setOpenMenu(s => ({ ...s, eraser: open }))}
+          onOpenChange={(open) => { open && setTool('eraser'); setOpenMenu(s => ({ ...s, eraser: open })) }}
         >
           <DropdownMenu.Trigger asChild>
             <button
               className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${tool === 'eraser' ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-              onClick={() => setTool('eraser')}
               aria-pressed={tool === 'eraser'}
               aria-haspopup="menu"
               title={`Eraser (size ${eraserSize})`}
@@ -153,12 +150,11 @@ export function ToolSelector() {
         <DropdownMenu.Root
           modal={false}
           open={openMenu.shape ?? false}
-          onOpenChange={(open) => setOpenMenu(s => ({ ...s, shape: open }))}
+          onOpenChange={(open) => { open && setTool(shapeTool); setOpenMenu(s => ({ ...s, shape: open })) }}
         >
           <DropdownMenu.Trigger asChild>
             <button
               className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${shapeToolSelected ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-              onClick={() => setTool(shapeTool)}
               aria-pressed={shapeToolSelected}
               aria-haspopup="menu"
               aria-expanded={openMenu.shape ?? false}
@@ -199,12 +195,11 @@ export function ToolSelector() {
         <DropdownMenu.Root
           modal={false}
           open={openMenu.select ?? false}
-          onOpenChange={(open) => setOpenMenu(s => ({ ...s, select: open }))}
+          onOpenChange={(open) => { open && setTool(selectTool); setOpenMenu(s => ({ ...s, select: open })) }}
         >
           <DropdownMenu.Trigger asChild>
             <button
               className={`px-2 py-1 inline-flex items-center gap-1 border-l border-border ${selectToolSelected ? 'bg-surface-muted' : 'bg-surface'} hover:bg-surface-muted`}
-              onClick={() => setTool(selectTool)}
               aria-pressed={selectToolSelected}
               aria-haspopup="menu"
               aria-expanded={openMenu.select ?? false}
