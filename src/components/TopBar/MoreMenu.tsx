@@ -6,6 +6,7 @@ import { useLogStore } from '@/stores/logStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAppStore } from '@/stores/store'
 import { GoogleDrive } from '@/utils/googleDrive'
+import { importImageFile } from '@/utils/importFile'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useEffect, useRef, useState } from 'react'
 import { FaEllipsisV } from 'react-icons/fa'
@@ -373,24 +374,7 @@ function pickAndImportPNG() {
     const f = input.files?.[0]
     if (!f) return
     try {
-      const url = URL.createObjectURL(f)
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-      img.onload = () => {
-        try {
-          const w = Math.max(1, img.naturalWidth | 0)
-          const h = Math.max(1, img.naturalHeight | 0)
-          const cvs = document.createElement('canvas')
-          cvs.width = w
-          cvs.height = h
-          const ctx = cvs.getContext('2d')!
-          ctx.drawImage(img, 0, 0)
-          const imageData = ctx.getImageData(0, 0, w, h)
-          useAppStore.getState().importPNGFromImageData(imageData, { name: f.name, source: { type: 'local' } })
-        } finally { URL.revokeObjectURL(url) }
-      }
-      img.onerror = () => { URL.revokeObjectURL(url); console.error('Failed to load image') }
-      img.src = url
+      await importImageFile(f)
     } catch (e) { console.error('Import PNG failed', e) }
   }
   input.click()
